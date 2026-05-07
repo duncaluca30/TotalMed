@@ -1,0 +1,16 @@
+// This tells Prisma to generate a standard JavaScript/TypeScript client
+generator client {
+  provider = "prisma-client-js"
+}
+
+// This connects Prisma to your Neon database using your .env file
+datasource db {
+  provider = "postgresql"
+}
+
+// Our test model
+model User {
+  id    String @id @default(uuid())
+  email String @unique
+  name  String?
+}

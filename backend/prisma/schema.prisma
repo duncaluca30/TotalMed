@@ -35,7 +35,7 @@ model Patient {
   lastName    String
   dateOfBirth DateTime
   phone       String?
-  accessCodes    AccessCode?
+  accessCode    AccessCode?
 
   userId      String   @unique
   user        User     @relation(fields: [userId], references: [id])

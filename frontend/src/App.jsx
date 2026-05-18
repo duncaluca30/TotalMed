@@ -21,6 +21,10 @@ function App() {
   const [formData, setFormData] = useState({ email: '', password: '', firstName: '', lastName: '', dateOfBirth: '', phone: '' });
   const [visitForm, setVisitForm] = useState({ appointmentId: null, diagnosis: '', treatment: '', notes: '' });
 
+  const [vaultCode, setVaultCode] = useState('');
+  const [unlockedPatient, setUnlockedPatient] = useState(null);
+  const [recordForm, setRecordForm] = useState({ diagnosis: '', treatment: '', notes: '' });
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -105,6 +109,47 @@ function App() {
     }
   };
 
+  const handleUnlockVault = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`${API_URL}/api/doctor/access-vault`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${loggedInToken}` },
+        body: JSON.stringify({ code: vaultCode })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setUnlockedPatient(data.patient);
+      } else {
+        alert(`❌ ${data.error}`);
+      }
+    } catch (error) { alert("Failed to connect."); }
+  };
+
+  const handleInjectRecord = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`${API_URL}/api/doctor/records`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${loggedInToken}` },
+        body: JSON.stringify({
+          patientId: unlockedPatient.id,
+          code: vaultCode,
+          ...recordForm
+        })
+      });
+      if (response.ok) {
+        alert("✅ Record Injected & Code Burned!");
+        setUnlockedPatient(null);
+        setVaultCode('');
+        setRecordForm({ diagnosis: '', treatment: '', notes: '' });
+      } else {
+        const data = await response.json();
+        alert(`❌ ${data.error}`);
+      }
+    } catch (error) { alert("Failed to save."); }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
@@ -156,43 +201,51 @@ function App() {
           <button onClick={handleLogout} style={{ backgroundColor: '#ff4757', color: 'white' }}>Log Out</button>
         </div>
         
-        {!doctorData ? <p>Loading your secure schedule...</p> : (
+        {!doctorData ? <p>Loading system...</p> : (
           <>
             <div className="card" style={{ backgroundColor: '#e8f4f8', color: '#2d3436' }}>
               <h3>Physician Profile</h3>
-              <p><strong>Name:</strong> Dr. {doctorData.firstName} {doctorData.lastName}</p>
-              <p><strong>Specialty:</strong> {doctorData.specialty}</p>
+              <p><strong>Dr. {doctorData.firstName} {doctorData.lastName}</strong> | {doctorData.specialty}</p>
             </div>
 
-            <h3 style={{ marginTop: '30px' }}>Your Schedule</h3>
-            {doctorData.appointments && doctorData.appointments.length > 0 ? (
-              doctorData.appointments.map((apt) => (
-                <div key={apt.id} className="card" style={{ borderLeft: apt.status === 'COMPLETED' ? '5px solid #b2bec3' : '5px solid #00b894', marginBottom: '10px' }}>
-                  <h4 style={{ margin: '0 0 10px 0' }}>Patient: {apt.patient.firstName} {apt.patient.lastName}</h4>
-                  <p style={{ margin: '5px 0' }}><strong>Time:</strong> {new Date(apt.dateTime).toLocaleString()}</p>
-                  <p style={{ margin: '5px 0' }}><strong>Status:</strong> {apt.status}</p>
-                  
-                  {/* The Complete Visit Button & Form */}
-                  {apt.status === 'SCHEDULED' && visitForm.appointmentId !== apt.id && (
-                    <button onClick={() => setVisitForm({ ...visitForm, appointmentId: apt.id })} style={{ marginTop: '10px', backgroundColor: '#0984e3' }}>
-                      Complete Visit & Add Notes
-                    </button>
-                  )}
-
-                  {visitForm.appointmentId === apt.id && (
-                    <form onSubmit={handleCompleteVisit} style={{ marginTop: '15px', display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', backgroundColor: '#f1f2f6', borderRadius: '5px' }}>
-                      <input type="text" placeholder="Diagnosis (Required)" required onChange={(e) => setVisitForm({...visitForm, diagnosis: e.target.value})} />
-                      <input type="text" placeholder="Treatment Plan (Optional)" onChange={(e) => setVisitForm({...visitForm, treatment: e.target.value})} />
-                      <textarea placeholder="Doctor's Internal Notes (Optional)" rows="3" onChange={(e) => setVisitForm({...visitForm, notes: e.target.value})} />
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button type="submit" style={{ backgroundColor: '#00b894', color: 'white', flex: 1 }}>Save Record</button>
-                        <button type="button" onClick={() => setVisitForm({ appointmentId: null, diagnosis: '', treatment: '', notes: '' })} style={{ backgroundColor: '#636e72', color: 'white' }}>Cancel</button>
-                      </div>
-                    </form>
-                  )}
+            {/* --- THE VAULT SEARCH BAR --- */}
+            {!unlockedPatient ? (
+              <div className="card" style={{ marginTop: '30px', backgroundColor: '#f1f2f6', textAlign: 'center' }}>
+                <h3>🔑 Unlock Patient File</h3>
+                <p>Enter the 6-digit access code provided by the patient.</p>
+                <form onSubmit={handleUnlockVault} style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '15px' }}>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 123456" 
+                    maxLength="6"
+                    value={vaultCode}
+                    onChange={(e) => setVaultCode(e.target.value)}
+                    style={{ fontSize: '1.5em', letterSpacing: '3px', width: '200px', textAlign: 'center' }}
+                    required 
+                  />
+                  <button type="submit" style={{ backgroundColor: '#0984e3' }}>Access Vault</button>
+                </form>
+              </div>
+            ) : (
+              /* --- THE UNLOCKED PATIENT FILE --- */
+              <div className="card" style={{ marginTop: '30px', border: '2px solid #00b894' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #dfe6e9', paddingBottom: '10px', marginBottom: '15px' }}>
+                  <h3 style={{ color: '#00b894', margin: 0 }}>🔓 Vault Unlocked</h3>
+                  <button onClick={() => setUnlockedPatient(null)} style={{ backgroundColor: '#636e72', padding: '5px 10px', fontSize: '0.8em' }}>Close File</button>
                 </div>
-              ))
-            ) : <p>You have no scheduled appointments.</p>}
+                
+                <h4>Patient: {unlockedPatient.firstName} {unlockedPatient.lastName}</h4>
+                <p><strong>DOB:</strong> {new Date(unlockedPatient.dateOfBirth).toLocaleDateString()}</p>
+
+                <h4 style={{ marginTop: '20px' }}>Inject New Medical Record</h4>
+                <form onSubmit={handleInjectRecord} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <input type="text" placeholder="Diagnosis (Required)" required value={recordForm.diagnosis} onChange={(e) => setRecordForm({...recordForm, diagnosis: e.target.value})} />
+                  <input type="text" placeholder="Treatment Plan" value={recordForm.treatment} onChange={(e) => setRecordForm({...recordForm, treatment: e.target.value})} />
+                  <textarea placeholder="Clinical Notes" rows="3" value={recordForm.notes} onChange={(e) => setRecordForm({...recordForm, notes: e.target.value})} />
+                  <button type="submit" style={{ backgroundColor: '#00b894', color: 'white', marginTop: '10px' }}>Save Record & Lock Vault</button>
+                </form>
+              </div>
+            )}
           </>
         )}
       </div>

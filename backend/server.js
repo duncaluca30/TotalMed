@@ -169,6 +169,53 @@ app.get('/api/doctor/dashboard', authenticateToken, async (req, res) => {
     }
 });
 
+// --- 6. DOCTOR: COMPLETE APPOINTMENT & ADD RECORD ---
+app.post('/api/doctor/appointments/:appointmentId/complete', authenticateToken, async (req, res) => {
+    try {
+        // Security Check: Only Doctors can write medical records
+        if (req.user.role !== 'DOCTOR') {
+            return res.status(403).json({ error: "Access Denied: Doctor clearance required." });
+        }
+
+        const { appointmentId } = req.params;
+        const { diagnosis, treatment, notes } = req.body;
+
+        // 1. Verify the appointment exists and belongs to THIS doctor
+        const appointment = await prisma.appointment.findUnique({
+            where: { id: appointmentId },
+            include: { doctor: true, patient: true }
+        });
+
+        if (!appointment || appointment.doctor.userId !== req.user.id) {
+            return res.status(403).json({ error: "Invalid appointment or unauthorized." });
+        }
+
+        // 2. The Prisma Transaction: Do both actions at the exact same time safely
+        const transaction = await prisma.$transaction([
+            // Action A: Update the appointment status
+            prisma.appointment.update({
+                where: { id: appointmentId },
+                data: { status: 'COMPLETED' }
+            }),
+            // Action B: Create the permanent medical record
+            prisma.medicalRecord.create({
+                data: {
+                    diagnosis: diagnosis,
+                    treatment: treatment,
+                    notes: notes,
+                    patientId: appointment.patientId,
+                    doctorId: appointment.doctorId
+                }
+            })
+        ]);
+
+        res.json({ message: "Visit completed and Medical Record saved successfully!" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to complete appointment and save record" });
+    }
+});
+
 // Start the server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

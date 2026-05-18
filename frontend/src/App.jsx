@@ -11,6 +11,7 @@ function App() {
   const [loggedInToken, setLoggedInToken] = useState(localStorage.getItem('token') || null);
   const [userRole, setUserRole] = useState(localStorage.getItem('role') || null);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // 👈 Forces the page to refresh when data changes
+  const [accessCode, setAccessCode] = useState(null);
   
   // Dashboard Data State
   const [patientData, setPatientData] = useState(null);
@@ -31,7 +32,13 @@ function App() {
     if (userRole === 'PATIENT') {
       fetch(`${API_URL}/api/patient/dashboard`, { headers: { 'Authorization': `Bearer ${loggedInToken}` } })
       .then(res => { if (!res.ok) throw new Error(); return res.json(); })
-      .then(data => setPatientData(data))
+      .then(data => {
+        setPatientData(data);
+        // 👈 Add this: If she already has a code active in the database, put it on screen immediately!
+        if (data.accessCode && new Date() < new Date(data.accessCode.expiresAt)) {
+          setAccessCode(data.accessCode.code);
+        }
+      })
       .catch(() => handleLogout());
     }
 
@@ -75,6 +82,27 @@ function App() {
         setStatusMessage('');
       } else setStatusMessage(`❌ Error: ${data.error}`);
     } catch (error) { setStatusMessage('❌ Failed to connect.'); }
+  };
+
+  const handleGenerateCode = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/patient/generate-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${loggedInToken}`
+        }
+      });
+      
+      const data = await response.json();
+      if (response.ok) {
+        setAccessCode(data.code);
+      } else {
+        alert(`❌ Error: ${data.error}`);
+      }
+    } catch (error) {
+      alert("Failed to connect to server.");
+    }
   };
 
   const handleLogout = () => {
@@ -188,6 +216,23 @@ function App() {
               <h3>Patient Profile</h3>
               <p><strong>Name:</strong> {patientData.firstName} {patientData.lastName}</p>
               <p><strong>DOB:</strong> {new Date(patientData.dateOfBirth).toLocaleDateString()}</p>
+            </div>
+
+            <div className="card" style={{ backgroundColor: '#fff3cd', color: '#856404', marginTop: '20px', border: '2px dashed #ffeeba' }}>
+              <h3>🔐 Share Medical File</h3>
+              <p>Generate a temporary 6-digit code to allow a doctor to view your history and add new records. This code expires in 60 minutes.</p>
+              
+              {!accessCode ? (
+                <button onClick={handleGenerateCode} style={{ backgroundColor: '#f39c12', color: 'white', fontWeight: 'bold' }}>
+                  Generate Access Code
+                </button>
+              ) : (
+                <div style={{ textAlign: 'center', margin: '15px 0' }}>
+                  <p style={{ fontSize: '1.2em', marginBottom: '5px' }}>Your Secure Code:</p>
+                  <h1 style={{ letterSpacing: '5px', color: '#d35400', fontSize: '3em', margin: '0' }}>{accessCode}</h1>
+                  <p style={{ fontSize: '0.8em', color: '#e74c3c' }}>Show this to your doctor. Do not close this window.</p>
+                </div>
+              )}
             </div>
 
             <h3 style={{ marginTop: '30px' }}>Upcoming Appointments</h3>

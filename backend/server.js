@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const cron = require('node-cron');
 
 // Security Packages
 const bcrypt = require('bcrypt');
@@ -124,8 +125,8 @@ app.get('/api/patient/dashboard', authenticateToken, async (req, res) => {
             where: { userId: req.user.id },
             include: {
                 appointments: {
-                    include: { doctor: true }
-                }
+                    include: { doctor: true } },
+                    accessCode: true
             }
         });
 
@@ -213,6 +214,60 @@ app.post('/api/doctor/appointments/:appointmentId/complete', authenticateToken, 
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to complete appointment and save record" });
+    }
+});
+
+// --- 7. PATIENT: SMART GENERATE ACCESS CODE ---
+app.post('/api/patient/generate-code', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+
+        const patient = await prisma.patient.findUnique({ where: { userId: req.user.id } });
+        if (!patient) return res.status(404).json({ error: "Patient profile not found." });
+
+        const existingCode = await prisma.accessCode.findUnique({
+            where: { patientId: patient.id }
+        });
+
+        if (existingCode) {
+            if (new Date() < existingCode.expiresAt) {
+                return res.json({ code: existingCode.code, expiresAt: existingCode.expiresAt });
+            } else {
+                await prisma.accessCode.delete({ where: { id: existingCode.id } });
+            }
+        }
+
+        const generatePin = () => Math.floor(100000 + Math.random() * 900000).toString();
+        let uniqueCode = generatePin();
+
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + 60);
+
+        const newCode = await prisma.accessCode.create({
+            data: { code: uniqueCode, expiresAt: expiresAt, patientId: patient.id }
+        });
+
+        res.json({ code: newCode.code, expiresAt: newCode.expiresAt });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to generate access code" });
+    }
+});
+
+cron.schedule('*/15 * * * *', async () => {
+    try {
+        console.log("🧹 Sweeping database for expired access codes...");
+        const result = await prisma.accessCode.deleteMany({
+            where: {
+                expiresAt: { lt: new Date() }
+            }
+        });
+        
+        if (result.count > 0) {
+            console.log(`✅ Deleted ${result.count} expired orphan codes.`);
+        }
+    } catch (error) {
+        console.error("🚨 Garbage collection failed:", error);
     }
 });
 

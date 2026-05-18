@@ -35,6 +35,7 @@ model Patient {
   lastName    String
   dateOfBirth DateTime
   phone       String?
+  accessCodes    AccessCode?
 
   userId      String   @unique
   user        User     @relation(fields: [userId], references: [id])
@@ -82,4 +83,14 @@ model MedicalRecord {
   
   doctorId    String
   doctor      Doctor   @relation(fields: [doctorId], references: [id])
+}
+
+model AccessCode {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  patientId String   @unique
+  patient   Patient  @relation(fields: [patientId], references: [id])
 }

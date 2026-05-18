@@ -8,12 +8,15 @@ function App() {
   // UI State
   const [isLoginView, setIsLoginView] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
+  
+  // Security State (Notice we now save the Role!)
   const [loggedInToken, setLoggedInToken] = useState(localStorage.getItem('token') || null);
+  const [userRole, setUserRole] = useState(localStorage.getItem('role') || null);
   
   // Dashboard Data State
   const [patientData, setPatientData] = useState(null);
+  const [doctorData, setDoctorData] = useState(null);
 
-  // Form Data State
   const [formData, setFormData] = useState({
     email: '', password: '', firstName: '', lastName: '', dateOfBirth: '', phone: ''
   });
@@ -23,29 +26,31 @@ function App() {
   };
 
   // --- FETCH SECURE DASHBOARD DATA ---
-  // This runs automatically whenever someone logs in
   useEffect(() => {
-    if (loggedInToken) {
-      fetch(`${API_URL}/api/patient/dashboard`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${loggedInToken}` // 👈 Here is the VIP Pass!
-        }
-      })
-      .then(response => {
-        if (!response.ok) throw new Error("Failed to authenticate token");
-        return response.json();
-      })
-      .then(data => setPatientData(data))
-      .catch(error => {
-        console.error(error);
-        handleLogout(); // If the token is fake or expired, kick them out!
-      });
-    }
-  }, [loggedInToken]);
+    if (!loggedInToken) return;
 
-  // --- SUBMIT REGISTRATION ---
+    // Route for PATIENTS
+    if (userRole === 'PATIENT') {
+      fetch(`${API_URL}/api/patient/dashboard`, {
+        headers: { 'Authorization': `Bearer ${loggedInToken}` }
+      })
+      .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+      .then(data => setPatientData(data))
+      .catch(() => handleLogout());
+    }
+
+    // Route for DOCTORS
+    if (userRole === 'DOCTOR') {
+      fetch(`${API_URL}/api/doctor/dashboard`, {
+        headers: { 'Authorization': `Bearer ${loggedInToken}` }
+      })
+      .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+      .then(data => setDoctorData(data))
+      .catch(() => handleLogout());
+    }
+  }, [loggedInToken, userRole]);
+
+  // --- SUBMIT REGISTRATION (Patients Only for now) ---
   const handleRegister = async (e) => {
     e.preventDefault();
     setStatusMessage('Registering...');
@@ -56,16 +61,11 @@ function App() {
         body: JSON.stringify(formData)
       });
       const data = await response.json();
-      
       if (response.ok) {
         setStatusMessage('✅ Registration successful! You can now log in.');
         setIsLoginView(true);
-      } else {
-        setStatusMessage(`❌ Error: ${data.error}`);
-      }
-    } catch (error) {
-      setStatusMessage('❌ Failed to connect to server.');
-    }
+      } else setStatusMessage(`❌ Error: ${data.error}`);
+    } catch (error) { setStatusMessage('❌ Failed to connect.'); }
   };
 
   // --- SUBMIT LOGIN ---
@@ -82,28 +82,66 @@ function App() {
 
       if (response.ok) {
         localStorage.setItem('token', data.token);
+        localStorage.setItem('role', data.role); // Save the role to memory
         setLoggedInToken(data.token);
+        setUserRole(data.role); // Update React state
         setStatusMessage('');
-      } else {
-        setStatusMessage(`❌ Error: ${data.error}`);
-      }
-    } catch (error) {
-      setStatusMessage('❌ Failed to connect to server.');
-    }
+      } else setStatusMessage(`❌ Error: ${data.error}`);
+    } catch (error) { setStatusMessage('❌ Failed to connect.'); }
   };
 
   // --- LOGOUT ---
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('role');
     setLoggedInToken(null);
+    setUserRole(null);
     setPatientData(null);
+    setDoctorData(null);
     setStatusMessage('Logged out safely.');
   };
 
   // ==========================================
-  // 🏥 DASHBOARD VIEW (If logged in)
+  // 🩺 DOCTOR DASHBOARD VIEW
   // ==========================================
-  if (loggedInToken) {
+  if (loggedInToken && userRole === 'DOCTOR') {
+    return (
+      <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'left' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>🩺 TotalMed Doctor Portal</h2>
+          <button onClick={handleLogout} style={{ backgroundColor: '#ff4757', color: 'white' }}>Log Out</button>
+        </div>
+        
+        {!doctorData ? <p>Loading your secure schedule...</p> : (
+          <>
+            <div className="card" style={{ backgroundColor: '#e8f4f8', color: '#2d3436' }}>
+              <h3>Physician Profile</h3>
+              <p><strong>Name:</strong> Dr. {doctorData.firstName} {doctorData.lastName}</p>
+              <p><strong>Specialty:</strong> {doctorData.specialty}</p>
+              <p><strong>License:</strong> {doctorData.licenseNumber}</p>
+            </div>
+
+            <h3 style={{ marginTop: '30px' }}>Your Schedule</h3>
+            {doctorData.appointments && doctorData.appointments.length > 0 ? (
+              doctorData.appointments.map((apt) => (
+                <div key={apt.id} className="card" style={{ borderLeft: '5px solid #00b894', marginBottom: '10px' }}>
+                  <h4 style={{ margin: '0 0 10px 0' }}>Patient: {apt.patient.firstName} {apt.patient.lastName}</h4>
+                  <p style={{ margin: '5px 0' }}><strong>Time:</strong> {new Date(apt.dateTime).toLocaleString()}</p>
+                  <p style={{ margin: '5px 0' }}><strong>Status:</strong> {apt.status}</p>
+                  {apt.reason && <p style={{ margin: '5px 0' }}><strong>Reason:</strong> {apt.reason}</p>}
+                </div>
+              ))
+            ) : <p>You have no scheduled appointments.</p>}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ==========================================
+  // 🏥 PATIENT DASHBOARD VIEW
+  // ==========================================
+  if (loggedInToken && userRole === 'PATIENT') {
     return (
       <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'left' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -111,15 +149,12 @@ function App() {
           <button onClick={handleLogout} style={{ backgroundColor: '#ff4757', color: 'white' }}>Log Out</button>
         </div>
         
-        {!patientData ? (
-          <p>Loading your secure medical records...</p>
-        ) : (
+        {!patientData ? <p>Loading your secure medical records...</p> : (
           <>
             <div className="card" style={{ backgroundColor: '#f8f9fa', color: '#2d3436' }}>
               <h3>Patient Profile</h3>
               <p><strong>Name:</strong> {patientData.firstName} {patientData.lastName}</p>
               <p><strong>DOB:</strong> {new Date(patientData.dateOfBirth).toLocaleDateString()}</p>
-              <p><strong>Phone:</strong> {patientData.phone}</p>
             </div>
 
             <h3 style={{ marginTop: '30px' }}>Upcoming Appointments</h3>
@@ -129,12 +164,9 @@ function App() {
                   <h4 style={{ margin: '0 0 10px 0' }}>Dr. {apt.doctor.lastName} ({apt.doctor.specialty})</h4>
                   <p style={{ margin: '5px 0' }}><strong>Date:</strong> {new Date(apt.dateTime).toLocaleString()}</p>
                   <p style={{ margin: '5px 0' }}><strong>Status:</strong> {apt.status}</p>
-                  {apt.reason && <p style={{ margin: '5px 0' }}><strong>Reason:</strong> {apt.reason}</p>}
                 </div>
               ))
-            ) : (
-              <p>You have no upcoming appointments.</p>
-            )}
+            ) : <p>You have no upcoming appointments.</p>}
           </>
         )}
       </div>
@@ -148,7 +180,7 @@ function App() {
     <>
       <h1>TotalMed System</h1>
       <div className="card" style={{ maxWidth: '400px', margin: '0 auto', padding: '20px' }}>
-        <h2>{isLoginView ? 'Sign In' : 'Create Account'}</h2>
+        <h2>{isLoginView ? 'Sign In' : 'Patient Registration'}</h2>
         
         <form onSubmit={isLoginView ? handleLogin : handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {!isLoginView && (
@@ -169,12 +201,8 @@ function App() {
         <p style={{ marginTop: '15px', color: '#ff4757', fontWeight: 'bold' }}>{statusMessage}</p>
 
         <p style={{ marginTop: '20px', fontSize: '0.9em' }}>
-          {isLoginView ? "Don't have an account? " : "Already have an account? "}
-          <button 
-            type="button" 
-            onClick={() => setIsLoginView(!isLoginView)} 
-            style={{ background: 'none', border: 'none', color: '#3498db', cursor: 'pointer', textDecoration: 'underline' }}
-          >
+          {isLoginView ? "New patient? " : "Already registered? "}
+          <button type="button" onClick={() => setIsLoginView(!isLoginView)} style={{ background: 'none', border: 'none', color: '#3498db', cursor: 'pointer', textDecoration: 'underline' }}>
             {isLoginView ? 'Sign up here' : 'Log in here'}
           </button>
         </p>

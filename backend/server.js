@@ -170,53 +170,6 @@ app.get('/api/doctor/dashboard', authenticateToken, async (req, res) => {
     }
 });
 
-// --- 6. DOCTOR: COMPLETE APPOINTMENT & ADD RECORD ---
-app.post('/api/doctor/appointments/:appointmentId/complete', authenticateToken, async (req, res) => {
-    try {
-        // Security Check: Only Doctors can write medical records
-        if (req.user.role !== 'DOCTOR') {
-            return res.status(403).json({ error: "Access Denied: Doctor clearance required." });
-        }
-
-        const { appointmentId } = req.params;
-        const { diagnosis, treatment, notes } = req.body;
-
-        // 1. Verify the appointment exists and belongs to THIS doctor
-        const appointment = await prisma.appointment.findUnique({
-            where: { id: appointmentId },
-            include: { doctor: true, patient: true }
-        });
-
-        if (!appointment || appointment.doctor.userId !== req.user.id) {
-            return res.status(403).json({ error: "Invalid appointment or unauthorized." });
-        }
-
-        // 2. The Prisma Transaction: Do both actions at the exact same time safely
-        const transaction = await prisma.$transaction([
-            // Action A: Update the appointment status
-            prisma.appointment.update({
-                where: { id: appointmentId },
-                data: { status: 'COMPLETED' }
-            }),
-            // Action B: Create the permanent medical record
-            prisma.medicalRecord.create({
-                data: {
-                    diagnosis: diagnosis,
-                    treatment: treatment,
-                    notes: notes,
-                    patientId: appointment.patientId,
-                    doctorId: appointment.doctorId
-                }
-            })
-        ]);
-
-        res.json({ message: "Visit completed and Medical Record saved successfully!" });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Failed to complete appointment and save record" });
-    }
-});
-
 // --- 7. PATIENT: SMART GENERATE ACCESS CODE ---
 app.post('/api/patient/generate-code', authenticateToken, async (req, res) => {
     try {
@@ -251,6 +204,78 @@ app.post('/api/patient/generate-code', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to generate access code" });
+    }
+});
+
+// --- 8. DOCTOR: UNLOCK PATIENT VAULT VIA CODE ---
+app.post('/api/doctor/access-vault', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied. Doctor clearance required." });
+
+        const { code } = req.body;
+        if (!code) return res.status(400).json({ error: "Please enter a 6-digit access code." });
+
+        // 1. Find the code in the database
+        const validCode = await prisma.accessCode.findUnique({
+            where: { code: code }
+        });
+
+        // 2. Security Checks
+        if (!validCode) return res.status(404).json({ error: "Invalid code. Please check the number." });
+        
+        if (new Date() > validCode.expiresAt) {
+            await prisma.accessCode.delete({ where: { id: validCode.id } }); // Clean it up
+            return res.status(403).json({ error: "This code has expired. Patient must generate a new one." });
+        }
+
+        // 3. Code is valid! Fetch the patient's basic profile
+        const patientData = await prisma.patient.findUnique({
+            where: { id: validCode.patientId }
+        });
+
+        res.json({ patient: patientData, vaultKey: validCode.code });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to access vault." });
+    }
+});
+
+// --- 9. DOCTOR: INJECT RECORD & BURN CODE ---
+app.post('/api/doctor/records', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+
+        const { patientId, code, diagnosis, treatment, notes } = req.body;
+
+        // 1. Final Security Check: Is the code STILL valid right this second?
+        const validCode = await prisma.accessCode.findUnique({ where: { code: code } });
+        if (!validCode || validCode.patientId !== patientId) {
+            return res.status(403).json({ error: "Invalid or expired authorization code." });
+        }
+
+        // 2. Find the Doctor's internal database ID
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        // 3. THE TRANSACTION: Create Record & Burn the Code
+        await prisma.$transaction([
+            // Action A: Inject the permanent medical record
+            prisma.medicalRecord.create({
+                data: {
+                    diagnosis: diagnosis,
+                    treatment: treatment,
+                    notes: notes,
+                    patientId: patientId,
+                    doctorId: doctor.id
+                }
+            }),
+            // Action B: THE BURN 🔥 (Permanently delete the key)
+            prisma.accessCode.delete({ where: { id: validCode.id } }) 
+        ]);
+
+        res.json({ message: "Medical record injected and vault securely locked!" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to save record." });
     }
 });
 

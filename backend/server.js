@@ -140,6 +140,35 @@ app.get('/api/patient/dashboard', authenticateToken, async (req, res) => {
     }
 });
 
+// --- 5. PROTECTED DOCTOR DASHBOARD ROUTE ---
+app.get('/api/doctor/dashboard', authenticateToken, async (req, res) => {
+    try {
+        // Security Check: Is this VIP pass actually for a Doctor?
+        if (req.user.role !== 'DOCTOR') {
+            return res.status(403).json({ error: "Access Denied: Doctor clearance required." });
+        }
+
+        // Ask Prisma for the Doctor Profile AND their Appointments (with Patient details)
+        const doctorData = await prisma.doctor.findUnique({
+            where: { userId: req.user.id },
+            include: {
+                appointments: {
+                    include: { patient: true } // We need the patient's name for the schedule!
+                }
+            }
+        });
+
+        if (!doctorData) {
+            return res.status(404).json({ error: "Doctor profile not found" });
+        }
+
+        res.json(doctorData);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to fetch doctor dashboard data" });
+    }
+});
+
 // Start the server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

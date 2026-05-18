@@ -118,26 +118,26 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// --- 4. PROTECTED PATIENT DASHBOARD ROUTE ---
+// --- 4. SECURE PATIENT DASHBOARD ---
 app.get('/api/patient/dashboard', authenticateToken, async (req, res) => {
     try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied" });
+
         const patientData = await prisma.patient.findUnique({
             where: { userId: req.user.id },
             include: {
-                appointments: {
-                    include: { doctor: true } },
-                    accessCode: true
+                accessCode: true, // Gets the active vault key if she has one
+                medicalRecords: { // 👈 Fetch the actual history!
+                    include: { doctor: true }, // Include the doctor's name who wrote it
+                    orderBy: { createdAt: 'desc' } // Newest records at the top
+                }
             }
         });
 
-        if (!patientData) {
-            return res.status(404).json({ error: "Patient profile not found" });
-        }
-
+        if (!patientData) return res.status(404).json({ error: "Profile not found" });
         res.json(patientData);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Failed to fetch dashboard data" });
+        res.status(500).json({ error: "Failed to fetch dashboard" });
     }
 });
 

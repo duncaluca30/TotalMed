@@ -288,16 +288,35 @@ function App() {
               )}
             </div>
 
-            <h3 style={{ marginTop: '30px' }}>Upcoming Appointments</h3>
-            {patientData.appointments && patientData.appointments.length > 0 ? (
-              patientData.appointments.map((apt) => (
-                <div key={apt.id} className="card" style={{ borderLeft: apt.status === 'COMPLETED' ? '5px solid #b2bec3' : '5px solid #0984e3', marginBottom: '10px' }}>
-                  <h4 style={{ margin: '0 0 10px 0' }}>Dr. {apt.doctor.lastName}</h4>
-                  <p style={{ margin: '5px 0' }}><strong>Date:</strong> {new Date(apt.dateTime).toLocaleString()}</p>
-                  <p style={{ margin: '5px 0' }}><strong>Status:</strong> {apt.status}</p>
+            {/* --- MEDICAL HISTORY VAULT --- */}
+            <h3 style={{ marginTop: '40px', borderBottom: '2px solid #dfe6e9', paddingBottom: '10px' }}>📁 Your Medical History</h3>
+            
+            {patientData.medicalRecords && patientData.medicalRecords.length > 0 ? (
+              patientData.medicalRecords.map((record) => (
+                <div key={record.id} className="card" style={{ borderLeft: '5px solid #00b894', marginBottom: '15px', backgroundColor: '#f8f9fa' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <h4 style={{ margin: 0, color: '#2d3436' }}>{record.diagnosis}</h4>
+                    <span style={{ fontSize: '0.9em', color: '#636e72' }}>
+                      {new Date(record.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  
+                  <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Attending Physician:</strong> Dr. {record.doctor.lastName}</p>
+                  
+                  {record.treatment && (
+                    <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Treatment Plan:</strong> {record.treatment}</p>
+                  )}
+                  
+                  {record.notes && (
+                    <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#e8ecef', borderRadius: '4px', fontSize: '0.9em', fontStyle: 'italic' }}>
+                      "{record.notes}"
+                    </div>
+                  )}
                 </div>
               ))
-            ) : <p>You have no appointments.</p>}
+            ) : (
+              <p style={{ color: '#636e72', fontStyle: 'italic' }}>Your medical vault is currently empty.</p>
+            )}
           </>
         )}
       </div>

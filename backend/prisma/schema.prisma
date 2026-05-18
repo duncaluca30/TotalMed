@@ -1,16 +1,85 @@
-// This tells Prisma to generate a standard JavaScript/TypeScript client
 generator client {
   provider = "prisma-client-js"
 }
 
-// This connects Prisma to your Neon database using your .env file
 datasource db {
   provider = "postgresql"
 }
 
-// Our test model
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
 model User {
-  id    String @id @default(uuid())
-  email String @unique
-  name  String?
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   
+  role      Role     @default(PATIENT)
+  createdAt DateTime @default(now())
+
+  patientProfile Patient?
+  doctorProfile  Doctor?
+}
+
+model Patient {
+  id          String   @id @default(uuid())
+  firstName   String
+  lastName    String
+  dateOfBirth DateTime
+  phone       String?
+
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+
+  appointments   Appointment[]
+  medicalRecords MedicalRecord[]
+}
+
+model Doctor {
+  id            String   @id @default(uuid())
+  firstName     String
+  lastName      String
+  specialty     String
+  licenseNumber String   @unique
+
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+
+  appointments   Appointment[]
+  medicalRecords MedicalRecord[]
+}
+
+model Appointment {
+  id        String            @id @default(uuid())
+  dateTime  DateTime
+  status    AppointmentStatus @default(SCHEDULED)
+  reason    String?
+
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id])
+
+  doctorId  String
+  doctor    Doctor   @relation(fields: [doctorId], references: [id])
+}
+
+model MedicalRecord {
+  id          String   @id @default(uuid())
+  diagnosis   String
+  treatment   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  
+  doctorId    String
+  doctor      Doctor   @relation(fields: [doctorId], references: [id])
 }

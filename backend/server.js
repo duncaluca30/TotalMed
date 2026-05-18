@@ -2,36 +2,102 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-// 1. The New Prisma 7 Adapter imports
+// Security Packages
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
+// Prisma 7 Adapter Setup
 const { Pool } = require('pg');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('@prisma/client');
 
-// 2. Initialize the adapter with your Neon URL
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
-
-const app = express();
-
-// 3. Give the adapter to the Prisma Client!
 const prisma = new PrismaClient({ adapter });
 
-// Middleware
+const app = express();
 app.use(cors());
 app.use(express.json());
 
-// A test route that actually checks the database connection
+// --- 1. SYSTEM STATUS ROUTE ---
 app.get('/api/status', async (req, res) => {
     try {
-        // This asks the database a simple math question to prove it's connected
         await prisma.$queryRaw`SELECT 1 + 1`;
-        res.json({ 
-            message: "Medical App API is running securely!", 
-            database: "Connected successfully to Neon Postgres!" 
+        res.json({ message: "Medical App API is running securely!", database: "Connected successfully to Neon Postgres!" });
+    } catch (error) {
+        res.status(500).json({ error: "Database connection failed" });
+    }
+});
+
+// --- 2. REGISTER A NEW PATIENT ---
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        // Grab the data the user typed into the frontend
+        const { email, password, firstName, lastName, dateOfBirth, phone } = req.body;
+
+        // Check if the email is already taken
+        const existingUser = await prisma.user.findUnique({ where: { email } });
+        if (existingUser) {
+            return res.status(400).json({ error: "Email is already registered" });
+        }
+
+        // Hash (encrypt) the password 10 times
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // Save the new User AND their Patient Profile to Neon
+        const newUser = await prisma.user.create({
+            data: {
+                email,
+                password: hashedPassword,
+                role: "PATIENT",
+                patientProfile: {
+                    create: {
+                        firstName,
+                        lastName,
+                        dateOfBirth: new Date(dateOfBirth),
+                        phone
+                    }
+                }
+            }
         });
+
+        res.status(201).json({ message: "Patient registered successfully!" });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Database connection failed" });
+        res.status(500).json({ error: "Registration failed" });
+    }
+});
+
+// --- 3. LOGIN ROUTE ---
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // Find the user in the database
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user) {
+            return res.status(400).json({ error: "Invalid email or password" });
+        }
+
+        // Compare the typed password with the encrypted database password
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ error: "Invalid email or password" });
+        }
+
+        // Create the JWT "VIP Pass" (Valid for 1 day)
+        const token = jwt.sign(
+            { id: user.id, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '1d' }
+        );
+
+        // Send the token back to the frontend
+        res.json({ token, message: "Logged in successfully", role: user.role });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Login failed" });
     }
 });
 

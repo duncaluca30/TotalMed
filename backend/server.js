@@ -19,6 +19,22 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// --- SECURITY GUARD (JWT Middleware) ---
+const authenticateToken = (req, res, next) => {
+
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.status(401).json({ error: "Access Denied: No Token Provided" });
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ error: "Access Denied: Invalid Token" });
+        
+        req.user = user; 
+        next();
+    });
+};
+
 // --- 1. SYSTEM STATUS ROUTE ---
 app.get('/api/status', async (req, res) => {
     try {
@@ -98,6 +114,29 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Login failed" });
+    }
+});
+
+// --- 4. PROTECTED PATIENT DASHBOARD ROUTE ---
+app.get('/api/patient/dashboard', authenticateToken, async (req, res) => {
+    try {
+        const patientData = await prisma.patient.findUnique({
+            where: { userId: req.user.id },
+            include: {
+                appointments: {
+                    include: { doctor: true }
+                }
+            }
+        });
+
+        if (!patientData) {
+            return res.status(404).json({ error: "Patient profile not found" });
+        }
+
+        res.json(patientData);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to fetch dashboard data" });
     }
 });
 

@@ -7,7 +7,7 @@ function App() {
 
   useEffect(() => {
     // This makes the frontend "call" the backend door
-    fetch('http://localhost:5000/api/status')
+    fetch('https://totalmed-backend.onrender.com/api/status')
       .then(response => response.json())
       .then(data => {
         setBackendMessage(data.message);

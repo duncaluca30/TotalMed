@@ -193,9 +193,9 @@ function App() {
     }
   };
 
-  // ==========================================
-  // 🩺 DOCTOR DASHBOARD VIEW
-  // ==========================================
+
+  //DOCTOR DASHBOARD VIEW
+
   if (loggedInToken && userRole === 'DOCTOR') {
     return (
       <div className="container">
@@ -220,21 +220,23 @@ function App() {
 
             {/* --- THE VAULT SEARCH BAR --- */}
             {!unlockedPatient ? (
-              <div className="card" style={{ marginTop: '30px', backgroundColor: '#f1f2f6', textAlign: 'center' }}>
-                <h3>🔑 Unlock Patient File</h3>
-                <p>Enter the 6-digit access code provided by the patient.</p>
-                <form onSubmit={handleUnlockVault} style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '15px' }}>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. 123456" 
-                    maxLength="6"
+              <div className="card" style={{ marginTop: '30px', backgroundColor: '#ffffff', textAlign: 'center', padding: '30px' }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1, color: '#2d3436' }}>🔑 Unlock Patient File</Typography>
+                <Typography sx={{ color: '#636e72', mb: 3 }}>Enter the 6-digit access code provided by the patient.</Typography>
+                
+                <Box component="form" onSubmit={handleUnlockVault} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <TextField 
+                    label="6-Digit Vault Code" 
+                    variant="outlined"
                     value={vaultCode}
                     onChange={(e) => setVaultCode(e.target.value)}
-                    style={{ fontSize: '1.5em', letterSpacing: '3px', width: '200px', textAlign: 'center' }}
+                    inputProps={{ maxLength: 6, style: { fontSize: '1.5em', letterSpacing: '8px', textAlign: 'center', color: '#2d3436' } }}
                     required 
                   />
-                  <button type="submit" style={{ backgroundColor: '#0984e3' }}>Access Vault</button>
-                </form>
+                  <Button type="submit" variant="contained" size="large" sx={{ backgroundColor: '#0984e3', px: 4 }}>
+                    Access Vault
+                  </Button>
+                </Box>
               </div>
             ) : (
               /* --- THE UNLOCKED PATIENT FILE --- */
@@ -247,13 +249,15 @@ function App() {
                 <h4>Patient: {unlockedPatient.firstName} {unlockedPatient.lastName}</h4>
                 <p><strong>DOB:</strong> {new Date(unlockedPatient.dateOfBirth).toLocaleDateString()}</p>
 
-                <h4 style={{ marginTop: '20px' }}>Inject New Medical Record</h4>
-                <form onSubmit={handleInjectRecord} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input type="text" placeholder="Diagnosis (Required)" required value={recordForm.diagnosis} onChange={(e) => setRecordForm({...recordForm, diagnosis: e.target.value})} />
-                  <input type="text" placeholder="Treatment Plan" value={recordForm.treatment} onChange={(e) => setRecordForm({...recordForm, treatment: e.target.value})} />
-                  <textarea placeholder="Clinical Notes" rows="3" value={recordForm.notes} onChange={(e) => setRecordForm({...recordForm, notes: e.target.value})} />
-                  <button type="submit" style={{ backgroundColor: '#00b894', color: 'white', marginTop: '10px' }}>Save Record & Lock Vault</button>
-                </form>
+                <h4 style={{ marginTop: '20px', color: '#2d3436' }}>Inject New Medical Record</h4>
+                <Box component="form" onSubmit={handleInjectRecord} sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+                  <TextField label="Diagnosis (Required)" required value={recordForm.diagnosis} onChange={(e) => setRecordForm({...recordForm, diagnosis: e.target.value})} fullWidth />
+                  <TextField label="Treatment Plan" value={recordForm.treatment} onChange={(e) => setRecordForm({...recordForm, treatment: e.target.value})} fullWidth />
+                  <TextField label="Clinical Notes" multiline rows={3} value={recordForm.notes} onChange={(e) => setRecordForm({...recordForm, notes: e.target.value})} fullWidth />
+                  <Button type="submit" variant="contained" sx={{ backgroundColor: '#00b894', color: 'white', mt: 1, py: 1.5, fontSize: '1.1rem' }}>
+                    Save Record & Lock Vault
+                  </Button>
+                </Box>
               </div>
             )}
           </>
@@ -262,6 +266,8 @@ function App() {
     );
   }
 
+
+  //PATIENT DASHBOARD VIEW
   if (loggedInToken && userRole === 'PATIENT') {
     return (
       <div className="container">

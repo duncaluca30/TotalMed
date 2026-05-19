@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
-import { AppBar, Toolbar, Typography, Button, TextField, Box } from '@mui/material';
+import { AppBar, Toolbar, Typography, Button, TextField, Box, Tabs, Tab } from '@mui/material';
 
 function App() {
   // 🔴 IMPORTANT: Keep your actual Render backend URL here!
@@ -18,6 +18,7 @@ function App() {
   // Dashboard Data State
   const [patientData, setPatientData] = useState(null);
   const [doctorData, setDoctorData] = useState(null);
+  const [patientTab, setPatientTab] = useState(0);
 
   // Form States
   const [formData, setFormData] = useState({ email: '', password: '', firstName: '', lastName: '', dateOfBirth: '', phone: '' });
@@ -277,59 +278,76 @@ function App() {
         </AppBar>
         
         {!patientData ? <p>Loading your secure medical records...</p> : (
-          <>
-            <div className="card" style={{ backgroundColor: '#f8f9fa', color: '#2d3436' }}>
-              <h3>Patient Profile</h3>
-              <p><strong>Name:</strong> {patientData.firstName} {patientData.lastName}</p>
-              <p><strong>DOB:</strong> {new Date(patientData.dateOfBirth).toLocaleDateString()}</p>
-            </div>
-
-            <div className="card" style={{ backgroundColor: '#fff3cd', color: '#856404', marginTop: '20px', border: '2px dashed #ffeeba' }}>
-              <h3>🔐 Share Medical File</h3>
-              <p>Generate a temporary 6-digit code to allow a doctor to view your history and add new records. This code expires in 60 minutes.</p>
-              
-              {!accessCode ? (
-                <button onClick={handleGenerateCode} style={{ backgroundColor: '#f39c12', color: 'white', fontWeight: 'bold' }}>
-                  Generate Access Code
-                </button>
-              ) : (
-                <div style={{ textAlign: 'center', margin: '15px 0' }}>
-                  <p style={{ fontSize: '1.2em', marginBottom: '5px' }}>Your Secure Code:</p>
-                  <h1 style={{ letterSpacing: '5px', color: '#d35400', fontSize: '3em', margin: '0' }}>{accessCode}</h1>
-                  <p style={{ fontSize: '0.8em', color: '#e74c3c' }}>Show this to your doctor. Do not close this window.</p>
-                </div>
-              )}
-            </div>
-
-            <h3 style={{ marginTop: '40px', borderBottom: '2px solid #dfe6e9', paddingBottom: '10px' }}>📁 Your Medical History</h3>
+          <Box sx={{ width: '100%' }}>
             
-            {patientData.medicalRecords && patientData.medicalRecords.length > 0 ? (
-              patientData.medicalRecords.map((record) => (
-                <div key={record.id} className="card" style={{ borderLeft: '5px solid #00b894', marginBottom: '15px', backgroundColor: '#f8f9fa' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <h4 style={{ margin: 0, color: '#2d3436' }}>{record.diagnosis}</h4>
-                    <span style={{ fontSize: '0.9em', color: '#636e72' }}>
-                      {new Date(record.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
+            {/* --- THE TAB NAVIGATION --- */}
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+              <Tabs value={patientTab} onChange={(e, newValue) => setPatientTab(newValue)} textColor="primary" indicatorColor="primary">
+                <Tab label="Dashboard & Vault Key" sx={{ fontWeight: 'bold' }} />
+                <Tab label="Medical History" sx={{ fontWeight: 'bold' }} />
+              </Tabs>
+            </Box>
+
+            {/* --- TAB 0: DASHBOARD & VAULT KEY --- */}
+            {patientTab === 0 && (
+              <Box>
+                {/* 1. THE PATIENT PROFILE CARD */}
+                <div className="card" style={{ backgroundColor: '#f8f9fa', color: '#2d3436' }}>
+                  <h3>Patient Profile</h3>
+                  <p><strong>Name:</strong> {patientData.firstName} {patientData.lastName}</p>
+                  <p><strong>DOB:</strong> {new Date(patientData.dateOfBirth).toLocaleDateString()}</p>
+                </div>
+
+                {/* 2. THE SECURE SHARE VAULT */}
+                <div className="card" style={{ backgroundColor: '#fff3cd', color: '#856404', marginTop: '20px', border: '2px dashed #ffeeba' }}>
+                  <h3>🔐 Share Medical File</h3>
+                  <p>Generate a temporary 6-digit code to allow a doctor to view your history and add new records. This code expires in 60 minutes.</p>
                   
-                  <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Attending Physician:</strong> Dr. {record.doctor.lastName}</p>
-                  
-                  {record.treatment && (
-                    <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Treatment Plan:</strong> {record.treatment}</p>
-                  )}
-                  
-                  {record.notes && (
-                    <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#e8ecef', borderRadius: '4px', fontSize: '0.9em', fontStyle: 'italic' }}>
-                      "{record.notes}"
+                  {!accessCode ? (
+                    <button onClick={handleGenerateCode} style={{ backgroundColor: '#f39c12', color: 'white', fontWeight: 'bold' }}>
+                      Generate Access Code
+                    </button>
+                  ) : (
+                    <div style={{ textAlign: 'center', margin: '15px 0' }}>
+                      <p style={{ fontSize: '1.2em', marginBottom: '5px' }}>Your Secure Code:</p>
+                      <h1 style={{ letterSpacing: '5px', color: '#d35400', fontSize: '3em', margin: '0' }}>{accessCode}</h1>
+                      <p style={{ fontSize: '0.8em', color: '#e74c3c' }}>Show this to your doctor. Do not close this window.</p>
                     </div>
                   )}
                 </div>
-              ))
-            ) : (
-              <p style={{ color: '#636e72', fontStyle: 'italic' }}>Your medical vault is currently empty.</p>
+              </Box>
             )}
-          </>
+
+            {/* --- TAB 1: MEDICAL HISTORY --- */}
+            {patientTab === 1 && (
+              <Box>
+                <h3 style={{ borderBottom: '2px solid #dfe6e9', paddingBottom: '10px', color: '#2d3436' }}>📁 Your Medical History</h3>
+                
+                {patientData.medicalRecords && patientData.medicalRecords.length > 0 ? (
+                  patientData.medicalRecords.map((record) => (
+                    <div key={record.id} className="card" style={{ borderLeft: '5px solid #0984e3', marginBottom: '15px', backgroundColor: '#ffffff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <h4 style={{ margin: 0, color: '#2d3436' }}>{record.diagnosis}</h4>
+                        <span style={{ fontSize: '0.9em', color: '#636e72' }}>
+                          {new Date(record.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Attending Physician:</strong> Dr. {record.doctor.lastName}</p>
+                      {record.treatment && <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Treatment Plan:</strong> {record.treatment}</p>}
+                      {record.notes && (
+                        <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f1f2f6', borderRadius: '4px', fontSize: '0.9em', fontStyle: 'italic' }}>
+                          "{record.notes}"
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ color: '#636e72', fontStyle: 'italic' }}>Your medical vault is currently empty.</p>
+                )}
+              </Box>
+            )}
+            
+          </Box>
         )}
       </div>
     );

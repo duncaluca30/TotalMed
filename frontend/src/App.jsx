@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-import { AppBar, Toolbar, Typography, Button } from '@mui/material';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
+import { AppBar, Toolbar, Typography, Button, TextField, Box } from '@mui/material';
 
 function App() {
   // 🔴 IMPORTANT: Keep your actual Render backend URL here!
@@ -342,30 +342,47 @@ function App() {
         <p style={{ color: '#636e72', marginTop: '5px' }}>Secure Ephemeral Health Vault</p>
       </div>
 
-      <div className="card" style={{ maxWidth: '400px', margin: '0 auto', padding: '20px' }}>
-        <h2>{isLoginView ? 'Sign In' : 'Patient Registration'}</h2>
-        <form onSubmit={isLoginView ? handleLogin : handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div className="card" style={{ maxWidth: '400px', margin: '0 auto', padding: '30px' }}>
+        <Typography variant="h4" sx={{ mb: 3, textAlign: 'center', fontWeight: 'bold', color: '#2d3436' }}>
+          {isLoginView ? 'Sign In' : 'Patient Registration'}
+        </Typography>
+
+        <Box component="form" onSubmit={isLoginView ? handleLogin : handleRegister} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          
           {!isLoginView && (
             <>
-              <input type="text" name="firstName" placeholder="First Name" onChange={handleChange} required />
-              <input type="text" name="lastName" placeholder="Last Name" onChange={handleChange} required />
-              <input type="date" name="dateOfBirth" onChange={handleChange} required />
-              <input type="tel" name="phone" placeholder="Phone Number" onChange={handleChange} required />
+              <TextField label="First Name" name="firstName" onChange={handleChange} required fullWidth />
+              <TextField label="Last Name" name="lastName" onChange={handleChange} required fullWidth />
+              <TextField label="Date of Birth" name="dateOfBirth" type="date" onChange={handleChange} required fullWidth InputLabelProps={{ shrink: true }} />
+              <TextField label="Phone Number" name="phone" type="tel" onChange={handleChange} required fullWidth />
             </>
           )}
-          <input type="email" name="email" placeholder="Email Address" onChange={handleChange} required />
-          <input type="password" name="password" placeholder="Password" onChange={handleChange} required />
-          <button type="submit" style={{ marginTop: '10px' }}>
+          
+          <TextField label="Email Address" name="email" type="email" onChange={handleChange} required fullWidth />
+          <TextField label="Password" name="password" type="password" onChange={handleChange} required fullWidth />
+
+          {statusMessage && (
+            <Typography sx={{ color: '#ff4757', textAlign: 'center', fontWeight: 'bold', mt: 1 }}>
+              {statusMessage}
+            </Typography>
+          )}
+
+          <Button 
+            type="submit" 
+            variant="contained" 
+            size="large" 
+            sx={{ mt: 1, backgroundColor: '#0984e3', py: 1.5, fontSize: '1.1rem', textTransform: 'none', borderRadius: '8px' }}
+          >
             {isLoginView ? 'Secure Login' : 'Register Patient'}
-          </button>
-        </form>
-        <p style={{ marginTop: '15px', color: '#ff4757', fontWeight: 'bold' }}>{statusMessage}</p>
-        <p style={{ marginTop: '20px', fontSize: '0.9em' }}>
-          {isLoginView ? "New patient? " : "Already registered? "}
-          <button type="button" onClick={() => setIsLoginView(!isLoginView)} style={{ background: 'none', border: 'none', color: '#3498db', cursor: 'pointer', textDecoration: 'underline' }}>
-            {isLoginView ? 'Sign up here' : 'Log in here'}
-          </button>
-        </p>
+          </Button>
+
+        </Box>
+
+        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+          <Button variant="text" onClick={() => setIsLoginView(!isLoginView)} sx={{ textTransform: 'none', color: '#636e72' }}>
+            {isLoginView ? "New patient? Sign up here" : "Already have an account? Sign in"}
+          </Button>
+        </div>
       </div>
     </div>
   )

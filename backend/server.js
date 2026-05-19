@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const cron = require('node-cron');
+const { encrypt, decrypt } = require('./utils/cipher');
 
 // Security Packages
 const bcrypt = require('bcrypt');
@@ -135,6 +136,11 @@ app.get('/api/patient/dashboard', authenticateToken, async (req, res) => {
         });
 
         if (!patientData) return res.status(404).json({ error: "Profile not found" });
+
+        if (patientData.accessCode) {
+            patientData.accessCode.code = decrypt(patientData.accessCode.code);
+        }
+
         res.json(patientData);
     } catch (error) {
         res.status(500).json({ error: "Failed to fetch dashboard" });
@@ -170,7 +176,6 @@ app.get('/api/doctor/dashboard', authenticateToken, async (req, res) => {
     }
 });
 
-// --- 7. PATIENT: SMART GENERATE ACCESS CODE ---
 app.post('/api/patient/generate-code', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -192,15 +197,21 @@ app.post('/api/patient/generate-code', authenticateToken, async (req, res) => {
 
         const generatePin = () => Math.floor(100000 + Math.random() * 900000).toString();
         let uniqueCode = generatePin();
+        let encryptedCode = encrypt(uniqueCode);
 
         const expiresAt = new Date();
         expiresAt.setMinutes(expiresAt.getMinutes() + 60);
 
         const newCode = await prisma.accessCode.create({
-            data: { code: uniqueCode, expiresAt: expiresAt, patientId: patient.id }
-        });
+            data: { 
+            code: encryptedCode,
+            expiresAt: expiresAt, 
+            patientId: patient.id 
+            }
+    });
 
-        res.json({ code: newCode.code, expiresAt: newCode.expiresAt });
+
+    res.json({ code: uniqueCode, expiresAt: newCode.expiresAt });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to generate access code" });
@@ -215,9 +226,10 @@ app.post('/api/doctor/access-vault', authenticateToken, async (req, res) => {
         const { code } = req.body;
         if (!code) return res.status(400).json({ error: "Please enter a 6-digit access code." });
 
-        // 1. Find the code in the database
+        const encryptedSearch = encrypt(code);
+
         const validCode = await prisma.accessCode.findUnique({
-            where: { code: code }
+            where: { code: encryptedSearch }
         });
 
         // 2. Security Checks
@@ -247,8 +259,9 @@ app.post('/api/doctor/records', authenticateToken, async (req, res) => {
 
         const { patientId, code, diagnosis, treatment, notes } = req.body;
 
-        // 1. Final Security Check: Is the code STILL valid right this second?
-        const validCode = await prisma.accessCode.findUnique({ where: { code: code } });
+        const encryptedSearch = encrypt(code);
+
+        const validCode = await prisma.accessCode.findUnique({ where: { code: encryptedSearch } });
         if (!validCode || validCode.patientId !== patientId) {
             return res.status(403).json({ error: "Invalid or expired authorization code." });
         }

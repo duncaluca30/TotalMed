@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import { AppBar, Toolbar, Typography, Button } from '@mui/material';
+import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 
 function App() {
   // 🔴 IMPORTANT: Keep your actual Render backend URL here!
@@ -196,10 +198,17 @@ function App() {
   if (loggedInToken && userRole === 'DOCTOR') {
     return (
       <div className="container">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>🩺 TotalMed Doctor Portal</h2>
-          <button onClick={handleLogout} style={{ backgroundColor: '#ff4757', color: 'white' }}>Log Out</button>
-        </div>
+        <AppBar position="static" sx={{ borderRadius: '8px', mb: 4, backgroundColor: '#0984e3', boxShadow: 3 }}>
+          <Toolbar>
+            <MedicalServicesIcon sx={{ mr: 2 }} />
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold', letterSpacing: '1px' }}>
+              TotalMed Doctor Portal
+            </Typography>
+            <Button color="inherit" onClick={handleLogout} sx={{ fontWeight: 'bold' }}>
+              Secure Logout
+            </Button>
+          </Toolbar>
+        </AppBar>
         
         {!doctorData ? <p>Loading system...</p> : (
           <>
@@ -255,10 +264,17 @@ function App() {
   if (loggedInToken && userRole === 'PATIENT') {
     return (
       <div className="container">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>🏥 TotalMed Patient Portal</h2>
-          <button onClick={handleLogout} style={{ backgroundColor: '#ff4757', color: 'white' }}>Log Out</button>
-        </div>
+        <AppBar position="static" sx={{ borderRadius: '8px', mb: 4, backgroundColor: '#0984e3', boxShadow: 3 }}>
+          <Toolbar>
+            <MedicalServicesIcon sx={{ mr: 2 }} />
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold', letterSpacing: '1px' }}>
+              TotalMed Patient Portal
+            </Typography>
+            <Button color="inherit" onClick={handleLogout} sx={{ fontWeight: 'bold' }}>
+              Secure Logout
+            </Button>
+          </Toolbar>
+        </AppBar>
         
         {!patientData ? <p>Loading your secure medical records...</p> : (
           <>

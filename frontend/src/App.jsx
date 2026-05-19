@@ -195,7 +195,7 @@ function App() {
   // ==========================================
   if (loggedInToken && userRole === 'DOCTOR') {
     return (
-      <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'left' }}>
+      <div className="container">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>🩺 TotalMed Doctor Portal</h2>
           <button onClick={handleLogout} style={{ backgroundColor: '#ff4757', color: 'white' }}>Log Out</button>
@@ -252,12 +252,9 @@ function App() {
     );
   }
 
-  // ==========================================
-  // 🏥 PATIENT DASHBOARD VIEW
-  // ==========================================
   if (loggedInToken && userRole === 'PATIENT') {
     return (
-      <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'left' }}>
+      <div className="container">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>🏥 TotalMed Patient Portal</h2>
           <button onClick={handleLogout} style={{ backgroundColor: '#ff4757', color: 'white' }}>Log Out</button>
@@ -288,7 +285,6 @@ function App() {
               )}
             </div>
 
-            {/* --- MEDICAL HISTORY VAULT --- */}
             <h3 style={{ marginTop: '40px', borderBottom: '2px solid #dfe6e9', paddingBottom: '10px' }}>📁 Your Medical History</h3>
             
             {patientData.medicalRecords && patientData.medicalRecords.length > 0 ? (
@@ -323,12 +319,13 @@ function App() {
     );
   }
 
-  // ==========================================
-  // 🔐 AUTHENTICATION VIEW
-  // ==========================================
   return (
-    <>
-      <h1>TotalMed System</h1>
+    <div className="container">
+      <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+        <h1 style={{ color: '#0984e3', fontSize: '2.5em', margin: 0 }}>TotalMed</h1>
+        <p style={{ color: '#636e72', marginTop: '5px' }}>Secure Ephemeral Health Vault</p>
+      </div>
+
       <div className="card" style={{ maxWidth: '400px', margin: '0 auto', padding: '20px' }}>
         <h2>{isLoginView ? 'Sign In' : 'Patient Registration'}</h2>
         <form onSubmit={isLoginView ? handleLogin : handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -354,7 +351,7 @@ function App() {
           </button>
         </p>
       </div>
-    </>
+    </div>
   )
 }
 

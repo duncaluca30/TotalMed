@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import './App.css'
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import { AppBar, Toolbar, Typography, Button, TextField, Box, Tabs, Tab } from '@mui/material';
+import { io } from 'socket.io-client';
+import { AppBar, Toolbar, Typography, Button, TextField, Box, Tabs, Tab, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 
 function App() {
   // 🔴 IMPORTANT: Keep your actual Render backend URL here!
@@ -27,6 +29,9 @@ function App() {
   const [vaultCode, setVaultCode] = useState('');
   const [unlockedPatient, setUnlockedPatient] = useState(null);
   const [recordForm, setRecordForm] = useState({ diagnosis: '', treatment: '', notes: '' });
+
+  const [socket, setSocket] = useState(null);
+  const [authRequest, setAuthRequest] = useState(null);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -55,7 +60,25 @@ function App() {
       .then(data => setDoctorData(data))
       .catch(() => handleLogout());
     }
-  }, [loggedInToken, userRole, refreshTrigger]); // 👈 Notice the refreshTrigger here!
+  }, [loggedInToken, userRole, refreshTrigger]);
+
+  // --- WEBSOCKET CONNECTION ---
+  useEffect(() => {
+    if (loggedInToken && userRole === 'PATIENT' && patientData) {
+
+      const newSocket = io(API_URL);
+      setSocket(newSocket);
+
+      newSocket.emit('join-secure-room', patientData.id);
+
+      newSocket.on('auth-request', (data) => {
+        setAuthRequest(data);
+      });
+
+      // Cleanup when we log out
+      return () => newSocket.disconnect();
+    }
+  }, [loggedInToken, userRole, patientData]);
 
   // --- SUBMIT REGISTRATION & LOGIN ---
   const handleRegister = async (e) => {
@@ -163,7 +186,11 @@ function App() {
     setStatusMessage('Logged out safely.');
   };
 
-  // --- 🩺 DOCTOR: SUBMIT MEDICAL RECORD ---
+  const handleAuthDecision = (approved) => {
+    socket.emit('auth-response', { code: authRequest.code, approved: approved });
+    setAuthRequest(null); // Close the popup
+  };
+
   const handleCompleteVisit = async (e) => {
     e.preventDefault();
     try {
@@ -193,8 +220,6 @@ function App() {
     }
   };
 
-
-  //DOCTOR DASHBOARD VIEW
 
   if (loggedInToken && userRole === 'DOCTOR') {
     return (
@@ -239,7 +264,7 @@ function App() {
                 </Box>
               </div>
             ) : (
-              /* --- THE UNLOCKED PATIENT FILE --- */
+
               <div className="card" style={{ marginTop: '30px', border: '2px solid #00b894' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #dfe6e9', paddingBottom: '10px', marginBottom: '15px' }}>
                   <h3 style={{ color: '#00b894', margin: 0 }}>🔓 Vault Unlocked</h3>
@@ -266,8 +291,6 @@ function App() {
     );
   }
 
-
-  //PATIENT DASHBOARD VIEW
   if (loggedInToken && userRole === 'PATIENT') {
     return (
       <div className="container">
@@ -355,6 +378,24 @@ function App() {
             
           </Box>
         )}
+          {/* --- THE REAL-TIME APPROVAL POPUP --- */}
+      <Dialog open={!!authRequest} disableEscapeKeyDown>
+        <DialogTitle sx={{ backgroundColor: '#dff9fb', color: '#2d3436', fontWeight: 'bold' }}>
+          🚨 Access Request Detected
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <Typography variant="h6"><strong>{authRequest?.doctorName}</strong> is attempting to unlock your medical vault.</Typography>
+          <Typography sx={{ mt: 2, color: '#636e72' }}>Do you authorize the release of your decrypted medical history to this physician?</Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, justifyContent: 'space-between' }}>
+          <Button onClick={() => handleAuthDecision(false)} variant="outlined" color="error" size="large">
+            Deny Access
+          </Button>
+          <Button onClick={() => handleAuthDecision(true)} variant="contained" color="success" size="large">
+            Authorize Vault
+          </Button>
+        </DialogActions>
+      </Dialog>
       </div>
     );
   }

@@ -15,7 +15,8 @@
     "@mui/icons-material": "^9.0.1",
     "@mui/material": "^9.0.1",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

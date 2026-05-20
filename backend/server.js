@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const cors = require('cors');
 const cron = require('node-cron');
 const { encrypt, decrypt } = require('./utils/cipher');
@@ -18,10 +20,34 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 const app = express();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+    cors: { origin: '*', methods: ["GET", "POST"] },
+    pingInterval: 25000,
+    pingTimeout: 60000
+});
+
+io.on('connection', (socket) => {
+    console.log('🟢 User connected to switchboard:', socket.id);
+
+    socket.on('join-secure-room', (patientId) => {
+        socket.join(patientId);
+        console.log(`🔒 Patient ${patientId} secured their connection.`);
+    });
+
+    socket.on('auth-response', (data) => {
+        app.emit(`auth-resolved-${data.code}`, data.approved);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('🔴 User disconnected');
+    });
+});
+
 app.use(cors());
 app.use(express.json());
 
-// --- SECURITY GUARD (JWT Middleware) ---
 const authenticateToken = (req, res, next) => {
 
     const authHeader = req.headers['authorization'];
@@ -218,34 +244,44 @@ app.post('/api/patient/generate-code', authenticateToken, async (req, res) => {
     }
 });
 
-// --- 8. DOCTOR: UNLOCK PATIENT VAULT VIA CODE ---
 app.post('/api/doctor/access-vault', authenticateToken, async (req, res) => {
     try {
-        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied. Doctor clearance required." });
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
 
         const { code } = req.body;
         if (!code) return res.status(400).json({ error: "Please enter a 6-digit access code." });
 
         const encryptedSearch = encrypt(code);
-
-        const validCode = await prisma.accessCode.findUnique({
-            where: { code: encryptedSearch }
-        });
-
-        // 2. Security Checks
-        if (!validCode) return res.status(404).json({ error: "Invalid code. Please check the number." });
+        const validCode = await prisma.accessCode.findUnique({ where: { code: encryptedSearch } });
         
-        if (new Date() > validCode.expiresAt) {
-            await prisma.accessCode.delete({ where: { id: validCode.id } }); // Clean it up
-            return res.status(403).json({ error: "This code has expired. Patient must generate a new one." });
-        }
+        if (!validCode) return res.status(404).json({ error: "Invalid code." });
+        if (new Date() > validCode.expiresAt) return res.status(403).json({ error: "Code expired." });
 
-        // 3. Code is valid! Fetch the patient's basic profile
-        const patientData = await prisma.patient.findUnique({
-            where: { id: validCode.patientId }
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        io.to(validCode.patientId).emit('auth-request', { 
+            doctorName: `Dr. ${doctor.lastName}`, 
+            code: code 
         });
 
-        res.json({ patient: patientData, vaultKey: validCode.code });
+        let responded = false;
+
+        const timeout = setTimeout(() => {
+            if (!responded) res.status(408).json({ error: "Patient did not respond to the approval request." });
+        }, 30000);
+
+        app.once(`auth-resolved-${code}`, async (approved) => {
+            responded = true;
+            clearTimeout(timeout);
+            
+            if (approved) {
+                const patientData = await prisma.patient.findUnique({ where: { id: validCode.patientId } });
+                res.json({ patient: patientData, vaultKey: code });
+            } else {
+                res.status(403).json({ error: "Access explicitly denied by patient." });
+            }
+        });
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to access vault." });
@@ -311,6 +347,6 @@ cron.schedule('*/15 * * * *', async () => {
 
 // Start the server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`✅ Server is running on http://localhost:${PORT}`);
+server.listen(port, () => {
+    console.log(`🚀 TotalMed Server (HTTP + WebSockets) running on port ${port}`);
 });

@@ -74,6 +74,18 @@ function App() {
         setAuthRequest(data);
       });
 
+      newSocket.on('vault-updated', (data) => {
+        // 1. Erase the access code from Maria's screen immediately
+        setAccessCode(null);
+
+        setPatientData(prevData => ({
+          ...prevData,
+          medicalRecords: [data.newRecord, ...prevData.medicalRecords]
+        }));
+
+        setPatientTab(1); 
+      });
+
       // Cleanup when we log out
       return () => newSocket.disconnect();
     }

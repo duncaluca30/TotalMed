@@ -321,7 +321,7 @@ app.post('/api/doctor/records', authenticateToken, async (req, res) => {
             prisma.accessCode.delete({ where: { id: validCode.id } }) 
         ]);
 
-        res.json({ message: "Medical record injected and vault securely locked!" });
+        res.json({ message: "Record added successfully and vault locked." });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to save record." });

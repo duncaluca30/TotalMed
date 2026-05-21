@@ -282,12 +282,45 @@ function App() {
 
               <div className="card" style={{ marginTop: '30px', border: '2px solid #00b894' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #dfe6e9', paddingBottom: '10px', marginBottom: '15px' }}>
-                  <h3 style={{ color: '#00b894', margin: 0 }}>🔓 Vault Unlocked</h3>
+                  <h3 style={{ color: '#00b894', margin: 0 }}>Vault Unlocked</h3>
                   <button onClick={() => setUnlockedPatient(null)} style={{ backgroundColor: '#636e72', padding: '5px 10px', fontSize: '0.8em' }}>Close File</button>
                 </div>
                 
                 <h4>Patient: {unlockedPatient.firstName} {unlockedPatient.lastName}</h4>
                 <p><strong>DOB:</strong> {new Date(unlockedPatient.dateOfBirth).toLocaleDateString()}</p>
+
+                {unlockedPatient?.medicalRecords && (
+                  <Box sx={{ mb: 4, mt: 3, p: 3, border: '1px solid #dfe6e9', borderRadius: '8px', backgroundColor: '#f8f9fa' }}>
+                    <Typography variant="h6" sx={{ color: '#0984e3', mb: 2, fontWeight: 'bold' }}>
+                      📁 Shared Medical History ({unlockedPatient.medicalRecords.length} records)
+                    </Typography>
+                    
+                    {unlockedPatient.medicalRecords.length > 0 ? (
+                      <List>
+                        {unlockedPatient.medicalRecords.map((record) => (
+                          <ListItem key={record.id} sx={{ borderBottom: '1px solid #dfe6e9', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', pb: 2, mb: 2 }}>
+                             <Typography variant="subtitle1" sx={{ color: '#2d3436' }}>
+                               <strong>Diagnosis:</strong> {record.diagnosis}
+                             </Typography>
+                             <Typography variant="body2" sx={{ mt: 0.5 }}>
+                               <strong>Treatment:</strong> {record.treatment}
+                             </Typography>
+                             <Typography variant="body2" sx={{ mt: 0.5, color: '#636e72' }}>
+                               <strong>Notes:</strong> {record.notes}
+                             </Typography>
+                             <Typography variant="caption" sx={{ mt: 1, color: '#b2bec3' }}>
+                               Date: {new Date(record.createdAt).toLocaleDateString()} | Attending: Dr. {record.doctor?.lastName || 'Unknown'}
+                             </Typography>
+                          </ListItem>
+                        ))}
+                      </List>
+                    ) : (
+                      <Typography sx={{ color: '#e17055', fontStyle: 'italic' }}>
+                        The patient chose not to share any prior medical records.
+                      </Typography>
+                    )}
+                  </Box>
+                )}
 
                 <h4 style={{ marginTop: '20px', color: '#2d3436' }}>Inject New Medical Record</h4>
                 <Box component="form" onSubmit={handleInjectRecord} sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
@@ -417,9 +450,9 @@ function App() {
           {/* 2. The Interactive Checklist */}
           <Box sx={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #dfe6e9', borderRadius: '4px' }}>
             <List>
-              {patientData?.medicalRecords
-                ?.filter(record => record.diagnosis.toLowerCase().includes(popupSearch.toLowerCase()))
-                .map((record) => {
+              {(patientData?.medicalRecords || [])
+              .filter(record => record.diagnosis.toLowerCase().includes(popupSearch.toLowerCase()))
+              .map((record) => {
                   const isChecked = selectedRecordIds.includes(record.id);
                   return (
                     <ListItem 

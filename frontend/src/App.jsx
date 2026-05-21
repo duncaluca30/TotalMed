@@ -2,26 +2,23 @@ import { useState, useEffect } from 'react'
 import './App.css'
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import { io } from 'socket.io-client';
-import { AppBar, Toolbar, Typography, Button, TextField, Box, Tabs, Tab, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { AppBar, Toolbar, Typography, Button, TextField, Box, Tabs, Tab, Dialog,
+   DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText, Checkbox } from '@mui/material';
 
 function App() {
-  // 🔴 IMPORTANT: Keep your actual Render backend URL here!
   const API_URL = 'https://totalmed-backend.onrender.com'; 
 
-  // UI & Security State
   const [isLoginView, setIsLoginView] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
   const [loggedInToken, setLoggedInToken] = useState(localStorage.getItem('token') || null);
   const [userRole, setUserRole] = useState(localStorage.getItem('role') || null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0); // 👈 Forces the page to refresh when data changes
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [accessCode, setAccessCode] = useState(null);
-  
-  // Dashboard Data State
+
   const [patientData, setPatientData] = useState(null);
   const [doctorData, setDoctorData] = useState(null);
   const [patientTab, setPatientTab] = useState(0);
 
-  // Form States
   const [formData, setFormData] = useState({ email: '', password: '', firstName: '', lastName: '', dateOfBirth: '', phone: '' });
   const [visitForm, setVisitForm] = useState({ appointmentId: null, diagnosis: '', treatment: '', notes: '' });
 
@@ -32,11 +29,13 @@ function App() {
   const [socket, setSocket] = useState(null);
   const [authRequest, setAuthRequest] = useState(null);
 
+  const [popupSearch, setPopupSearch] = useState('');
+  const [selectedRecordIds, setSelectedRecordIds] = useState([]);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // --- FETCH SECURE DASHBOARD DATA ---
   useEffect(() => {
     if (!loggedInToken) return;
 
@@ -45,7 +44,6 @@ function App() {
       .then(res => { if (!res.ok) throw new Error(); return res.json(); })
       .then(data => {
         setPatientData(data);
-        // 👈 Add this: If she already has a code active in the database, put it on screen immediately!
         if (data.accessCode && new Date() < new Date(data.accessCode.expiresAt)) {
           setAccessCode(data.accessCode.code);
         }
@@ -61,7 +59,6 @@ function App() {
     }
   }, [loggedInToken, userRole, refreshTrigger]);
 
-  // --- WEBSOCKET CONNECTION ---
   useEffect(() => {
     if (loggedInToken && userRole === 'PATIENT' && patientData) {
 
@@ -88,12 +85,10 @@ function App() {
         setPatientTab(1); 
       });
 
-      // Cleanup when we log out
       return () => newSocket.disconnect();
     }
   }, [loggedInToken, userRole, patientData]);
 
-  // --- SUBMIT REGISTRATION & LOGIN ---
   const handleRegister = async (e) => {
     e.preventDefault();
     setStatusMessage('Registering...');
@@ -200,8 +195,15 @@ function App() {
   };
 
   const handleAuthDecision = (approved) => {
-    socket.emit('auth-response', { code: authRequest.code, approved: approved });
-    setAuthRequest(null); // Close the popup
+    socket.emit('auth-response', { 
+      code: authRequest.code, 
+      approved: approved,
+      sharedRecordIds: selectedRecordIds 
+    });
+    
+    setAuthRequest(null);
+    setPopupSearch('');
+    setSelectedRecordIds([]);
   };
 
   const handleCompleteVisit = async (e) => {
@@ -222,8 +224,8 @@ function App() {
 
       if (response.ok) {
         alert("✅ Medical Record Saved & Appointment Completed!");
-        setVisitForm({ appointmentId: null, diagnosis: '', treatment: '', notes: '' }); // Reset form
-        setRefreshTrigger(prev => prev + 1); // Trigger the useEffect to refresh the schedule!
+        setVisitForm({ appointmentId: null, diagnosis: '', treatment: '', notes: '' });
+        setRefreshTrigger(prev => prev + 1);
       } else {
         const data = await response.json();
         alert(`❌ Error: ${data.error}`);
@@ -391,21 +393,74 @@ function App() {
             
           </Box>
         )}
-          {/* --- THE REAL-TIME APPROVAL POPUP --- */}
-      <Dialog open={!!authRequest} disableEscapeKeyDown>
-        <DialogTitle sx={{ backgroundColor: '#dff9fb', color: '#2d3436', fontWeight: 'bold' }}>
-          🚨 Access Request Detected
+      <Dialog open={!!authRequest} disableEscapeKeyDown maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ backgroundColor: '#0984e3', color: 'white', fontWeight: 'bold' }}>
+          🚨 Access Request: {authRequest?.doctorName}
         </DialogTitle>
+        
         <DialogContent sx={{ mt: 2 }}>
-          <Typography variant="h6"><strong>{authRequest?.doctorName}</strong> is attempting to unlock your medical vault.</Typography>
-          <Typography sx={{ mt: 2, color: '#636e72' }}>Do you authorize the release of your decrypted medical history to this physician?</Typography>
+          <Typography sx={{ mb: 2, color: '#2d3436' }}>
+            Please select the specific medical records you wish to share with this physician.
+          </Typography>
+
+          {/* 1. The Search Bar */}
+          <TextField 
+            fullWidth 
+            size="small" 
+            label="Filter Diagnostics..." 
+            variant="outlined" 
+            value={popupSearch}
+            onChange={(e) => setPopupSearch(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+
+          {/* 2. The Interactive Checklist */}
+          <Box sx={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #dfe6e9', borderRadius: '4px' }}>
+            <List>
+              {patientData?.medicalRecords
+                ?.filter(record => record.diagnosis.toLowerCase().includes(popupSearch.toLowerCase()))
+                .map((record) => {
+                  const isChecked = selectedRecordIds.includes(record.id);
+                  return (
+                    <ListItem 
+                      key={record.id} 
+                      button 
+                      onClick={() => {
+                        if (isChecked) {
+                          setSelectedRecordIds(selectedRecordIds.filter(id => id !== record.id));
+                        } else {
+                          setSelectedRecordIds([...selectedRecordIds, record.id]);
+                        }
+                      }}
+                    >
+                      <Checkbox checked={isChecked} color="primary" />
+                      <ListItemText 
+                        primary={<strong>{record.diagnosis}</strong>} 
+                        secondary={`${new Date(record.createdAt).toLocaleDateString()} - Dr. ${record.doctor.lastName}`} 
+                      />
+                    </ListItem>
+                  );
+              })}
+              {patientData?.medicalRecords?.length === 0 && (
+                <Typography sx={{ p: 2, color: '#636e72', fontStyle: 'italic', textAlign: 'center' }}>
+                  No medical records available to share.
+                </Typography>
+              )}
+            </List>
+          </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3, justifyContent: 'space-between' }}>
-          <Button onClick={() => handleAuthDecision(false)} variant="outlined" color="error" size="large">
-            Deny Access
+
+        <DialogActions sx={{ p: 3, justifyContent: 'space-between', borderTop: '1px solid #dfe6e9' }}>
+          <Button onClick={() => handleAuthDecision(false)} variant="outlined" color="error">
+            Deny All Access
           </Button>
-          <Button onClick={() => handleAuthDecision(true)} variant="contained" color="success" size="large">
-            Authorize Vault
+          <Button 
+            onClick={() => handleAuthDecision(true)} 
+            variant="contained" 
+            color="success"
+            disabled={selectedRecordIds.length === 0}
+          >
+            Share {selectedRecordIds.length} Selected Record(s)
           </Button>
         </DialogActions>
       </Dialog>

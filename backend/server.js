@@ -38,7 +38,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('auth-response', (data) => {
-        app.emit(`auth-resolved-${data.code}`, data.approved);
+        app.emit(`auth-resolved-${data.code}`, data);
     });
 
     socket.on('disconnect', () => {
@@ -64,7 +64,6 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// --- 1. SYSTEM STATUS ROUTE ---
 app.get('/api/status', async (req, res) => {
     try {
         await prisma.$queryRaw`SELECT 1 + 1`;
@@ -74,23 +73,18 @@ app.get('/api/status', async (req, res) => {
     }
 });
 
-// --- 2. REGISTER A NEW PATIENT ---
 app.post('/api/auth/register', async (req, res) => {
     try {
-        // Grab the data the user typed into the frontend
         const { email, password, firstName, lastName, dateOfBirth, phone } = req.body;
 
-        // Check if the email is already taken
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) {
             return res.status(400).json({ error: "Email is already registered" });
         }
 
-        // Hash (encrypt) the password 10 times
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Save the new User AND their Patient Profile to Neon
         const newUser = await prisma.user.create({
             data: {
                 email,
@@ -114,31 +108,26 @@ app.post('/api/auth/register', async (req, res) => {
     }
 });
 
-// --- 3. LOGIN ROUTE ---
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Find the user in the database
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) {
             return res.status(400).json({ error: "Invalid email or password" });
         }
 
-        // Compare the typed password with the encrypted database password
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(400).json({ error: "Invalid email or password" });
         }
 
-        // Create the JWT "VIP Pass" (Valid for 1 day)
         const token = jwt.sign(
             { id: user.id, role: user.role },
             process.env.JWT_SECRET,
             { expiresIn: '1d' }
         );
 
-        // Send the token back to the frontend
         res.json({ token, message: "Logged in successfully", role: user.role });
     } catch (error) {
         console.error(error);
@@ -146,7 +135,6 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// --- 4. SECURE PATIENT DASHBOARD ---
 app.get('/api/patient/dashboard', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied" });
@@ -154,10 +142,10 @@ app.get('/api/patient/dashboard', authenticateToken, async (req, res) => {
         const patientData = await prisma.patient.findUnique({
             where: { userId: req.user.id },
             include: {
-                accessCode: true, // Gets the active vault key if she has one
-                medicalRecords: { // 👈 Fetch the actual history!
-                    include: { doctor: true }, // Include the doctor's name who wrote it
-                    orderBy: { createdAt: 'desc' } // Newest records at the top
+                accessCode: true,
+                medicalRecords: {
+                    include: { doctor: true },
+                    orderBy: { createdAt: 'desc' }
                 }
             }
         });
@@ -174,20 +162,17 @@ app.get('/api/patient/dashboard', authenticateToken, async (req, res) => {
     }
 });
 
-// --- 5. PROTECTED DOCTOR DASHBOARD ROUTE ---
 app.get('/api/doctor/dashboard', authenticateToken, async (req, res) => {
     try {
-        // Security Check: Is this VIP pass actually for a Doctor?
         if (req.user.role !== 'DOCTOR') {
             return res.status(403).json({ error: "Access Denied: Doctor clearance required." });
         }
 
-        // Ask Prisma for the Doctor Profile AND their Appointments (with Patient details)
         const doctorData = await prisma.doctor.findUnique({
             where: { userId: req.user.id },
             include: {
                 appointments: {
-                    include: { patient: true } // We need the patient's name for the schedule!
+                    include: { patient: true }
                 }
             }
         });
@@ -271,12 +256,22 @@ app.post('/api/doctor/access-vault', authenticateToken, async (req, res) => {
             if (!responded) res.status(408).json({ error: "Patient did not respond to the approval request." });
         }, 30000);
 
-        app.once(`auth-resolved-${code}`, async (approved) => {
+        app.once(`auth-resolved-${code}`, async (authData) => {
             responded = true;
             clearTimeout(timeout);
             
-            if (approved) {
-                const patientData = await prisma.patient.findUnique({ where: { id: validCode.patientId } });
+            if (authData.approved) {
+                const patientData = await prisma.patient.findUnique({ 
+                    where: { id: validCode.patientId },
+                    include: {
+                        medicalRecords: { include: { doctor: true } }
+                    }
+                });
+
+                patientData.medicalRecords = patientData.medicalRecords.filter(record => 
+                    authData.sharedRecordIds.includes(record.id)
+                );
+
                 res.json({ patient: patientData, vaultKey: code });
             } else {
                 res.status(403).json({ error: "Access explicitly denied by patient." });
@@ -289,7 +284,6 @@ app.post('/api/doctor/access-vault', authenticateToken, async (req, res) => {
     }
 });
 
-// --- 9. DOCTOR: INJECT RECORD & BURN CODE ---
 app.post('/api/doctor/records', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -354,7 +348,6 @@ cron.schedule('*/15 * * * *', async () => {
     }
 });
 
-// Start the server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
     console.log(`🚀 TotalMed Server (HTTP + WebSockets) running on port ${PORT}`);

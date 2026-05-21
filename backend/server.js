@@ -347,6 +347,6 @@ cron.schedule('*/15 * * * *', async () => {
 
 // Start the server
 const PORT = process.env.PORT || 5000;
-server.listen(port, () => {
-    console.log(`🚀 TotalMed Server (HTTP + WebSockets) running on port ${port}`);
+server.listen(PORT, () => {
+    console.log(`🚀 TotalMed Server (HTTP + WebSockets) running on port ${PORT}`);
 });

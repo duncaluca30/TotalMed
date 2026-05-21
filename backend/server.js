@@ -313,7 +313,8 @@ app.post('/api/doctor/records', authenticateToken, async (req, res) => {
                 notes: notes,
                 patientId: patientId,
                 doctorId: doctor.id
-                }   
+                },   
+                include: { doctor: true }
             }),
             prisma.accessCode.delete({ where: { id: validCode.id } })
         ]); 

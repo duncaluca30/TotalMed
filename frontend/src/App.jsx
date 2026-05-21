@@ -75,7 +75,9 @@ function App() {
       });
 
       newSocket.on('vault-updated', (data) => {
-        // 1. Erase the access code from Maria's screen immediately
+
+        console.log("🚨 WEBSOCKET RECEIVED:", data);
+        
         setAccessCode(null);
 
         setPatientData(prevData => ({

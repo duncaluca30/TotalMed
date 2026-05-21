@@ -32,8 +32,9 @@ io.on('connection', (socket) => {
     console.log('🟢 User connected to switchboard:', socket.id);
 
     socket.on('join-secure-room', (patientId) => {
-        socket.join(patientId);
-        console.log(`🔒 Patient ${patientId} secured their connection.`);
+        const roomName = patientId.toString();
+        socket.join(roomName);
+        console.log(`🔒 Patient secured their connection in room: ${roomName}`);
     });
 
     socket.on('auth-response', (data) => {
@@ -318,6 +319,9 @@ app.post('/api/doctor/records', authenticateToken, async (req, res) => {
             }),
             prisma.accessCode.delete({ where: { id: validCode.id } }) 
         ]);
+
+        const targetRoom = validCode.patientId.toString();
+        console.log(`🚨 PINGING PATIENT ROOM: ${targetRoom}`);
 
         io.to(patientId).emit('vault-updated', { newRecord: record });
 

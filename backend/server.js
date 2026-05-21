@@ -307,7 +307,6 @@ app.post('/api/doctor/records', authenticateToken, async (req, res) => {
 
         // 3. THE TRANSACTION: Create Record & Burn the Code
         await prisma.$transaction([
-            // Action A: Inject the permanent medical record
             prisma.medicalRecord.create({
                 data: {
                     diagnosis: diagnosis,
@@ -317,9 +316,10 @@ app.post('/api/doctor/records', authenticateToken, async (req, res) => {
                     doctorId: doctor.id
                 }
             }),
-            // Action B: THE BURN 🔥 (Permanently delete the key)
             prisma.accessCode.delete({ where: { id: validCode.id } }) 
         ]);
+
+        io.to(patientId).emit('vault-updated', { newRecord: record });
 
         res.json({ message: "Record added successfully and vault locked." });
     } catch (error) {

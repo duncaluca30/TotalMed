@@ -303,33 +303,37 @@ app.post('/api/doctor/records', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: "Invalid or expired authorization code." });
         }
 
-        // 2. Find the Doctor's internal database ID
         const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
 
-        // 3. THE TRANSACTION: Create Record & Burn the Code
-        await prisma.$transaction([
+        const [savedRecord, deletedCode] = await prisma.$transaction([
             prisma.medicalRecord.create({
                 data: {
-                    diagnosis: diagnosis,
-                    treatment: treatment,
-                    notes: notes,
-                    patientId: patientId,
-                    doctorId: doctor.id
-                }
+                diagnosis: diagnosis,
+                treatment: treatment,
+                notes: notes,
+                patientId: patientId,
+                doctorId: doctor.id
+                }   
             }),
-            prisma.accessCode.delete({ where: { id: validCode.id } }) 
-        ]);
+            prisma.accessCode.delete({ where: { id: validCode.id } })
+        ]); 
 
+        try {
         const targetRoom = validCode.patientId.toString();
         console.log(`🚨 PINGING PATIENT ROOM: ${targetRoom}`);
 
-        io.to(patientId).emit('vault-updated', { newRecord: record });
+        io.to(targetRoom).emit('vault-updated', { newRecord: savedRecord });
+      
+        } catch (socketError) {
+            console.error("🚨 WEBSOCKET ERROR:", socketError);
+        }
 
         res.json({ message: "Record added successfully and vault locked." });
+
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Failed to save record." });
-    }
+        res.status(500).json({ error: "Failed to add record." });
+      } 
 });
 
 cron.schedule('*/15 * * * *', async () => {

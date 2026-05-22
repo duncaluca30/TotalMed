@@ -32,8 +32,6 @@ function App() {
   const [popupSearch, setPopupSearch] = useState('');
   const [selectedRecordIds, setSelectedRecordIds] = useState([]);
 
-  const todayString = new Date().toISOString().split("T")[0];
-
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -536,13 +534,18 @@ function App() {
               
               <TextField 
                 label="Date of Birth" 
-                type="date" 
-                InputLabelProps={{ shrink: true }} 
-                inputProps={{ max: todayString }}
+                type="text"
+                onFocus={(e) => (e.target.type = "date")}
+                onBlur={(e) => {
+                  if (!formData.dateOfBirth) e.target.type = "text";
+                }}
                 value={formData.dateOfBirth}
                 onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}
                 required
                 fullWidth
+                inputProps={{ 
+                  max: new Date().toISOString().split("T")[0] 
+                }}
               />
               
               <TextField label="Phone Number" name="phone" type="tel" onChange={handleChange} required fullWidth />

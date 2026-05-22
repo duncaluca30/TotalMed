@@ -4,6 +4,11 @@ import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import { io } from 'socket.io-client';
 import { AppBar, Toolbar, Typography, Button, TextField, Box, Tabs, Tab, Dialog,
    DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText, Checkbox } from '@mui/material';
+   
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 
 function App() {
   const API_URL = 'https://totalmed-backend.onrender.com'; 
@@ -94,14 +99,21 @@ function App() {
   const handleRegister = async (e) => {
     e.preventDefault();
 
+    const selectedDate = new Date(formData.dateOfBirth);
+    const today = new Date();
+    if (selectedDate > today) {
+      setStatusMessage("❌ Error: Date of birth cannot be in the future.");
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match!");
+      setStatusMessage("❌ Error: Passwords do not match!"); 
       return; 
     }
 
     const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
     if (!passwordRegex.test(formData.password)) {
-      alert("Password must be at least 8 characters, with 1 letter, 1 number, and 1 special character.");
+      setStatusMessage("❌ Error: Password must be 8+ characters, with 1 letter, 1 number, and 1 special character.");
       return;
     }
 
@@ -115,7 +127,7 @@ function App() {
         setStatusMessage('✅ Registration successful! You can now log in.');
         setIsLoginView(true);
       } else setStatusMessage(`❌ Error: ${data.error}`);
-    } catch (error) { setStatusMessage('❌ Failed to connect.'); }
+    } catch (error) { setStatusMessage('❌ Failed to connect to server.'); }
   };
 
   const handleLogin = async (e) => {
@@ -516,6 +528,7 @@ function App() {
   }
 
   return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
     <div className="container">
       <div style={{ textAlign: 'center', marginBottom: '30px' }}>
         <h1 style={{ color: '#0984e3', fontSize: '2.5em', margin: 0 }}>TotalMed</h1>
@@ -534,19 +547,21 @@ function App() {
               <TextField label="First Name" name="firstName" onChange={handleChange} required fullWidth />
               <TextField label="Last Name" name="lastName" onChange={handleChange} required fullWidth />
               
-              <TextField 
-                label="Date of Birth" 
-                type={dateInputType}
-                onFocus={() => setDateInputType('date')}
-                onBlur={() => {
-                  if (!formData.dateOfBirth) setDateInputType('text');
+              <DatePicker 
+                label="Date of Birth *"
+                disableFuture
+                value={formData.dateOfBirth ? dayjs(formData.dateOfBirth) : null}
+                onChange={(newValue) => {
+                  setFormData({ 
+                    ...formData, 
+                    dateOfBirth: newValue ? newValue.format('YYYY-MM-DD') : '' 
+                  });
                 }}
-                value={formData.dateOfBirth}
-                onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}
-                required
-                fullWidth
-                inputProps={{ 
-                  max: new Date().toISOString().split("T")[0] 
+                slotProps={{ 
+                  textField: { 
+                    fullWidth: true, 
+                    required: true 
+                  } 
                 }}
               />
               
@@ -592,6 +607,7 @@ function App() {
         </div>
       </div>
     </div>
+    </LocalizationProvider>
   )
 }
 

@@ -32,6 +32,8 @@ function App() {
   const [popupSearch, setPopupSearch] = useState('');
   const [selectedRecordIds, setSelectedRecordIds] = useState([]);
 
+  const [dateInputType, setDateInputType] = useState('text');
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -534,10 +536,10 @@ function App() {
               
               <TextField 
                 label="Date of Birth" 
-                type="text"
-                onFocus={(e) => (e.target.type = "date")}
-                onBlur={(e) => {
-                  if (!formData.dateOfBirth) e.target.type = "text";
+                type={dateInputType}
+                onFocus={() => setDateInputType('date')}
+                onBlur={() => {
+                  if (!formData.dateOfBirth) setDateInputType('text');
                 }}
                 value={formData.dateOfBirth}
                 onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}

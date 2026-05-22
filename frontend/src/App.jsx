@@ -534,7 +534,7 @@ function App() {
               <TextField label="First Name" name="firstName" onChange={handleChange} required fullWidth />
               <TextField label="Last Name" name="lastName" onChange={handleChange} required fullWidth />
               <TextField label="Date of Birth" type="date" InputLabelProps={{ shrink: true }}inputProps={{ max: todayString }}
-                         value={registerForm.dateOfBirth}onChange={(e) => setRegisterForm({...registerForm, dateOfBirth: e.target.value})}requiredfullWidth/>
+                         value={formData.dateOfBirth}onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}requiredfullWidth/>
               <TextField label="Phone Number" name="phone" type="tel" onChange={handleChange} required fullWidth />
             </>
           )}

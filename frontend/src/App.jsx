@@ -19,7 +19,7 @@ function App() {
   const [doctorData, setDoctorData] = useState(null);
   const [patientTab, setPatientTab] = useState(0);
 
-  const [formData, setFormData] = useState({ email: '', password: '', firstName: '', lastName: '', dateOfBirth: '', phone: '' });
+  const [formData, setFormData] = useState({ email: '', password: '', confirmPassword: '', firstName: '', lastName: '', dateOfBirth: '', phone: '' });
   const [visitForm, setVisitForm] = useState({ appointmentId: null, diagnosis: '', treatment: '', notes: '' });
 
   const [vaultCode, setVaultCode] = useState('');
@@ -31,6 +31,8 @@ function App() {
 
   const [popupSearch, setPopupSearch] = useState('');
   const [selectedRecordIds, setSelectedRecordIds] = useState([]);
+
+  const todayString = new Date().toISOString().split("T")[0];
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -91,6 +93,18 @@ function App() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+
+    if (formData.password !== formData.confirmPassword) {
+      alert("Passwords do not match!");
+      return; 
+    }
+
+    const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+    if (!passwordRegex.test(formData.password)) {
+      alert("Password must be at least 8 characters, with 1 letter, 1 number, and 1 special character.");
+      return;
+    }
+
     setStatusMessage('Registering...');
     try {
       const response = await fetch(`${API_URL}/api/auth/register`, {
@@ -519,13 +533,22 @@ function App() {
             <>
               <TextField label="First Name" name="firstName" onChange={handleChange} required fullWidth />
               <TextField label="Last Name" name="lastName" onChange={handleChange} required fullWidth />
-              <TextField label="Date of Birth" name="dateOfBirth" type="date" onChange={handleChange} required fullWidth InputLabelProps={{ shrink: true }} />
+              <TextField label="Date of Birth" type="date" InputLabelProps={{ shrink: true }}inputProps={{ max: todayString }}
+                         value={registerForm.dateOfBirth}onChange={(e) => setRegisterForm({...registerForm, dateOfBirth: e.target.value})}requiredfullWidth/>
               <TextField label="Phone Number" name="phone" type="tel" onChange={handleChange} required fullWidth />
             </>
           )}
           
           <TextField label="Email Address" name="email" type="email" onChange={handleChange} required fullWidth />
           <TextField label="Password" name="password" type="password" onChange={handleChange} required fullWidth />
+          <TextField 
+            label="Confirm Password" 
+            type="password" 
+            value={formData.confirmPassword}
+            onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+            required
+            fullWidth
+          />
 
           {statusMessage && (
             <Typography sx={{ color: '#ff4757', textAlign: 'center', fontWeight: 'bold', mt: 1 }}>

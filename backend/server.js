@@ -82,6 +82,21 @@ app.post('/api/auth/register', async (req, res) => {
             return res.status(400).json({ error: "Email is already registered" });
         }
 
+        if (dateOfBirth) {
+            const dob = new Date(dateOfBirth);
+            const today = new Date();
+            if (dob > today) {
+                return res.status(400).json({ error: "Date of birth cannot be in the future." });
+            }
+        }
+
+        const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+        if (!passwordRegex.test(password)) {
+            return res.status(400).json({ 
+                error: "Password must be at least 8 characters long and include a letter, a number, and a special character." 
+            });
+        }
+
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 

@@ -533,22 +533,35 @@ function App() {
             <>
               <TextField label="First Name" name="firstName" onChange={handleChange} required fullWidth />
               <TextField label="Last Name" name="lastName" onChange={handleChange} required fullWidth />
-              <TextField label="Date of Birth" type="date" InputLabelProps={{ shrink: true }}inputProps={{ max: todayString }}
-                         value={formData.dateOfBirth}onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}requiredfullWidth/>
+              
+              <TextField 
+                label="Date of Birth" 
+                type="date" 
+                InputLabelProps={{ shrink: true }} 
+                inputProps={{ max: todayString }}
+                value={formData.dateOfBirth}
+                onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}
+                required
+                fullWidth
+              />
+              
               <TextField label="Phone Number" name="phone" type="tel" onChange={handleChange} required fullWidth />
             </>
           )}
           
           <TextField label="Email Address" name="email" type="email" onChange={handleChange} required fullWidth />
           <TextField label="Password" name="password" type="password" onChange={handleChange} required fullWidth />
-          <TextField 
-            label="Confirm Password" 
-            type="password" 
-            value={formData.confirmPassword}
-            onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-            required
-            fullWidth
-          />
+          
+          {!isLoginView && (
+            <TextField 
+              label="Confirm Password" 
+              type="password" 
+              value={formData.confirmPassword}
+              onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+              required
+              fullWidth
+            />
+          )}
 
           {statusMessage && (
             <Typography sx={{ color: '#ff4757', textAlign: 'center', fontWeight: 'bold', mt: 1 }}>

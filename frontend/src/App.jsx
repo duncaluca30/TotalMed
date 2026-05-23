@@ -601,9 +601,13 @@ function App() {
             onClick={() => handleAuthDecision(true)} 
             variant="contained" 
             color="success"
-            disabled={selectedRecordIds.length === 0}
           >
-            Share {selectedRecordIds.length} Selected Record(s)
+            {patientData?.medicalRecords?.length === 0 
+              ? "Grant Access to Empty Vault" 
+              : selectedRecordIds.length === 0 
+                ? "Grant Access (Hide Past History)" 
+                : `Share ${selectedRecordIds.length} Selected Record(s)`
+            }
           </Button>
         </DialogActions>
       </Dialog>

@@ -11,7 +11,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
 function App() {
@@ -299,7 +299,7 @@ function App() {
       tableRows.push(recordData);
     });
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: 55,
       head: [tableColumn],
       body: tableRows,

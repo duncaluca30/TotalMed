@@ -221,6 +221,11 @@ function App() {
     setUserRole(null);
     setPatientData(null);
     setDoctorData(null);
+    setAccessCode(null);
+    setPatientTab(0);
+    setUnlockedPatient(null);
+    setVaultCode('');
+    setAuthRequest(null);
     setStatusMessage('Logged out safely.');
   };
 
@@ -483,7 +488,17 @@ function App() {
             {/* --- TAB 1: MEDICAL HISTORY --- */}
             {patientTab === 1 && (
               <Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #dfe6e9', paddingBottom: '10px', mb: 2 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  flexWrap: 'wrap',
+                  gap: 2,
+                  width: '100%',
+                  borderBottom: '2px solid #dfe6e9', 
+                  paddingBottom: '10px', 
+                  mb: 2 
+                }}>
                   <h3 style={{ margin: 0, color: '#2d3436' }}>📁 Your Medical History</h3>
                   <Button 
                     variant="contained" 

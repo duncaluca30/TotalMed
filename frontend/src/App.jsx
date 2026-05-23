@@ -10,6 +10,10 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+
 function App() {
   const API_URL = 'https://totalmed-backend.onrender.com'; 
 
@@ -111,7 +115,7 @@ function App() {
       return; 
     }
 
-    const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
     if (!passwordRegex.test(formData.password)) {
       setStatusMessage("❌ Error: Password must be 8+ characters, with 1 letter, 1 number, and 1 special character.");
       return;
@@ -261,6 +265,52 @@ function App() {
     }
   };
 
+  const handleDownloadPDF = (profileData, recordsToPrint, role) => {
+    if (!recordsToPrint || recordsToPrint.length === 0) {
+      alert("No medical records available to download.");
+      return;
+    }
+
+    const doc = new jsPDF();
+    
+    doc.setFontSize(22);
+    doc.setTextColor(9, 132, 227); 
+    doc.text("TotalMed Secure Health Vault", 14, 22);
+    
+    doc.setFontSize(11);
+    doc.setTextColor(45, 52, 54); 
+    doc.text(`Official Medical Records Report`, 14, 32);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 38);
+    
+    const titlePrefix = role === 'DOCTOR' ? 'Attending Physician: Dr.' : 'Patient File:';
+    doc.text(`${titlePrefix} ${profileData.firstName} ${profileData.lastName}`, 14, 48);
+
+    const tableColumn = ["Date", "Diagnosis", "Treatment Plan", "Attending Dr.", "Clinical Notes"];
+    const tableRows = [];
+
+    recordsToPrint.forEach(record => {
+      const recordData = [
+        new Date(record.createdAt).toLocaleDateString(),
+        record.diagnosis,
+        record.treatment || "N/A",
+        `Dr. ${record.doctor?.lastName || 'Unknown'}`,
+        record.notes || "None"
+      ];
+      tableRows.push(recordData);
+    });
+
+    doc.autoTable({
+      startY: 55,
+      head: [tableColumn],
+      body: tableRows,
+      theme: 'grid',
+      headStyles: { fillColor: [9, 132, 227], textColor: [255, 255, 255] },
+      styles: { fontSize: 9, cellPadding: 4 },
+      columnStyles: { 4: { cellWidth: 50 } } 
+    });
+
+    doc.save(`TotalMed_Export_${profileData.lastName}_${new Date().getTime()}.pdf`);
+  };
 
   if (loggedInToken && userRole === 'DOCTOR') {
     return (
@@ -317,9 +367,18 @@ function App() {
 
                 {unlockedPatient?.medicalRecords && (
                   <Box sx={{ mb: 4, mt: 3, p: 3, border: '1px solid #dfe6e9', borderRadius: '8px', backgroundColor: '#f8f9fa' }}>
-                    <Typography variant="h6" sx={{ color: '#0984e3', mb: 2, fontWeight: 'bold' }}>
-                      📁 Shared Medical History ({unlockedPatient.medicalRecords.length} records)
-                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h6" sx={{ color: '#0984e3', fontWeight: 'bold' }}>
+                        📁 Shared Medical History ({unlockedPatient.medicalRecords.length} records)
+                      </Typography>
+                      <Button 
+                        variant="outlined" 
+                        startIcon={<PictureAsPdfIcon />}
+                        onClick={() => handleDownloadPDF(doctorData, unlockedPatient.medicalRecords, 'DOCTOR')}
+                      >
+                        Export as PDF
+                      </Button>
+                    </Box>
                     
                     {unlockedPatient.medicalRecords.length > 0 ? (
                       <List>
@@ -424,7 +483,17 @@ function App() {
             {/* --- TAB 1: MEDICAL HISTORY --- */}
             {patientTab === 1 && (
               <Box>
-                <h3 style={{ borderBottom: '2px solid #dfe6e9', paddingBottom: '10px', color: '#2d3436' }}>📁 Your Medical History</h3>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #dfe6e9', paddingBottom: '10px', mb: 2 }}>
+                  <h3 style={{ margin: 0, color: '#2d3436' }}>📁 Your Medical History</h3>
+                  <Button 
+                    variant="contained" 
+                    startIcon={<PictureAsPdfIcon />}
+                    onClick={() => handleDownloadPDF(patientData, patientData.medicalRecords, 'PATIENT')}
+                    sx={{ backgroundColor: '#0984e3' }}
+                  >
+                    Download Vault PDF
+                  </Button>
+                </Box>
                 
                 {patientData.medicalRecords && patientData.medicalRecords.length > 0 ? (
                   patientData.medicalRecords.map((record) => (

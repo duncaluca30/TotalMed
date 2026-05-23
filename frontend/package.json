@@ -16,6 +16,8 @@
     "@mui/material": "^9.0.1",
     "@mui/x-date-pickers": "^9.3.0",
     "dayjs": "^1.11.20",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "socket.io-client": "^4.8.3"

@@ -438,6 +438,11 @@ function App() {
             )}
           </>
         )}
+        <Snackbar open={toast.open} autoHideDuration={4000} onClose={handleCloseToast} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={handleCloseToast} severity={toast.severity || 'info'} sx={{ width: '100%', fontSize: '1.1rem', fontWeight: 'bold' }}>
+          {toast.message}
+        </Alert>
+      </Snackbar>
       </div>
     );
   }
@@ -624,6 +629,11 @@ function App() {
           </Button>
         </DialogActions>
       </Dialog>
+      <Snackbar open={toast.open} autoHideDuration={4000} onClose={handleCloseToast} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={handleCloseToast} severity={toast.severity || 'info'} sx={{ width: '100%', fontSize: '1.1rem', fontWeight: 'bold' }}>
+          {toast.message}
+        </Alert>
+      </Snackbar>
       </div>
     );
   }
@@ -717,7 +727,7 @@ function App() {
         <Alert onClose={handleCloseToast} severity={toast.severity} sx={{ width: '100%', fontSize: '1.1rem', fontWeight: 'bold' }}>
           {toast.message}
         </Alert>
-      </Snackbar>
+      </Snackbar> 
     </LocalizationProvider>
   )
 }

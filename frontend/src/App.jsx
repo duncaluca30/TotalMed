@@ -3,7 +3,7 @@ import './App.css'
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import { io } from 'socket.io-client';
 import { AppBar, Toolbar, Typography, Button, TextField, Box, Tabs, Tab, Dialog,
-   DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText, Checkbox } from '@mui/material';
+   DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText, Checkbox, Snackbar, Alert} from '@mui/material';
    
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -42,6 +42,13 @@ function App() {
   const [selectedRecordIds, setSelectedRecordIds] = useState([]);
 
   const [dateInputType, setDateInputType] = useState('text');
+
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'info' });
+
+  const handleCloseToast = (event, reason) => {
+    if (reason === 'clickaway') return;
+    setToast({ ...toast, open: false });
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -165,11 +172,12 @@ function App() {
       const data = await response.json();
       if (response.ok) {
         setAccessCode(data.code);
+        setToast({ open: true, message: "Code generated successfully!", severity: 'success' });
       } else {
-        alert(`❌ Error: ${data.error}`);
+        setToast({ open: true, message: data.error, severity: 'error' });
       }
     } catch (error) {
-      alert("Failed to connect to server.");
+      setToast({ open: true, message: "Failed to connect to server.", severity: 'error' });
     }
   };
 
@@ -184,10 +192,13 @@ function App() {
       const data = await response.json();
       if (response.ok) {
         setUnlockedPatient(data.patient);
+        setToast({ open: true, message: "Vault Unlocked Successfully", severity: 'success' });
       } else {
-        alert(`❌ ${data.error}`);
+        setToast({ open: true, message: data.error, severity: 'error' });
       }
-    } catch (error) { alert("Failed to connect."); }
+    } catch (error) {
+      setToast({ open: true, message: "Failed to connect.", severity: 'error' });
+    }
   };
 
   const handleInjectRecord = async (e) => {
@@ -203,15 +214,17 @@ function App() {
         })
       });
       if (response.ok) {
-        alert("✅ Record Injected & Code Burned!");
+        setToast({ open: true, message: "Record Injected & Code Burned!", severity: 'success' });
         setUnlockedPatient(null);
         setVaultCode('');
         setRecordForm({ diagnosis: '', treatment: '', notes: '' });
       } else {
         const data = await response.json();
-        alert(`❌ ${data.error}`);
+        setToast({ open: true, message: data.error, severity: 'error' });
       }
-    } catch (error) { alert("Failed to save."); }
+    } catch (error) {
+      setToast({ open: true, message: "Failed to save record.", severity: 'error' });
+    }
   };
 
   const handleLogout = () => {
@@ -258,21 +271,21 @@ function App() {
       });
 
       if (response.ok) {
-        alert("✅ Medical Record Saved & Appointment Completed!");
+        setToast({ open: true, message: "Medical Record Saved & Appointment Completed!", severity: 'success' });
         setVisitForm({ appointmentId: null, diagnosis: '', treatment: '', notes: '' });
         setRefreshTrigger(prev => prev + 1);
       } else {
         const data = await response.json();
-        alert(`❌ Error: ${data.error}`);
+        setToast({ open: true, message: data.error, severity: 'error' });
       }
     } catch (error) {
-      alert('❌ Failed to save record.');
+      setToast({ open: true, message: "Failed to save record.", severity: 'error' });
     }
   };
 
   const handleDownloadPDF = (profileData, recordsToPrint, role) => {
     if (!recordsToPrint || recordsToPrint.length === 0) {
-      alert("No medical records available to download.");
+      setToast({ open: true, message: "No medical records available to download.", severity: 'error' });
       return;
     }
 
@@ -695,6 +708,16 @@ function App() {
         </div>
       </div>
     </div>
+    <Snackbar 
+        open={toast.open} 
+        autoHideDuration={4000} 
+        onClose={handleCloseToast}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseToast} severity={toast.severity} sx={{ width: '100%', fontSize: '1.1rem', fontWeight: 'bold' }}>
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </LocalizationProvider>
   )
 }

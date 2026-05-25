@@ -216,6 +216,7 @@ app.post('/api/patient/generate-code', authenticateToken, async (req, res) => {
 
         if (existingCode) {
             if (new Date() < existingCode.expiresAt) {
+                const decryptedCode = decrypt(existingCode.code);
                 return res.json({ code: existingCode.code, expiresAt: existingCode.expiresAt });
             } else {
                 await prisma.accessCode.delete({ where: { id: existingCode.id } });

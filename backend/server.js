@@ -243,6 +243,7 @@ app.get('/api/patient/dashboard', authenticateToken, async (req, res) => {
         const patientData = await prisma.patient.findUnique({
             where: { userId: req.user.id },
             include: {
+                user: { select: { isTwoFactorEnabled: true } },
                 accessCode: true,
                 medicalRecords: {
                     include: { doctor: true },

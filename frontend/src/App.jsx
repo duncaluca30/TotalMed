@@ -430,23 +430,28 @@ function App() {
                     <h3>🔐 Two-Factor Authentication</h3>
                     <p style={{ color: '#636e72', fontSize: '0.9em' }}>Protect your vault with Google Authenticator.</p>
                     
-                    {setupStep === 'initial' && (
-                      <Button variant="outlined" onClick={handleStart2FASetup} sx={{ mt: 1 }}>Enable 2FA</Button>
-                    )}
-                    {setupStep === 'scan' && (
-                      <Box sx={{ textAlign: 'center', mt: 2 }}>
-                        <Typography sx={{ mb: 2 }}>Scan this QR code with your Authenticator App:</Typography>
-                        <img src={qrCodeUrl} alt="QR Code" style={{ width: '180px', border: '10px solid white', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
-                        <Typography sx={{ mt: 1, fontSize: '0.85em', color: '#636e72' }}>Manual Key: <strong>{twoFactorSecret}</strong></Typography>
-                        
-                        <Box component="form" onSubmit={handleVerify2FASetup} sx={{ display: 'flex', gap: 1, mt: 3, justifyContent: 'center' }}>
-                          <TextField size="small" label="Enter 6-digit code" value={setupPin} onChange={(e) => setSetupPin(e.target.value.replace(/\D/g, ''))} inputProps={{ maxLength: 6 }} required />
-                          <Button type="submit" variant="contained" sx={{ backgroundColor: '#0984e3' }}>Verify</Button>
-                        </Box>
-                      </Box>
-                    )}
-                    {setupStep === 'success' && (
-                      <Typography sx={{ color: '#00b894', fontWeight: 'bold', mt: 1 }}>✅ 2FA is Active</Typography>
+                    {patientData?.user?.isTwoFactorEnabled || setupStep === 'success' ? (
+                      <Typography sx={{ color: '#00b894', fontWeight: 'bold', mt: 2, fontSize: '1.2em' }}>
+                        ✅ 2FA is securely enabled on this account.
+                      </Typography>
+                    ) : (
+                      <>
+                        {setupStep === 'initial' && (
+                          <Button variant="outlined" onClick={handleStart2FASetup} sx={{ mt: 1 }}>Enable 2FA</Button>
+                        )}
+                        {setupStep === 'scan' && (
+                          <Box sx={{ textAlign: 'center', mt: 2 }}>
+                            <Typography sx={{ mb: 2 }}>Scan this QR code with your Authenticator App:</Typography>
+                            <img src={qrCodeUrl} alt="QR Code" style={{ width: '180px', border: '10px solid white', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
+                            <Typography sx={{ mt: 1, fontSize: '0.85em', color: '#636e72' }}>Manual Key: <strong>{twoFactorSecret}</strong></Typography>
+                            
+                            <Box component="form" onSubmit={handleVerify2FASetup} sx={{ display: 'flex', gap: 1, mt: 3, justifyContent: 'center' }}>
+                              <TextField size="small" label="Enter 6-digit code" value={setupPin} onChange={(e) => setSetupPin(e.target.value.replace(/\D/g, ''))} inputProps={{ maxLength: 6 }} required />
+                              <Button type="submit" variant="contained" sx={{ backgroundColor: '#0984e3' }}>Verify</Button>
+                            </Box>
+                          </Box>
+                        )}
+                      </>
                     )}
                   </div>
 

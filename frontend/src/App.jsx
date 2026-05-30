@@ -240,7 +240,7 @@ const handleSendEmailCode = async (uid = savedUserId) => {
 
       if (!optionsRes.ok) throw new Error(options.error || "Failed to get challenge");
 
-      const attestationResponse = await startRegistration(options);
+      const attestationResponse = await startRegistration({ optionsJSON: options });
 
       const verificationRes = await fetch(`${API_URL}/api/auth/webauthn/verify-registration`, {
         method: 'POST',

@@ -159,6 +159,9 @@ app.post('/api/auth/login', async (req, res) => {
 app.post('/api/auth/2fa/generate', authenticateToken, async (req, res) => {
     try {
         const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+
+        if (!user) return res.status(404).json({ error: "User profile not found." });
+        
         if (user.isTwoFactorEnabled) return res.status(400).json({ error: "2FA is already enabled." });
 
         const secret = authenticator.generateSecret();

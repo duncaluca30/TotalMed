@@ -45,6 +45,10 @@ function App() {
   const [requires2FA, setRequires2FA] = useState(false);
   const [savedUserId, setSavedUserId] = useState('');
   const [twoFactorToken, setTwoFactorToken] = useState('');
+
+  const [available2FAMethods, setAvailable2FAMethods] = useState(['EMAIL']);
+  const [selected2FAMethod, setSelected2FAMethod] = useState('EMAIL');
+  const [emailCodeSent, setEmailCodeSent] = useState(false);
   
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [twoFactorSecret, setTwoFactorSecret] = useState('');
@@ -140,24 +144,39 @@ function App() {
       if (data.requires2FA) {
         setSavedUserId(data.userId);
         setRequires2FA(true);
-        setToast({ open: true, message: data.message, severity: 'info' });
-        return;
+        setAvailable2FAMethods(data.methods);
+        
+        const defaultMethod = data.methods.includes('APP') ? 'APP' : 'EMAIL';
+        setSelected2FAMethod(defaultMethod);
+        
+        if (defaultMethod === 'EMAIL') {
+          handleSendEmailCode(data.userId);
+        } else {
+          setToast({ open: true, message: "Please open Google Authenticator.", severity: 'info' });
+        }
       }
-
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('role', data.role);
-      setLoggedInToken(data.token);
-      setUserRole(data.role);
-      setToast({ open: true, message: 'Logged in successfully', severity: 'success' });
     } catch (error) { setToast({ open: true, message: 'Failed to connect.', severity: 'error' }); }
   };
 
-  // 2FA VALIDATION
+const handleSendEmailCode = async (uid = savedUserId) => {
+    setToast({ open: true, message: 'Dispatching secure code to your email...', severity: 'info' });
+    try {
+      const response = await fetch(`${API_URL}/api/auth/2fa/send-email`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: uid })
+      });
+      if (response.ok) {
+        setEmailCodeSent(true);
+        setToast({ open: true, message: 'Code successfully sent to your email!', severity: 'success' });
+      }
+    } catch (error) { setToast({ open: true, message: 'Failed to send email.', severity: 'error' }); }
+  };
+
   const handle2FAValidation = async (e) => {
     e.preventDefault();
     try {
       const response = await fetch(`${API_URL}/api/auth/2fa/validate`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: savedUserId, token: twoFactorToken })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ userId: savedUserId, token: twoFactorToken, method: selected2FAMethod }) // 👈 Pass the selected method
       });
       const data = await response.json();
       if (response.ok) {
@@ -165,16 +184,15 @@ function App() {
         localStorage.setItem('role', data.role);
         setLoggedInToken(data.token);
         setUserRole(data.role);
-        setToast({ open: true, message: '2FA Verified! Logged in successfully', severity: 'success' });
+        setToast({ open: true, message: 'Identity Verified! Welcome.', severity: 'success' });
         
         setRequires2FA(false);
         setTwoFactorToken('');
+        setEmailCodeSent(false);
       } else {
         setToast({ open: true, message: data.error, severity: 'error' });
       }
-    } catch (error) {
-      setToast({ open: true, message: 'Failed to validate 2FA.', severity: 'error' });
-    }
+    } catch (error) { setToast({ open: true, message: 'Failed to validate 2FA.', severity: 'error' }); }
   };
 
   // 2FA SETUP LOGIC
@@ -546,11 +564,31 @@ function App() {
 
             {requires2FA ? (
               <Box component="form" onSubmit={handle2FAValidation} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Typography sx={{ textAlign: 'center', color: '#2d3436', mb: 1 }}>
-                  🔒 Enter the 6-digit code from Google Authenticator
+                
+                {/* 2FA Method Selector Tabs */}
+                {available2FAMethods.length > 1 && (
+                  <Tabs 
+                    value={selected2FAMethod} 
+                    onChange={(e, newValue) => {
+                      setSelected2FAMethod(newValue);
+                      if (newValue === 'EMAIL' && !emailCodeSent) handleSendEmailCode();
+                    }} 
+                    centered 
+                    sx={{ mb: 1 }}
+                  >
+                    <Tab label="Authenticator App" value="APP" />
+                    <Tab label="Email OTP" value="EMAIL" />
+                  </Tabs>
+                )}
+
+                <Typography sx={{ textAlign: 'center', color: '#2d3436', mb: 1, fontWeight: 'bold' }}>
+                  {selected2FAMethod === 'APP' 
+                    ? "🔒 Enter the 6-digit code from Google Authenticator" 
+                    : "📧 Enter the 6-digit code sent to your email"}
                 </Typography>
+
                 <TextField 
-                  label="Authenticator Code" 
+                  label="6-Digit Code" 
                   value={twoFactorToken}
                   onChange={(e) => setTwoFactorToken(e.target.value.replace(/\D/g, ''))}
                   inputProps={{ maxLength: 6, style: { letterSpacing: '8px', textAlign: 'center', fontSize: '1.5em', fontWeight: 'bold' } }}
@@ -558,10 +596,18 @@ function App() {
                   fullWidth 
                   autoFocus
                 />
+
                 <Button type="submit" variant="contained" size="large" sx={{ mt: 1, backgroundColor: '#00b894', py: 1.5, fontSize: '1.1rem', textTransform: 'none' }}>
-                  Verify Code
+                  Verify & Access Vault
                 </Button>
-                <Button onClick={() => setRequires2FA(false)} variant="text" sx={{ color: '#636e72', textTransform: 'none' }}>
+
+                {selected2FAMethod === 'EMAIL' && (
+                   <Button onClick={() => handleSendEmailCode()} variant="text" sx={{ color: '#0984e3', textTransform: 'none' }}>
+                     Didn't receive it? Resend Email
+                   </Button>
+                )}
+
+                <Button onClick={() => { setRequires2FA(false); setEmailCodeSent(false); }} variant="text" sx={{ color: '#636e72', textTransform: 'none' }}>
                   Cancel & Return to Login
                 </Button>
               </Box>

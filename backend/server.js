@@ -11,6 +11,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { generateSecret, generateURI, verify } = require('otplib');
 const qrcode = require('qrcode');
+const { sendOTPEmail } = require('./utils/mailer');
+const { verify } = require('otplib');
 
 // Prisma 7 Adapter Setup
 const { Pool } = require('pg');
@@ -135,24 +137,43 @@ app.post('/api/auth/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ error: "Invalid email or password" });
 
-        if (user.isTwoFactorEnabled) {
-            return res.json({ 
-                requires2FA: true, 
-                userId: user.id, 
-                message: "Please enter your Authenticator code." 
-            });
-        }
+        // Email 2FA is mandatory for everyone. Add APP if they set it up.
+        const availableMethods = ['EMAIL'];
+        if (user.isTwoFactorEnabled) availableMethods.push('APP');
 
-        const token = jwt.sign(
-            { id: user.id, role: user.role },
-            process.env.JWT_SECRET,
-            { expiresIn: '1d' }
-        );
+        return res.json({ 
+            requires2FA: true, 
+            userId: user.id, 
+            methods: availableMethods 
+        });
 
-        res.json({ token, message: "Logged in successfully", role: user.role });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Login failed" });
+    }
+});
+
+app.post('/api/auth/2fa/send-email', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        // Generate a random 6-digit code and set expiry to 10 minutes from now
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 10 * 60000); 
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: { emailOtpCode: otpCode, emailOtpExpiresAt: expiresAt }
+        });
+
+        await sendOTPEmail(user.email, otpCode);
+        res.json({ message: "Security code sent to your email." });
+
+    } catch (error) {
+        console.error("🚨 EMAIL DISPATCH ERROR:", error);
+        res.status(500).json({ error: "Failed to send email." });
     }
 });
 
@@ -213,26 +234,38 @@ app.post('/api/auth/2fa/verify-setup', authenticateToken, async (req, res) => {
 
 app.post('/api/auth/2fa/validate', async (req, res) => {
     try {
-        const { userId, token } = req.body;
-
+        const { userId, token, method } = req.body;
         const user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user || !user.isTwoFactorEnabled) return res.status(400).json({ error: "Invalid 2FA request." });
+        if (!user) return res.status(400).json({ error: "Invalid request." });
 
-        const verification = await verify({ token, secret: user.twoFactorSecret });
+        let isValid = false;
 
-        if (verification.valid) {
-            const jwtToken = jwt.sign(
-                { id: user.id, role: user.role },
-                process.env.JWT_SECRET,
-                { expiresIn: '1d' }
-            );
-            res.json({ token: jwtToken, message: "2FA Validated! Logged in successfully", role: user.role });
+        if (method === 'APP') {
+            if (!user.isTwoFactorEnabled) return res.status(400).json({ error: "App 2FA is not enabled." });
+            const verification = await verify({ token, secret: user.twoFactorSecret });
+            isValid = verification.valid;
+
+        } else if (method === 'EMAIL') {
+            if (!user.emailOtpCode || !user.emailOtpExpiresAt) return res.status(400).json({ error: "No email code requested." });
+            if (new Date() > user.emailOtpExpiresAt) return res.status(400).json({ error: "Code expired. Please request a new one." });
+            if (token === user.emailOtpCode) isValid = true;
+        }
+
+        if (isValid) {
+            // Burn the email OTP so it can't be used twice
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { emailOtpCode: null, emailOtpExpiresAt: null }
+            });
+
+            const jwtToken = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
+            res.json({ token: jwtToken, message: "Logged in successfully", role: user.role });
         } else {
-            res.status(400).json({ error: "Invalid authenticator code." });
+            res.status(400).json({ error: "Invalid verification code." });
         }
     } catch (error) {
-        console.error("🚨 2FA LOGIN ERROR:", error);
-        res.status(500).json({ error: "Failed to validate 2FA." });
+        console.error("🚨 2FA VALIDATION ERROR:", error);
+        res.status(500).json({ error: "Failed to validate code." });
     }
 });
 

@@ -264,9 +264,9 @@ app.post('/api/auth/webauthn/verify-authentication', async (req, res) => {
             expectedChallenge,
             expectedOrigin: origin,
             expectedRPID: rpID,
-            authenticator: {
-                credentialPublicKey: passkey.credentialPublicKey,
-                credentialID: passkey.credentialId,
+            credential: {
+                id: passkey.credentialId,
+                publicKey: passkey.credentialPublicKey,
                 counter: passkey.counter,
             }
         });

@@ -140,7 +140,7 @@ app.get('/api/auth/webauthn/generate-registration', authenticateToken, async (re
         const options = await generateRegistrationOptions({
             rpName: 'TotalMed Secure Vault',
             rpID,
-            userID: user.id,
+            userID: new Uint8Array(Buffer.from(user.id)),
             userName: user.email,
 
             excludeCredentials: user.passkeys.map(passkey => ({

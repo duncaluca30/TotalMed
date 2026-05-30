@@ -12,7 +12,6 @@ const jwt = require('jsonwebtoken');
 const { generateSecret, generateURI, verify } = require('otplib');
 const qrcode = require('qrcode');
 const { sendOTPEmail } = require('./utils/mailer');
-const { verify } = require('otplib');
 
 // Prisma 7 Adapter Setup
 const { Pool } = require('pg');

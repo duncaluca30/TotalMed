@@ -13,7 +13,7 @@ import dayjs from 'dayjs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import { startRegistration } from '@simplewebauthn/browser';
+import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 
 function App() {
   const API_URL = 'https://totalmed-backend.onrender.com'; 
@@ -266,6 +266,40 @@ const handleSendEmailCode = async (uid = savedUserId) => {
       } else {
          setToast({ open: true, message: `Failed: ${error.message || error.name}`, severity: 'error' });
       }
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    setToast({ open: true, message: 'Waiting for fingerprint/Face ID...', severity: 'info' });
+    try {
+      // 1. Get the challenge
+      const optionsRes = await fetch(`${API_URL}/api/auth/webauthn/generate-authentication`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: savedUserId })
+      });
+      const options = await optionsRes.json();
+
+      // 2. Trigger the hardware scanner popup
+      const authResponse = await startAuthentication({ optionsJSON: options });
+
+      // 3. Send signature to backend
+      const verifyRes = await fetch(`${API_URL}/api/auth/webauthn/verify-authentication`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: savedUserId, response: authResponse })
+      });
+      const data = await verifyRes.json();
+
+      if (verifyRes.ok) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('role', data.role);
+        setLoggedInToken(data.token);
+        setUserRole(data.role);
+        setToast({ open: true, message: 'Identity Verified! Welcome.', severity: 'success' });
+        setRequires2FA(false);
+      } else {
+        setToast({ open: true, message: data.error, severity: 'error' });
+      }
+    } catch (error) {
+      console.error(error);
+      setToast({ open: true, message: 'Biometric login failed or cancelled.', severity: 'error' });
     }
   };
 
@@ -625,37 +659,53 @@ const handleSendEmailCode = async (uid = savedUserId) => {
                       if (newValue === 'EMAIL' && !emailCodeSent) handleSendEmailCode();
                     }} 
                     centered 
-                    sx={{ mb: 1 }}
+                    sx={{ mb: 2 }}
                   >
-                    <Tab label="Authenticator App" value="APP" />
-                    <Tab label="Email OTP" value="EMAIL" />
+                    {available2FAMethods.includes('APP') && <Tab label="App" value="APP" />}
+                    {available2FAMethods.includes('EMAIL') && <Tab label="Email" value="EMAIL" />}
+                    {available2FAMethods.includes('BIOMETRICS') && <Tab label="Biometrics" value="BIOMETRICS" />}
                   </Tabs>
                 )}
 
-                <Typography sx={{ textAlign: 'center', color: '#2d3436', mb: 1, fontWeight: 'bold' }}>
-                  {selected2FAMethod === 'APP' 
-                    ? "🔒 Enter the 6-digit code from Google Authenticator" 
-                    : "📧 Enter the 6-digit code sent to your email"}
-                </Typography>
+                {selected2FAMethod === 'BIOMETRICS' ? (
+                  <Box sx={{ textAlign: 'center', py: 2 }}>
+                    <Typography sx={{ color: '#636e72', mb: 3 }}>Use your device's secure hardware to log in.</Typography>
+                    <Button 
+                      variant="contained" 
+                      onClick={handleBiometricLogin} 
+                      sx={{ backgroundColor: '#6c5ce7', py: 1.5, fontSize: '1.1rem', width: '100%', textTransform: 'none' }}
+                    >
+                      👆 Scan Fingerprint / Face ID
+                    </Button>
+                  </Box>
+                ) : (
+                  <>
+                    <Typography sx={{ textAlign: 'center', color: '#2d3436', mb: 1, fontWeight: 'bold' }}>
+                      {selected2FAMethod === 'APP' 
+                        ? "🔒 Enter the 6-digit code from Google Authenticator" 
+                        : "📧 Enter the 6-digit code sent to your email"}
+                    </Typography>
 
-                <TextField 
-                  label="6-Digit Code" 
-                  value={twoFactorToken}
-                  onChange={(e) => setTwoFactorToken(e.target.value.replace(/\D/g, ''))}
-                  inputProps={{ maxLength: 6, style: { letterSpacing: '8px', textAlign: 'center', fontSize: '1.5em', fontWeight: 'bold' } }}
-                  required 
-                  fullWidth 
-                  autoFocus
-                />
+                    <TextField 
+                      label="6-Digit Code" 
+                      value={twoFactorToken}
+                      onChange={(e) => setTwoFactorToken(e.target.value.replace(/\D/g, ''))}
+                      inputProps={{ maxLength: 6, style: { letterSpacing: '8px', textAlign: 'center', fontSize: '1.5em', fontWeight: 'bold' } }}
+                      required 
+                      fullWidth 
+                      autoFocus
+                    />
 
-                <Button type="submit" variant="contained" size="large" sx={{ mt: 1, backgroundColor: '#00b894', py: 1.5, fontSize: '1.1rem', textTransform: 'none' }}>
-                  Verify & Access Vault
-                </Button>
+                    <Button type="submit" variant="contained" size="large" sx={{ mt: 1, backgroundColor: '#00b894', py: 1.5, fontSize: '1.1rem', textTransform: 'none' }}>
+                      Verify & Access Vault
+                    </Button>
 
-                {selected2FAMethod === 'EMAIL' && (
-                   <Button onClick={() => handleSendEmailCode()} variant="text" sx={{ color: '#0984e3', textTransform: 'none' }}>
-                     Didn't receive it? Resend Email
-                   </Button>
+                    {selected2FAMethod === 'EMAIL' && (
+                       <Button onClick={() => handleSendEmailCode()} variant="text" sx={{ color: '#0984e3', textTransform: 'none' }}>
+                         Didn't receive it? Resend Email
+                       </Button>
+                    )}
+                  </>
                 )}
 
                 <Button onClick={() => { setRequires2FA(false); setEmailCodeSent(false); }} variant="text" sx={{ color: '#636e72', textTransform: 'none' }}>

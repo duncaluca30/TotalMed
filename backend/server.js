@@ -12,9 +12,9 @@ const jwt = require('jsonwebtoken');
 const { generateSecret, generateURI, verify } = require('otplib');
 const qrcode = require('qrcode');
 const { sendOTPEmail } = require('./utils/mailer');
-const { generateRegistrationOptions, verifyRegistrationResponse } = require('@simplewebauthn/server');
+const { generateRegistrationOptions, verifyRegistrationResponse, 
+        generateAuthenticationOptions, verifyAuthenticationResponse } = require('@simplewebauthn/server');
 
-// Prisma 7 Adapter Setup
 const { Pool } = require('pg');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('@prisma/client');
@@ -215,11 +215,90 @@ app.post('/api/auth/webauthn/verify-registration', authenticateToken, async (req
     }
 });
 
+app.post('/api/auth/webauthn/generate-authentication', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        const user = await prisma.user.findUnique({ where: { id: userId }, include: { passkeys: true } });
+        
+        const origin = req.headers.origin || 'http://localhost:5173';
+        const rpID = new URL(origin).hostname;
+
+        const options = await generateAuthenticationOptions({
+            rpID,
+            // Only allow devices that this specific user has registered
+            allowCredentials: user.passkeys.map(passkey => ({
+                id: passkey.credentialId,
+                type: 'public-key',
+            })),
+            userVerification: 'preferred',
+        });
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { webAuthnChallenge: options.challenge }
+        });
+
+        res.json(options);
+    } catch (error) {
+        console.error("🚨 AUTH GENERATE ERROR:", error);
+        res.status(500).json({ error: "Failed to generate login challenge." });
+    }
+});
+
+app.post('/api/auth/webauthn/verify-authentication', async (req, res) => {
+    try {
+        const { userId, response } = req.body;
+        const user = await prisma.user.findUnique({ where: { id: userId }, include: { passkeys: true } });
+        
+        const expectedChallenge = user.webAuthnChallenge;
+        // Find the specific device the user just scanned
+        const passkey = user.passkeys.find(pk => pk.credentialId === response.id);
+
+        if (!passkey) return res.status(400).json({ error: "Unrecognized device." });
+
+        const origin = req.headers.origin || 'http://localhost:5173';
+        const rpID = new URL(origin).hostname;
+
+        const verification = await verifyAuthenticationResponse({
+            response,
+            expectedChallenge,
+            expectedOrigin: origin,
+            expectedRPID: rpID,
+            authenticator: {
+                credentialPublicKey: passkey.credentialPublicKey,
+                credentialID: passkey.credentialId,
+                counter: passkey.counter,
+            }
+        });
+
+        if (verification.verified) {
+            // Update the secure counter to prevent replay attacks
+            await prisma.passkey.update({
+                where: { id: passkey.id },
+                data: { counter: verification.authenticationInfo.newCounter }
+            });
+            await prisma.user.update({ where: { id: user.id }, data: { webAuthnChallenge: null } });
+
+            // LOG THEM IN!
+            const jwtToken = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
+            res.json({ token: jwtToken, message: "Biometrics Verified! Welcome.", role: user.role });
+        } else {
+            res.status(400).json({ error: "Biometric verification failed." });
+        }
+    } catch (error) {
+        console.error("🚨 AUTH VERIFY ERROR:", error);
+        res.status(500).json({ error: "Failed to verify biometrics." });
+    }
+});
+
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await prisma.user.findUnique({
+             where: { email },
+             include: { passkeys: true }
+            });
         if (!user) return res.status(400).json({ error: "Invalid email or password" });
 
         const isMatch = await bcrypt.compare(password, user.password);
@@ -228,6 +307,8 @@ app.post('/api/auth/login', async (req, res) => {
         // Email 2FA is mandatory for everyone. Add APP if they set it up.
         const availableMethods = ['EMAIL'];
         if (user.isTwoFactorEnabled) availableMethods.push('APP');
+
+        if (user.passkeys && user.passkeys.length > 0) availableMethods.push('BIOMETRICS');
 
         return res.json({ 
             requires2FA: true, 

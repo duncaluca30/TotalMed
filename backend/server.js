@@ -161,7 +161,7 @@ app.post('/api/auth/2fa/generate', authenticateToken, async (req, res) => {
         const user = await prisma.user.findUnique({ where: { id: req.user.id } });
 
         if (!user) return res.status(404).json({ error: "User profile not found." });
-        
+
         if (user.isTwoFactorEnabled) return res.status(400).json({ error: "2FA is already enabled." });
 
         const secret = authenticator.generateSecret();
@@ -177,6 +177,7 @@ app.post('/api/auth/2fa/generate', authenticateToken, async (req, res) => {
 
         res.json({ qrCodeUrl, secret });
     } catch (error) {
+        console.error("🚨 2FA GENERATION ERROR:", error);
         res.status(500).json({ error: "Failed to generate 2FA code." });
     }
 });

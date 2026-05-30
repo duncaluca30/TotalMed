@@ -185,17 +185,18 @@ app.post('/api/auth/webauthn/verify-registration', authenticateToken, async (req
 
         if (verification.verified) {
             const { registrationInfo } = verification;
-            const { credentialPublicKey, credentialID, counter } = registrationInfo;
+            
+            const { credential, credentialDeviceType, credentialBackedUp } = registrationInfo;
 
             await prisma.passkey.create({
                 data: {
                     userId: user.id,
                     webauthnUserId: user.id,
-                    credentialId: Buffer.from(credentialID).toString('base64url'),
-                    credentialPublicKey: Buffer.from(credentialPublicKey),
-                    counter,
-                    deviceType: registrationInfo.credentialDeviceType,
-                    backedUp: registrationInfo.credentialBackedUp,
+                    credentialId: credential.id, // V10 already formats this as a Base64 string!
+                    credentialPublicKey: Buffer.from(credential.publicKey),
+                    counter: credential.counter,
+                    deviceType: credentialDeviceType,
+                    backedUp: credentialBackedUp,
                 }
             });
 

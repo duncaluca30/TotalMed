@@ -25,14 +25,16 @@ model User {
   role      Role     @default(PATIENT)
   createdAt DateTime @default(now())
 
-  patientProfile Patient?
-  doctorProfile  Doctor?
-
   twoFactorSecret String?
   isTwoFactorEnabled Boolean @default(false)
 
   emailOtpCode       String?
   emailOtpExpiresAt  DateTime?
+  webAuthnChallenge  String?
+
+  patientProfile Patient?
+  doctorProfile  Doctor?
+  passkeys       Passkey[]
 }
 
 model Patient {
@@ -99,4 +101,16 @@ model AccessCode {
 
   patientId String   @unique
   patient   Patient  @relation(fields: [patientId], references: [id])
+}
+
+model Passkey {
+  id                  String   @id @default(uuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id])
+  webauthnUserId      String   // Unique identifier for the credential
+  credentialId        String   // Unique to the authenticator
+  credentialPublicKey Bytes    // Public key to verify signatures
+  counter             Int      // Increments each time the authenticator is used
+  deviceType          String
+  backedUp            Boolean
 }

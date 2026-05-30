@@ -13,6 +13,7 @@ import dayjs from 'dayjs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import { startRegistration } from '@simplewebauthn/browser';
 
 function App() {
   const API_URL = 'https://totalmed-backend.onrender.com'; 
@@ -227,6 +228,42 @@ const handleSendEmailCode = async (uid = savedUserId) => {
         setToast({ open: true, message: data.error, severity: 'error' });
       }
     } catch (err) { setToast({ open: true, message: 'Failed to verify 2FA', severity: 'error' }); }
+  };
+
+  const handleEnableBiometrics = async () => {
+    setToast({ open: true, message: 'Initiating biometric setup...', severity: 'info' });
+    try {
+      const optionsRes = await fetch(`${API_URL}/api/auth/webauthn/generate-registration`, {
+        headers: { 'Authorization': `Bearer ${loggedInToken}` }
+      });
+      const options = await optionsRes.json();
+
+      const attestationResponse = await startRegistration(options);
+
+      const verificationRes = await fetch(`${API_URL}/api/auth/webauthn/verify-registration`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${loggedInToken}`
+        },
+        body: JSON.stringify(attestationResponse)
+      });
+
+      const verification = await verificationRes.json();
+
+      if (verificationRes.ok) {
+        setToast({ open: true, message: 'Fingerprint/Face ID securely registered!', severity: 'success' });
+      } else {
+        setToast({ open: true, message: verification.error, severity: 'error' });
+      }
+    } catch (error) {
+      console.error(error);
+      if (error.name === 'NotAllowedError') {
+         setToast({ open: true, message: 'Biometric setup cancelled.', severity: 'warning' });
+      } else {
+         setToast({ open: true, message: 'Your device does not support this feature.', severity: 'error' });
+      }
+    }
   };
 
   const handleGenerateCode = async () => {

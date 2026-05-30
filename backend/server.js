@@ -12,6 +12,7 @@ const jwt = require('jsonwebtoken');
 const { generateSecret, generateURI, verify } = require('otplib');
 const qrcode = require('qrcode');
 const { sendOTPEmail } = require('./utils/mailer');
+const { generateRegistrationOptions, verifyRegistrationResponse } = require('@simplewebauthn/server');
 
 // Prisma 7 Adapter Setup
 const { Pool } = require('pg');
@@ -123,6 +124,93 @@ app.post('/api/auth/register', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Registration failed" });
+    }
+});
+
+app.get('/api/auth/webauthn/generate-registration', authenticateToken, async (req, res) => {
+    try {
+        const user = await prisma.user.findUnique({ 
+            where: { id: req.user.id },
+            include: { passkeys: true }
+        });
+
+        const origin = req.headers.origin || 'http://localhost:5173';
+        const rpID = new URL(origin).hostname;
+
+        const options = await generateRegistrationOptions({
+            rpName: 'TotalMed Secure Vault',
+            rpID,
+            userID: user.id,
+            userName: user.email,
+
+            excludeCredentials: user.passkeys.map(passkey => ({
+                id: passkey.credentialId,
+                type: 'public-key',
+            })),
+            authenticatorSelection: {
+                residentKey: 'preferred',
+                userVerification: 'preferred',
+                authenticatorAttachment: 'platform',
+            },
+        });
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { webAuthnChallenge: options.challenge }
+        });
+
+        res.json(options);
+    } catch (error) {
+        console.error("🚨 WEBAUTHN GENERATE ERROR:", error);
+        res.status(500).json({ error: "Failed to generate biometrics challenge." });
+    }
+});
+
+app.post('/api/auth/webauthn/verify-registration', authenticateToken, async (req, res) => {
+    try {
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+        const expectedChallenge = user.webAuthnChallenge;
+
+        if (!expectedChallenge) return res.status(400).json({ error: "No challenge found." });
+
+        const origin = req.headers.origin || 'http://localhost:5173';
+        const rpID = new URL(origin).hostname;
+
+        const verification = await verifyRegistrationResponse({
+            response: req.body,
+            expectedChallenge,
+            expectedOrigin: origin,
+            expectedRPID: rpID,
+        });
+
+        if (verification.verified) {
+            const { registrationInfo } = verification;
+            const { credentialPublicKey, credentialID, counter } = registrationInfo;
+
+            await prisma.passkey.create({
+                data: {
+                    userId: user.id,
+                    webauthnUserId: user.id,
+                    credentialId: Buffer.from(credentialID).toString('base64url'),
+                    credentialPublicKey: Buffer.from(credentialPublicKey),
+                    counter,
+                    deviceType: registrationInfo.credentialDeviceType,
+                    backedUp: registrationInfo.credentialBackedUp,
+                }
+            });
+
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { webAuthnChallenge: null }
+            });
+
+            res.json({ message: "Biometrics successfully registered!" });
+        } else {
+            res.status(400).json({ error: "Biometric verification failed." });
+        }
+    } catch (error) {
+        console.error("🚨 WEBAUTHN VERIFY ERROR:", error);
+        res.status(500).json({ error: "Failed to verify biometrics." });
     }
 });
 

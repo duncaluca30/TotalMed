@@ -259,11 +259,12 @@ const handleSendEmailCode = async (uid = savedUserId) => {
         setToast({ open: true, message: verification.error, severity: 'error' });
       }
     } catch (error) {
-      console.error(error);
+      console.error("🚨 BIOMETRICS ERROR:", error);
+      
       if (error.name === 'NotAllowedError') {
          setToast({ open: true, message: 'Biometric setup cancelled.', severity: 'warning' });
       } else {
-         setToast({ open: true, message: 'Your device does not support this feature.', severity: 'error' });
+         setToast({ open: true, message: `Failed: ${error.message || error.name}`, severity: 'error' });
       }
     }
   };

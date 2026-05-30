@@ -238,6 +238,8 @@ const handleSendEmailCode = async (uid = savedUserId) => {
       });
       const options = await optionsRes.json();
 
+      if (!optionsRes.ok) throw new Error(options.error || "Failed to get challenge");
+
       const attestationResponse = await startRegistration(options);
 
       const verificationRes = await fetch(`${API_URL}/api/auth/webauthn/verify-registration`, {
@@ -508,6 +510,17 @@ const handleSendEmailCode = async (uid = savedUserId) => {
                         )}
                       </>
                     )}
+                    <hr style={{ border: 'none', borderTop: '1px dashed #dfe6e9', margin: '30px 0 20px 0' }} />
+                    
+                    <h3>👆 Biometric Login</h3>
+                    <p style={{ color: '#636e72', fontSize: '0.9em' }}>Register this device to log in with Fingerprint, Face ID, or Windows Hello.</p>
+                    <Button 
+                      variant="contained" 
+                      onClick={handleEnableBiometrics} 
+                      sx={{ mt: 1, backgroundColor: '#6c5ce7', '&:hover': { backgroundColor: '#a29bfe' }, textTransform: 'none' }}
+                    >
+                      Register Current Device
+                    </Button>
                   </div>
 
                   <div className="card" style={{ backgroundColor: '#fff3cd', color: '#856404', marginTop: '20px', border: '2px dashed #ffeeba' }}>

@@ -107,10 +107,10 @@ model Passkey {
   id                  String   @id @default(uuid())
   userId              String
   user                User     @relation(fields: [userId], references: [id])
-  webauthnUserId      String   // Unique identifier for the credential
-  credentialId        String   // Unique to the authenticator
-  credentialPublicKey Bytes    // Public key to verify signatures
-  counter             Int      // Increments each time the authenticator is used
+  webauthnUserId      String
+  credentialId        String
+  credentialPublicKey Bytes
+  counter             Int
   deviceType          String
   backedUp            Boolean
 }

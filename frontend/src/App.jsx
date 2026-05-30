@@ -18,7 +18,6 @@ function App() {
   const API_URL = 'https://totalmed-backend.onrender.com'; 
 
   const [isLoginView, setIsLoginView] = useState(true);
-  const [statusMessage, setStatusMessage] = useState('');
   const [loggedInToken, setLoggedInToken] = useState(localStorage.getItem('token') || null);
   const [userRole, setUserRole] = useState(localStorage.getItem('role') || null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -41,9 +40,16 @@ function App() {
   const [popupSearch, setPopupSearch] = useState('');
   const [selectedRecordIds, setSelectedRecordIds] = useState([]);
 
-  const [dateInputType, setDateInputType] = useState('text');
-
   const [toast, setToast] = useState({ open: false, message: '', severity: 'info' });
+
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [savedUserId, setSavedUserId] = useState('');
+  const [twoFactorToken, setTwoFactorToken] = useState('');
+  
+  const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [twoFactorSecret, setTwoFactorSecret] = useState('');
+  const [setupPin, setSetupPin] = useState('');
+  const [setupStep, setSetupStep] = useState('initial'); // 'initial' | 'scan' | 'success'
 
   const handleCloseToast = (event, reason) => {
     if (reason === 'clickaway') return;
@@ -79,30 +85,16 @@ function App() {
 
   useEffect(() => {
     if (loggedInToken && userRole === 'PATIENT' && patientData) {
-
       const newSocket = io(API_URL);
       setSocket(newSocket);
 
       newSocket.emit('join-secure-room', patientData.id);
-
-      newSocket.on('auth-request', (data) => {
-        setAuthRequest(data);
-      });
-
+      newSocket.on('auth-request', (data) => setAuthRequest(data));
       newSocket.on('vault-updated', (data) => {
-
-        console.log("🚨 WEBSOCKET RECEIVED:", data);
-        
         setAccessCode(null);
-
-        setPatientData(prevData => ({
-          ...prevData,
-          medicalRecords: [data.newRecord, ...prevData.medicalRecords]
-        }));
-
+        setPatientData(prevData => ({ ...prevData, medicalRecords: [data.newRecord, ...prevData.medicalRecords] }));
         setPatientTab(1); 
       });
-
       return () => newSocket.disconnect();
     }
   }, [loggedInToken, userRole, patientData]);
@@ -111,42 +103,61 @@ function App() {
     e.preventDefault();
 
     const selectedDate = new Date(formData.dateOfBirth);
-    const today = new Date();
-    if (selectedDate > today) {
-      setStatusMessage("❌ Error: Date of birth cannot be in the future.");
-      return;
+    if (selectedDate > new Date()) {
+      return setToast({ open: true, message: "Date of birth cannot be in the future.", severity: 'error' });
     }
-
     if (formData.password !== formData.confirmPassword) {
-      setStatusMessage("❌ Error: Passwords do not match!"); 
-      return; 
+      return setToast({ open: true, message: "Passwords do not match!", severity: 'error' });
+    }
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/.test(formData.password)) {
+      return setToast({ open: true, message: "Password must be 8+ characters, with 1 uppercase, 1 lowercase, 1 number, and 1 special character.", severity: 'error' });
     }
 
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
-    if (!passwordRegex.test(formData.password)) {
-      setStatusMessage("❌ Error: Password must be 8+ characters, with 1 letter, 1 number, and 1 special character.");
-      return;
-    }
-
-    setStatusMessage('Registering...');
+    setToast({ open: true, message: 'Registering...', severity: 'info' });
     try {
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData)
       });
       const data = await response.json();
       if (response.ok) {
-        setStatusMessage('✅ Registration successful! You can now log in.');
+        setToast({ open: true, message: '✅ Registration successful! You can now log in.', severity: 'success' });
         setIsLoginView(true);
-      } else setStatusMessage(`❌ Error: ${data.error}`);
-    } catch (error) { setStatusMessage('❌ Failed to connect to server.'); }
+      } else setToast({ open: true, message: data.error, severity: 'error' });
+    } catch (error) { setToast({ open: true, message: 'Failed to connect to server.', severity: 'error' }); }
   };
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setStatusMessage('Logging in...');
+    setToast({ open: true, message: 'Verifying credentials...', severity: 'info' });
     try {
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: formData.email, password: formData.password })
+      });
+      const data = await response.json();
+      
+      if (!response.ok) return setToast({ open: true, message: data.error, severity: 'error' });
+
+      if (data.requires2FA) {
+        setSavedUserId(data.userId);
+        setRequires2FA(true);
+        setToast({ open: true, message: data.message, severity: 'info' });
+        return;
+      }
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('role', data.role);
+      setLoggedInToken(data.token);
+      setUserRole(data.role);
+      setToast({ open: true, message: 'Logged in successfully', severity: 'success' });
+    } catch (error) { setToast({ open: true, message: 'Failed to connect.', severity: 'error' }); }
+  };
+
+  // 2FA VALIDATION
+  const handle2FAValidation = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`${API_URL}/api/auth/2fa/validate`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: savedUserId, token: twoFactorToken })
       });
       const data = await response.json();
       if (response.ok) {
@@ -154,67 +165,87 @@ function App() {
         localStorage.setItem('role', data.role);
         setLoggedInToken(data.token);
         setUserRole(data.role);
-        setStatusMessage('');
-      } else setStatusMessage(`❌ Error: ${data.error}`);
-    } catch (error) { setStatusMessage('❌ Failed to connect.'); }
+        setToast({ open: true, message: '2FA Verified! Logged in successfully', severity: 'success' });
+        
+        setRequires2FA(false);
+        setTwoFactorToken('');
+      } else {
+        setToast({ open: true, message: data.error, severity: 'error' });
+      }
+    } catch (error) {
+      setToast({ open: true, message: 'Failed to validate 2FA.', severity: 'error' });
+    }
+  };
+
+  // 2FA SETUP LOGIC
+  const handleStart2FASetup = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/2fa/generate`, {
+        method: 'POST', headers: { 'Authorization': `Bearer ${loggedInToken}`, 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setQrCodeUrl(data.qrCodeUrl);
+        setTwoFactorSecret(data.secret);
+        setSetupStep('scan');
+      } else {
+        setToast({ open: true, message: data.error, severity: 'error' });
+      }
+    } catch (err) { setToast({ open: true, message: 'Failed to generate 2FA', severity: 'error' }); }
+  };
+
+  const handleVerify2FASetup = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_URL}/api/auth/2fa/verify-setup`, {
+        method: 'POST', headers: { 'Authorization': `Bearer ${loggedInToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: setupPin })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSetupStep('success');
+        setToast({ open: true, message: '2FA activated successfully!', severity: 'success' });
+      } else {
+        setToast({ open: true, message: data.error, severity: 'error' });
+      }
+    } catch (err) { setToast({ open: true, message: 'Failed to verify 2FA', severity: 'error' }); }
   };
 
   const handleGenerateCode = async () => {
     try {
       const response = await fetch(`${API_URL}/api/patient/generate-code`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${loggedInToken}`
-        }
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${loggedInToken}` }
       });
-      
       const data = await response.json();
       if (response.ok) {
         setAccessCode(data.code);
         setToast({ open: true, message: "Code generated successfully!", severity: 'success' });
-      } else {
-        setToast({ open: true, message: data.error, severity: 'error' });
-      }
-    } catch (error) {
-      setToast({ open: true, message: "Failed to connect to server.", severity: 'error' });
-    }
+      } else setToast({ open: true, message: data.error, severity: 'error' });
+    } catch (error) { setToast({ open: true, message: "Failed to connect.", severity: 'error' }); }
   };
 
   const handleUnlockVault = async (e) => {
     e.preventDefault();
     try {
       const response = await fetch(`${API_URL}/api/doctor/access-vault`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${loggedInToken}` },
-        body: JSON.stringify({ code: vaultCode })
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${loggedInToken}` }, body: JSON.stringify({ code: vaultCode })
       });
       const data = await response.json();
       if (response.ok) {
         setUnlockedPatient(data.patient);
-        setToast({ open: true, message: "Vault Unlocked Successfully", severity: 'success' });
-      } else {
-        setToast({ open: true, message: data.error, severity: 'error' });
-      }
-    } catch (error) {
-      setToast({ open: true, message: "Failed to connect.", severity: 'error' });
-    }
+        setToast({ open: true, message: "Vault Unlocked", severity: 'success' });
+      } else setToast({ open: true, message: data.error, severity: 'error' });
+    } catch (error) { setToast({ open: true, message: "Failed to connect.", severity: 'error' }); }
   };
 
   const handleInjectRecord = async (e) => {
     e.preventDefault();
     try {
       const response = await fetch(`${API_URL}/api/doctor/records`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${loggedInToken}` },
-        body: JSON.stringify({
-          patientId: unlockedPatient.id,
-          code: vaultCode,
-          ...recordForm
-        })
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${loggedInToken}` }, body: JSON.stringify({ patientId: unlockedPatient.id, code: vaultCode, ...recordForm })
       });
       if (response.ok) {
-        setToast({ open: true, message: "Record Injected & Code Burned!", severity: 'success' });
+        setToast({ open: true, message: "Record Injected!", severity: 'success' });
         setUnlockedPatient(null);
         setVaultCode('');
         setRecordForm({ diagnosis: '', treatment: '', notes: '' });
@@ -222,9 +253,7 @@ function App() {
         const data = await response.json();
         setToast({ open: true, message: data.error, severity: 'error' });
       }
-    } catch (error) {
-      setToast({ open: true, message: "Failed to save record.", severity: 'error' });
-    }
+    } catch (error) { setToast({ open: true, message: "Failed to save.", severity: 'error' }); }
   };
 
   const handleLogout = () => {
@@ -239,94 +268,47 @@ function App() {
     setUnlockedPatient(null);
     setVaultCode('');
     setAuthRequest(null);
-    setStatusMessage('Logged out safely.');
+    
+    // Clear 2FA States
+    setRequires2FA(false);
+    setTwoFactorToken('');
+    setSetupStep('initial');
+    setQrCodeUrl('');
+    setSetupPin('');
+
+    setToast({ open: true, message: "Logged out safely.", severity: 'info' });
   };
 
   const handleAuthDecision = (approved) => {
-    socket.emit('auth-response', { 
-      code: authRequest.code, 
-      approved: approved,
-      sharedRecordIds: selectedRecordIds 
-    });
-    
+    socket.emit('auth-response', { code: authRequest.code, approved: approved, sharedRecordIds: selectedRecordIds });
     setAuthRequest(null);
     setPopupSearch('');
     setSelectedRecordIds([]);
   };
 
-  const handleCompleteVisit = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await fetch(`${API_URL}/api/doctor/appointments/${visitForm.appointmentId}/complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${loggedInToken}`
-        },
-        body: JSON.stringify({
-          diagnosis: visitForm.diagnosis,
-          treatment: visitForm.treatment,
-          notes: visitForm.notes
-        })
-      });
-
-      if (response.ok) {
-        setToast({ open: true, message: "Medical Record Saved & Appointment Completed!", severity: 'success' });
-        setVisitForm({ appointmentId: null, diagnosis: '', treatment: '', notes: '' });
-        setRefreshTrigger(prev => prev + 1);
-      } else {
-        const data = await response.json();
-        setToast({ open: true, message: data.error, severity: 'error' });
-      }
-    } catch (error) {
-      setToast({ open: true, message: "Failed to save record.", severity: 'error' });
-    }
-  };
-
   const handleDownloadPDF = (profileData, recordsToPrint, role) => {
     if (!recordsToPrint || recordsToPrint.length === 0) {
-      setToast({ open: true, message: "No medical records available to download.", severity: 'error' });
-      return;
+      return setToast({ open: true, message: "No records to download.", severity: 'error' });
     }
-
     const doc = new jsPDF();
-    
     doc.setFontSize(22);
     doc.setTextColor(9, 132, 227); 
     doc.text("TotalMed Secure Health Vault", 14, 22);
-    
     doc.setFontSize(11);
     doc.setTextColor(45, 52, 54); 
     doc.text(`Official Medical Records Report`, 14, 32);
     doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 38);
-    
     const titlePrefix = role === 'DOCTOR' ? 'Attending Physician: Dr.' : 'Patient File:';
     doc.text(`${titlePrefix} ${profileData.firstName} ${profileData.lastName}`, 14, 48);
-
     const tableColumn = ["Date", "Diagnosis", "Treatment Plan", "Attending Dr.", "Clinical Notes"];
     const tableRows = [];
-
     recordsToPrint.forEach(record => {
-      const recordData = [
-        new Date(record.createdAt).toLocaleDateString(),
-        record.diagnosis,
-        record.treatment || "N/A",
-        `Dr. ${record.doctor?.lastName || 'Unknown'}`,
-        record.notes || "None"
-      ];
-      tableRows.push(recordData);
+      tableRows.push([new Date(record.createdAt).toLocaleDateString(), record.diagnosis, record.treatment || "N/A", `Dr. ${record.doctor?.lastName || 'Unknown'}`, record.notes || "None"]);
     });
-
     autoTable(doc, {
-      startY: 55,
-      head: [tableColumn],
-      body: tableRows,
-      theme: 'grid',
-      headStyles: { fillColor: [9, 132, 227], textColor: [255, 255, 255] },
-      styles: { fontSize: 9, cellPadding: 4 },
-      columnStyles: { 4: { cellWidth: 50 } } 
+      startY: 55, head: [tableColumn], body: tableRows, theme: 'grid',
+      headStyles: { fillColor: [9, 132, 227], textColor: [255, 255, 255] }, styles: { fontSize: 9, cellPadding: 4 }, columnStyles: { 4: { cellWidth: 50 } } 
     });
-
     doc.save(`TotalMed_Export_${profileData.lastName}_${new Date().getTime()}.pdf`);
   };
 
@@ -342,9 +324,7 @@ function App() {
               <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold', letterSpacing: '1px' }}>
                 TotalMed Doctor Portal
               </Typography>
-              <Button color="inherit" onClick={handleLogout} sx={{ fontWeight: 'bold' }}>
-                Secure Logout
-              </Button>
+              <Button color="inherit" onClick={handleLogout} sx={{ fontWeight: 'bold' }}>Secure Logout</Button>
             </Toolbar>
           </AppBar>
           
@@ -361,17 +341,8 @@ function App() {
                   <Typography sx={{ color: '#636e72', mb: 3 }}>Enter the 6-digit access code provided by the patient.</Typography>
                   
                   <Box component="form" onSubmit={handleUnlockVault} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                    <TextField 
-                      label="6-Digit Vault Code" 
-                      variant="outlined"
-                      value={vaultCode}
-                      onChange={(e) => setVaultCode(e.target.value)}
-                      inputProps={{ maxLength: 6, style: { fontSize: '1.5em', letterSpacing: '8px', textAlign: 'center', color: '#2d3436' } }}
-                      required 
-                    />
-                    <Button type="submit" variant="contained" size="large" sx={{ backgroundColor: '#0984e3', px: 4 }}>
-                      Access Vault
-                    </Button>
+                    <TextField label="6-Digit Vault Code" variant="outlined" value={vaultCode} onChange={(e) => setVaultCode(e.target.value)} inputProps={{ maxLength: 6, style: { fontSize: '1.5em', letterSpacing: '8px', textAlign: 'center' } }} required />
+                    <Button type="submit" variant="contained" size="large" sx={{ backgroundColor: '#0984e3', px: 4 }}>Access Vault</Button>
                   </Box>
                 </div>
               ) : (
@@ -391,13 +362,7 @@ function App() {
                           📁 Shared Medical History ({unlockedPatient.medicalRecords.length} records)
                         </Typography>
                         {unlockedPatient.medicalRecords.length > 0 && (
-                          <Button 
-                            variant="outlined" 
-                            startIcon={<PictureAsPdfIcon />}
-                            onClick={() => handleDownloadPDF(doctorData, unlockedPatient.medicalRecords, 'DOCTOR')}
-                          >
-                            Export as PDF
-                          </Button>
+                          <Button variant="outlined" startIcon={<PictureAsPdfIcon />} onClick={() => handleDownloadPDF(doctorData, unlockedPatient.medicalRecords, 'DOCTOR')}>Export as PDF</Button>
                         )}
                       </Box>
                       
@@ -405,25 +370,15 @@ function App() {
                         <List>
                           {unlockedPatient.medicalRecords.map((record) => (
                             <ListItem key={record.id} sx={{ borderBottom: '1px solid #dfe6e9', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', pb: 2, mb: 2 }}>
-                               <Typography variant="subtitle1" sx={{ color: '#2d3436' }}>
-                                 <strong>Diagnosis:</strong> {record.diagnosis}
-                               </Typography>
-                               <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                 <strong>Treatment:</strong> {record.treatment}
-                               </Typography>
-                               <Typography variant="body2" sx={{ mt: 0.5, color: '#636e72' }}>
-                                 <strong>Notes:</strong> {record.notes}
-                               </Typography>
-                               <Typography variant="caption" sx={{ mt: 1, color: '#b2bec3' }}>
-                                 Date: {new Date(record.createdAt).toLocaleDateString()} | Attending: Dr. {record.doctor?.lastName || 'Unknown'}
-                               </Typography>
+                               <Typography variant="subtitle1" sx={{ color: '#2d3436' }}><strong>Diagnosis:</strong> {record.diagnosis}</Typography>
+                               <Typography variant="body2" sx={{ mt: 0.5 }}><strong>Treatment:</strong> {record.treatment}</Typography>
+                               <Typography variant="body2" sx={{ mt: 0.5, color: '#636e72' }}><strong>Notes:</strong> {record.notes}</Typography>
+                               <Typography variant="caption" sx={{ mt: 1, color: '#b2bec3' }}>Date: {new Date(record.createdAt).toLocaleDateString()} | Attending: Dr. {record.doctor?.lastName || 'Unknown'}</Typography>
                             </ListItem>
                           ))}
                         </List>
                       ) : (
-                        <Typography sx={{ color: '#e17055', fontStyle: 'italic' }}>
-                          The patient chose not to share any prior medical records.
-                        </Typography>
+                        <Typography sx={{ color: '#e17055', fontStyle: 'italic' }}>The patient chose not to share any prior medical records.</Typography>
                       )}
                     </Box>
                   )}
@@ -433,9 +388,7 @@ function App() {
                     <TextField label="Diagnosis (Required)" required value={recordForm.diagnosis} onChange={(e) => setRecordForm({...recordForm, diagnosis: e.target.value})} fullWidth />
                     <TextField label="Treatment Plan" value={recordForm.treatment} onChange={(e) => setRecordForm({...recordForm, treatment: e.target.value})} fullWidth />
                     <TextField label="Clinical Notes" multiline rows={3} value={recordForm.notes} onChange={(e) => setRecordForm({...recordForm, notes: e.target.value})} fullWidth />
-                    <Button type="submit" variant="contained" sx={{ backgroundColor: '#00b894', color: 'white', mt: 1, py: 1.5, fontSize: '1.1rem' }}>
-                      Save Record & Lock Vault
-                    </Button>
+                    <Button type="submit" variant="contained" sx={{ backgroundColor: '#00b894', color: 'white', mt: 1, py: 1.5, fontSize: '1.1rem' }}>Save Record & Lock Vault</Button>
                   </Box>
                 </div>
               )}
@@ -450,18 +403,13 @@ function App() {
           <AppBar position="static" sx={{ borderRadius: '8px', mb: 4, backgroundColor: '#0984e3', boxShadow: 3 }}>
             <Toolbar>
               <MedicalServicesIcon sx={{ mr: 2 }} />
-              <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold', letterSpacing: '1px' }}>
-                TotalMed Patient Portal
-              </Typography>
-              <Button color="inherit" onClick={handleLogout} sx={{ fontWeight: 'bold' }}>
-                Secure Logout
-              </Button>
+              <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold', letterSpacing: '1px' }}>TotalMed Patient Portal</Typography>
+              <Button color="inherit" onClick={handleLogout} sx={{ fontWeight: 'bold' }}>Secure Logout</Button>
             </Toolbar>
           </AppBar>
           
           {!patientData ? <p>Loading your secure medical records...</p> : (
             <Box sx={{ width: '100%' }}>
-              
               <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
                 <Tabs value={patientTab} onChange={(e, newValue) => setPatientTab(newValue)} textColor="primary" indicatorColor="primary">
                   <Tab label="Dashboard & Vault Key" sx={{ fontWeight: 'bold' }} />
@@ -477,14 +425,37 @@ function App() {
                     <p><strong>DOB:</strong> {new Date(patientData.dateOfBirth).toLocaleDateString()}</p>
                   </div>
 
+                  {/* 2FA SECURITY DASHBOARD CARD */}
+                  <div className="card" style={{ backgroundColor: '#fdfbfb', marginTop: '20px', border: '1px solid #dfe6e9' }}>
+                    <h3>🔐 Two-Factor Authentication</h3>
+                    <p style={{ color: '#636e72', fontSize: '0.9em' }}>Protect your vault with Google Authenticator.</p>
+                    
+                    {setupStep === 'initial' && (
+                      <Button variant="outlined" onClick={handleStart2FASetup} sx={{ mt: 1 }}>Enable 2FA</Button>
+                    )}
+                    {setupStep === 'scan' && (
+                      <Box sx={{ textAlign: 'center', mt: 2 }}>
+                        <Typography sx={{ mb: 2 }}>Scan this QR code with your Authenticator App:</Typography>
+                        <img src={qrCodeUrl} alt="QR Code" style={{ width: '180px', border: '10px solid white', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
+                        <Typography sx={{ mt: 1, fontSize: '0.85em', color: '#636e72' }}>Manual Key: <strong>{twoFactorSecret}</strong></Typography>
+                        
+                        <Box component="form" onSubmit={handleVerify2FASetup} sx={{ display: 'flex', gap: 1, mt: 3, justifyContent: 'center' }}>
+                          <TextField size="small" label="Enter 6-digit code" value={setupPin} onChange={(e) => setSetupPin(e.target.value.replace(/\D/g, ''))} inputProps={{ maxLength: 6 }} required />
+                          <Button type="submit" variant="contained" sx={{ backgroundColor: '#0984e3' }}>Verify</Button>
+                        </Box>
+                      </Box>
+                    )}
+                    {setupStep === 'success' && (
+                      <Typography sx={{ color: '#00b894', fontWeight: 'bold', mt: 1 }}>✅ 2FA is Active</Typography>
+                    )}
+                  </div>
+
                   <div className="card" style={{ backgroundColor: '#fff3cd', color: '#856404', marginTop: '20px', border: '2px dashed #ffeeba' }}>
                     <h3>🔐 Share Medical File</h3>
                     <p>Generate a temporary 6-digit code to allow a doctor to view your history and add new records. This code expires in 60 minutes.</p>
                     
                     {!accessCode ? (
-                      <button onClick={handleGenerateCode} style={{ backgroundColor: '#f39c12', color: 'white', fontWeight: 'bold' }}>
-                        Generate Access Code
-                      </button>
+                      <button onClick={handleGenerateCode} style={{ backgroundColor: '#f39c12', color: 'white', fontWeight: 'bold' }}>Generate Access Code</button>
                     ) : (
                       <div style={{ textAlign: 'center', margin: '15px 0' }}>
                         <p style={{ fontSize: '1.2em', marginBottom: '5px' }}>Your Secure Code:</p>
@@ -500,14 +471,7 @@ function App() {
                 <Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, width: '100%', borderBottom: '2px solid #dfe6e9', paddingBottom: '10px', mb: 2 }}>
                     <h3 style={{ margin: 0, color: '#2d3436' }}>📁 Your Medical History</h3>
-                    <Button 
-                      variant="contained" 
-                      startIcon={<PictureAsPdfIcon />}
-                      onClick={() => handleDownloadPDF(patientData, patientData.medicalRecords, 'PATIENT')}
-                      sx={{ backgroundColor: '#0984e3' }}
-                    >
-                      Download Vault PDF
-                    </Button>
+                    <Button variant="contained" startIcon={<PictureAsPdfIcon />} onClick={() => handleDownloadPDF(patientData, patientData.medicalRecords, 'PATIENT')} sx={{ backgroundColor: '#0984e3' }}>Download Vault PDF</Button>
                   </Box>
                   
                   {patientData.medicalRecords && patientData.medicalRecords.length > 0 ? (
@@ -515,17 +479,11 @@ function App() {
                       <div key={record.id} className="card" style={{ borderLeft: '5px solid #0984e3', marginBottom: '15px', backgroundColor: '#ffffff' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                           <h4 style={{ margin: 0, color: '#2d3436' }}>{record.diagnosis}</h4>
-                          <span style={{ fontSize: '0.9em', color: '#636e72' }}>
-                            {new Date(record.createdAt).toLocaleDateString()}
-                          </span>
+                          <span style={{ fontSize: '0.9em', color: '#636e72' }}>{new Date(record.createdAt).toLocaleDateString()}</span>
                         </div>
                         <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Attending Physician:</strong> Dr. {record.doctor.lastName}</p>
                         {record.treatment && <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Treatment Plan:</strong> {record.treatment}</p>}
-                        {record.notes && (
-                          <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f1f2f6', borderRadius: '4px', fontSize: '0.9em', fontStyle: 'italic' }}>
-                            "{record.notes}"
-                          </div>
-                        )}
+                        {record.notes && <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f1f2f6', borderRadius: '4px', fontSize: '0.9em', fontStyle: 'italic' }}>"{record.notes}"</div>}
                       </div>
                     ))
                   ) : (
@@ -537,17 +495,10 @@ function App() {
           )}
 
           <Dialog open={!!authRequest} disableEscapeKeyDown maxWidth="sm" fullWidth>
-            <DialogTitle sx={{ backgroundColor: '#0984e3', color: 'white', fontWeight: 'bold' }}>
-              🚨 Access Request: {authRequest?.doctorName}
-            </DialogTitle>
+            <DialogTitle sx={{ backgroundColor: '#0984e3', color: 'white', fontWeight: 'bold' }}>🚨 Access Request: {authRequest?.doctorName}</DialogTitle>
             <DialogContent sx={{ mt: 2 }}>
-              <Typography sx={{ mb: 2, color: '#2d3436' }}>
-                Please select the specific medical records you wish to share with this physician.
-              </Typography>
-              <TextField 
-                fullWidth size="small" label="Filter Diagnostics..." variant="outlined" 
-                value={popupSearch} onChange={(e) => setPopupSearch(e.target.value)} sx={{ mb: 2 }}
-              />
+              <Typography sx={{ mb: 2, color: '#2d3436' }}>Please select the specific medical records you wish to share with this physician.</Typography>
+              <TextField fullWidth size="small" label="Filter Diagnostics..." variant="outlined" value={popupSearch} onChange={(e) => setPopupSearch(e.target.value)} sx={{ mb: 2 }} />
               <Box sx={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #dfe6e9', borderRadius: '4px' }}>
                 <List>
                   {(patientData?.medicalRecords || [])
@@ -555,21 +506,13 @@ function App() {
                   .map((record) => {
                       const isChecked = selectedRecordIds.includes(record.id);
                       return (
-                        <ListItem key={record.id} button onClick={() => {
-                            if (isChecked) setSelectedRecordIds(selectedRecordIds.filter(id => id !== record.id));
-                            else setSelectedRecordIds([...selectedRecordIds, record.id]);
-                          }}
-                        >
+                        <ListItem key={record.id} button onClick={() => { isChecked ? setSelectedRecordIds(selectedRecordIds.filter(id => id !== record.id)) : setSelectedRecordIds([...selectedRecordIds, record.id]); }}>
                           <Checkbox checked={isChecked} color="primary" />
                           <ListItemText primary={<strong>{record.diagnosis}</strong>} secondary={`${new Date(record.createdAt).toLocaleDateString()} - Dr. ${record.doctor.lastName}`} />
                         </ListItem>
                       );
                   })}
-                  {patientData?.medicalRecords?.length === 0 && (
-                    <Typography sx={{ p: 2, color: '#636e72', fontStyle: 'italic', textAlign: 'center' }}>
-                      No medical records available to share.
-                    </Typography>
-                  )}
+                  {patientData?.medicalRecords?.length === 0 && <Typography sx={{ p: 2, color: '#636e72', fontStyle: 'italic', textAlign: 'center' }}>No medical records available to share.</Typography>}
                 </List>
               </Box>
             </DialogContent>
@@ -596,36 +539,61 @@ function App() {
               {isLoginView ? 'Sign In' : 'Patient Registration'}
             </Typography>
 
-            <Box component="form" onSubmit={isLoginView ? handleLogin : handleRegister} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {!isLoginView && (
-                <>
-                  <TextField label="First Name" name="firstName" onChange={handleChange} required fullWidth />
-                  <TextField label="Last Name" name="lastName" onChange={handleChange} required fullWidth />
-                  <DatePicker 
-                    label="Date of Birth *"
-                    disableFuture
-                    value={formData.dateOfBirth ? dayjs(formData.dateOfBirth) : null}
-                    onChange={(newValue) => setFormData({ ...formData, dateOfBirth: newValue ? newValue.format('YYYY-MM-DD') : '' })}
-                    slotProps={{ textField: { fullWidth: true, required: true } }}
-                  />
-                  <TextField label="Phone Number" name="phone" type="tel" onChange={handleChange} required fullWidth />
-                </>
-              )}
-              <TextField label="Email Address" name="email" type="email" onChange={handleChange} required fullWidth />
-              <TextField label="Password" name="password" type="password" onChange={handleChange} required fullWidth />
-              {!isLoginView && (
-                <TextField label="Confirm Password" type="password" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} required fullWidth />
-              )}
-              <Button type="submit" variant="contained" size="large" sx={{ mt: 1, backgroundColor: '#0984e3', py: 1.5, fontSize: '1.1rem', textTransform: 'none', borderRadius: '8px' }}>
-                {isLoginView ? 'Secure Login' : 'Register Patient'}
-              </Button>
-            </Box>
+            {requires2FA ? (
+              <Box component="form" onSubmit={handle2FAValidation} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Typography sx={{ textAlign: 'center', color: '#2d3436', mb: 1 }}>
+                  🔒 Enter the 6-digit code from Google Authenticator
+                </Typography>
+                <TextField 
+                  label="Authenticator Code" 
+                  value={twoFactorToken}
+                  onChange={(e) => setTwoFactorToken(e.target.value.replace(/\D/g, ''))}
+                  inputProps={{ maxLength: 6, style: { letterSpacing: '8px', textAlign: 'center', fontSize: '1.5em', fontWeight: 'bold' } }}
+                  required 
+                  fullWidth 
+                  autoFocus
+                />
+                <Button type="submit" variant="contained" size="large" sx={{ mt: 1, backgroundColor: '#00b894', py: 1.5, fontSize: '1.1rem', textTransform: 'none' }}>
+                  Verify Code
+                </Button>
+                <Button onClick={() => setRequires2FA(false)} variant="text" sx={{ color: '#636e72', textTransform: 'none' }}>
+                  Cancel & Return to Login
+                </Button>
+              </Box>
+            ) : (
+              <Box component="form" onSubmit={isLoginView ? handleLogin : handleRegister} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {!isLoginView && (
+                  <>
+                    <TextField label="First Name" name="firstName" onChange={handleChange} required fullWidth />
+                    <TextField label="Last Name" name="lastName" onChange={handleChange} required fullWidth />
+                    <DatePicker 
+                      label="Date of Birth *"
+                      disableFuture
+                      value={formData.dateOfBirth ? dayjs(formData.dateOfBirth) : null}
+                      onChange={(newValue) => setFormData({ ...formData, dateOfBirth: newValue ? newValue.format('YYYY-MM-DD') : '' })}
+                      slotProps={{ textField: { fullWidth: true, required: true } }}
+                    />
+                    <TextField label="Phone Number" name="phone" type="tel" onChange={handleChange} required fullWidth />
+                  </>
+                )}
+                <TextField label="Email Address" name="email" type="email" onChange={handleChange} required fullWidth />
+                <TextField label="Password" name="password" type="password" onChange={handleChange} required fullWidth />
+                {!isLoginView && (
+                  <TextField label="Confirm Password" type="password" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} required fullWidth />
+                )}
+                <Button type="submit" variant="contained" size="large" sx={{ mt: 1, backgroundColor: '#0984e3', py: 1.5, fontSize: '1.1rem', textTransform: 'none', borderRadius: '8px' }}>
+                  {isLoginView ? 'Secure Login' : 'Register Patient'}
+                </Button>
+              </Box>
+            )}
 
-            <div style={{ marginTop: '20px', textAlign: 'center' }}>
-              <Button variant="text" onClick={() => setIsLoginView(!isLoginView)} sx={{ textTransform: 'none', color: '#636e72' }}>
-                {isLoginView ? "New patient? Sign up here" : "Already have an account? Sign in"}
-              </Button>
-            </div>
+            {!requires2FA && (
+              <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                <Button variant="text" onClick={() => setIsLoginView(!isLoginView)} sx={{ textTransform: 'none', color: '#636e72' }}>
+                  {isLoginView ? "New patient? Sign up here" : "Already have an account? Sign in"}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}

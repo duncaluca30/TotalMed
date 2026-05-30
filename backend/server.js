@@ -9,6 +9,8 @@ const { encrypt, decrypt } = require('./utils/cipher');
 // Security Packages
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { authenticator } = require('otplib');
+const qrcode = require('qrcode');
 
 // Prisma 7 Adapter Setup
 const { Pool } = require('pg');
@@ -128,13 +130,17 @@ app.post('/api/auth/login', async (req, res) => {
         const { email, password } = req.body;
 
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) {
-            return res.status(400).json({ error: "Invalid email or password" });
-        }
+        if (!user) return res.status(400).json({ error: "Invalid email or password" });
 
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ error: "Invalid email or password" });
+        if (!isMatch) return res.status(400).json({ error: "Invalid email or password" });
+
+        if (user.isTwoFactorEnabled) {
+            return res.json({ 
+                requires2FA: true, 
+                userId: user.id, 
+                message: "Please enter your Authenticator code." 
+            });
         }
 
         const token = jwt.sign(
@@ -147,6 +153,75 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Login failed" });
+    }
+});
+
+app.post('/api/auth/2fa/generate', authenticateToken, async (req, res) => {
+    try {
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+        if (user.isTwoFactorEnabled) return res.status(400).json({ error: "2FA is already enabled." });
+
+        const secret = authenticator.generateSecret();
+
+        await prisma.user.update({
+            where: { id: req.user.id },
+            data: { twoFactorSecret: secret }
+        });
+
+        const otpauth = authenticator.keyuri(user.email, 'TotalMed Secure Vault', secret);
+        
+        const qrCodeUrl = await qrcode.toDataURL(otpauth);
+
+        res.json({ qrCodeUrl, secret });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to generate 2FA code." });
+    }
+});
+
+app.post('/api/auth/2fa/verify-setup', authenticateToken, async (req, res) => {
+    try {
+        const { token } = req.body;
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+
+        if (!user.twoFactorSecret) return res.status(400).json({ error: "No 2FA setup in progress." });
+
+        const isValid = authenticator.check(token, user.twoFactorSecret);
+
+        if (isValid) {
+            await prisma.user.update({
+                where: { id: req.user.id },
+                data: { isTwoFactorEnabled: true }
+            });
+            res.json({ message: "2FA successfully enabled!" });
+        } else {
+            res.status(400).json({ error: "Invalid authenticator code. Please try again." });
+        }
+    } catch (error) {
+        res.status(500).json({ error: "Failed to verify 2FA." });
+    }
+});
+
+app.post('/api/auth/2fa/validate', async (req, res) => {
+    try {
+        const { userId, token } = req.body;
+
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user || !user.isTwoFactorEnabled) return res.status(400).json({ error: "Invalid 2FA request." });
+
+        const isValid = authenticator.check(token, user.twoFactorSecret);
+
+        if (isValid) {
+            const jwtToken = jwt.sign(
+                { id: user.id, role: user.role },
+                process.env.JWT_SECRET,
+                { expiresIn: '1d' }
+            );
+            res.json({ token: jwtToken, message: "2FA Validated! Logged in successfully", role: user.role });
+        } else {
+            res.status(400).json({ error: "Invalid authenticator code." });
+        }
+    } catch (error) {
+        res.status(500).json({ error: "Failed to validate 2FA." });
     }
 });
 

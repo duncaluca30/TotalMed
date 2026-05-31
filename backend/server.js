@@ -304,7 +304,8 @@ app.post('/api/auth/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ error: "Invalid email or password" });
 
-        const currentIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const currentIp = rawIp.split(',')[0].trim();
         const currentDevice = req.headers['user-agent'];
 
         if (user.lastLoginIp && user.lastLoginIp !== currentIp) {

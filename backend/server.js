@@ -11,7 +11,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { generateSecret, generateURI, verify } = require('otplib');
 const qrcode = require('qrcode');
-const { sendOTPEmail } = require('./utils/mailer');
+const { sendOTPEmail, sendSecurityAlertEmail } = require('./utils/mailer');
 const { generateRegistrationOptions, verifyRegistrationResponse, 
         generateAuthenticationOptions, verifyAuthenticationResponse } = require('@simplewebauthn/server');
 
@@ -304,7 +304,38 @@ app.post('/api/auth/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ error: "Invalid email or password" });
 
-        // Email 2FA is mandatory for everyone. Add APP if they set it up.
+        const currentIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const currentDevice = req.headers['user-agent'];
+
+        if (user.lastLoginIp && user.lastLoginIp !== currentIp) {
+            
+            let locationString = "Unknown Location";
+            
+            if (currentIp === '::1' || currentIp === '127.0.0.1') {
+                 locationString = "Local Development Network";
+            } else {
+                 try {
+                     const geoRes = await fetch(`https://get.geojs.io/v1/ip/geo/${currentIp}.json`);
+                     if (geoRes.ok) {
+                         const geoData = await geoRes.json();
+                         locationString = `${geoData.city}, ${geoData.country}`;
+                     }
+                 } catch (err) {
+                     console.error("Failed to fetch Geolocation", err);
+                 }
+            }
+
+            sendSecurityAlertEmail(user.email, locationString, currentDevice);
+        }
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { 
+                lastLoginIp: currentIp,
+                lastLoginDevice: currentDevice
+            }
+        });
+
         const availableMethods = ['EMAIL'];
         if (user.isTwoFactorEnabled) availableMethods.push('APP');
 

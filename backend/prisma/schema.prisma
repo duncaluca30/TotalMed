@@ -32,6 +32,9 @@ model User {
   emailOtpExpiresAt  DateTime?
   webAuthnChallenge  String?
 
+  lastLoginIp       String?
+  lastLoginDevice   String?
+
   patientProfile Patient?
   doctorProfile  Doctor?
   passkeys       Passkey[]

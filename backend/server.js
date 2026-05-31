@@ -580,11 +580,20 @@ app.post('/api/doctor/access-vault', authenticateToken, async (req, res) => {
         const { code } = req.body;
         if (!code) return res.status(400).json({ error: "Please enter a 6-digit access code." });
 
-        const encryptedSearch = encrypt(code);
-        const validCode = await prisma.accessCode.findUnique({ where: { code: encryptedSearch } });
+        const activeCodes = await prisma.accessCode.findMany({
+            where: { expiresAt: { gt: new Date() } }
+        });
+
+        let validCode = null;
+        for (const record of activeCodes) {
+            const decryptedCode = decrypt(record.code);
+            if (decryptedCode === code) {
+                validCode = record;
+                break;
+            }
+        };
         
         if (!validCode) return res.status(404).json({ error: "Invalid code." });
-        if (new Date() > validCode.expiresAt) return res.status(403).json({ error: "Code expired." });
 
         const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
 
@@ -633,10 +642,19 @@ app.post('/api/doctor/records', authenticateToken, async (req, res) => {
 
         const { patientId, code, diagnosis, treatment, notes } = req.body;
 
-        const encryptedSearch = encrypt(code);
+        const patientCodes = await prisma.accessCode.findMany({ 
+            where: { patientId: patientId } 
+        });
 
-        const validCode = await prisma.accessCode.findUnique({ where: { code: encryptedSearch } });
-        if (!validCode || validCode.patientId !== patientId) {
+        let validCode = null;
+        for (const record of patientCodes) {
+            if (decrypt(record.code) === code) {
+                validCode = record;
+                break;
+            }
+        }
+
+        if (!validCode) {
             return res.status(403).json({ error: "Invalid or expired authorization code." });
         }
 

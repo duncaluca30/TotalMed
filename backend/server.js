@@ -421,7 +421,9 @@ app.post('/api/auth/2fa/verify-setup', authenticateToken, async (req, res) => {
             // Lock it in!
             await prisma.user.update({
                 where: { id: req.user.id },
-                data: { isTwoFactorEnabled: true }
+                data: { isTwoFactorEnabled: true,
+                        twoFactorSecret: encrypt(user.twoFactorSecret)
+                 }
             });
             res.json({ message: "2FA successfully enabled!" });
         } else {
@@ -443,7 +445,12 @@ app.post('/api/auth/2fa/validate', async (req, res) => {
 
         if (method === 'APP') {
             if (!user.isTwoFactorEnabled) return res.status(400).json({ error: "App 2FA is not enabled." });
-            const verification = await verify({ token, secret: user.twoFactorSecret });
+            
+            const decryptedSecret = decrypt(user.twoFactorSecret);
+            
+            if (!decryptedSecret) return res.status(500).json({ error: "Security error: Could not read 2FA key." });
+
+            const verification = await verify({ token, secret: decryptedSecret });
             isValid = verification.valid;
 
         } else if (method === 'EMAIL') {
@@ -453,7 +460,6 @@ app.post('/api/auth/2fa/validate', async (req, res) => {
         }
 
         if (isValid) {
-            // Burn the email OTP so it can't be used twice
             await prisma.user.update({
                 where: { id: user.id },
                 data: { emailOtpCode: null, emailOtpExpiresAt: null }

@@ -4,6 +4,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const cron = require('node-cron');
+const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 const { encrypt, decrypt } = require('./utils/cipher');
 
 // Security Packages
@@ -26,19 +28,32 @@ const prisma = new PrismaClient({ adapter });
 const app = express();
 const server = http.createServer(app);
 
+const ALLOWED_ORIGIN = process.env.FRONTEND_URL || 'http://localhost:5173';
+
 const io = new Server(server, {
-    cors: { origin: '*', methods: ["GET", "POST"] },
+    cors: { origin: ALLOWED_ORIGIN, methods: ["GET", "POST"] },
     pingInterval: 25000,
     pingTimeout: 60000
 });
 
 io.on('connection', (socket) => {
-    console.log('🟢 User connected to switchboard:', socket.id);
+    if (process.env.NODE_ENV !== 'production') {
+        console.log('🟢 User connected to switchboard:', socket.id);
+    }
 
-    socket.on('join-secure-room', (patientId) => {
-        const roomName = patientId.toString();
-        socket.join(roomName);
-        console.log(`🔒 Patient secured their connection in room: ${roomName}`);
+    socket.on('join-secure-room', (token) => {
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            if (decoded.role !== 'PATIENT') return;
+            const roomName = decoded.id.toString();
+            socket.join(roomName);
+            socket._patientUserId = roomName;
+            if (process.env.NODE_ENV !== 'production') {
+                console.log(`🔒 Patient secured their connection in room: ${roomName}`);
+            }
+        } catch (err) {
+            socket.disconnect(true);
+        }
     });
 
     socket.on('auth-response', (data) => {
@@ -46,12 +61,31 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log('🔴 User disconnected');
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('🔴 User disconnected');
+        }
     });
 });
 
-app.use(cors());
+app.use(cors({ origin: ALLOWED_ORIGIN, credentials: true }));
 app.use(express.json());
+
+// Fix #2: Rate limiters
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20,
+    message: { error: "Too many attempts. Please try again in 15 minutes." },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const vaultLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: "Too many vault access attempts. Please try again later." },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
 
 const authenticateToken = (req, res, next) => {
 
@@ -88,16 +122,19 @@ app.post('/api/auth/register', async (req, res) => {
 
         if (dateOfBirth) {
             const dob = new Date(dateOfBirth);
+            if (isNaN(dob.getTime())) {
+                return res.status(400).json({ error: "Invalid date of birth." });
+            }
             const today = new Date();
             if (dob > today) {
                 return res.status(400).json({ error: "Date of birth cannot be in the future." });
             }
         }
 
-        const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
         if (!passwordRegex.test(password)) {
             return res.status(400).json({ 
-                error: "Password must be at least 8 characters long and include a letter, a number, and a special character." 
+                error: "Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a special character." 
             });
         }
 
@@ -291,7 +328,7 @@ app.post('/api/auth/webauthn/verify-authentication', async (req, res) => {
     }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -326,7 +363,7 @@ app.post('/api/auth/login', async (req, res) => {
                  }
             }
 
-            sendSecurityAlertEmail(user.email, locationString, currentDevice);
+            await sendSecurityAlertEmail(user.email, locationString, currentDevice);
         }
 
         await prisma.user.update({
@@ -354,7 +391,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-app.post('/api/auth/2fa/send-email', async (req, res) => {
+app.post('/api/auth/2fa/send-email', authLimiter, async (req, res) => {
     try {
         const { userId } = req.body;
         const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -362,11 +399,14 @@ app.post('/api/auth/2fa/send-email', async (req, res) => {
 
         // Generate a random 6-digit code and set expiry to 10 minutes from now
         const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiresAt = new Date(Date.now() + 10 * 60000); 
+        const expiresAt = new Date(Date.now() + 10 * 60000);
+
+        // Fix #3: Hash the OTP before storing — never persist plaintext codes
+        const hashedOtp = await bcrypt.hash(otpCode, 10);
 
         await prisma.user.update({
             where: { id: userId },
-            data: { emailOtpCode: otpCode, emailOtpExpiresAt: expiresAt }
+            data: { emailOtpCode: hashedOtp, emailOtpExpiresAt: expiresAt }
         });
 
         await sendOTPEmail(user.email, otpCode);
@@ -415,9 +455,10 @@ app.post('/api/auth/2fa/verify-setup', authenticateToken, async (req, res) => {
 
         if (!user.twoFactorSecret) return res.status(400).json({ error: "No 2FA setup in progress." });
 
-        const verification = await verify({ token, secret: user.twoFactorSecret });
+        // Fix #11: verify() from otplib returns a boolean directly
+        const isValid = verify({ token, secret: user.twoFactorSecret });
 
-        if (verification.valid) {
+        if (isValid) {
             // Lock it in!
             await prisma.user.update({
                 where: { id: req.user.id },
@@ -450,13 +491,14 @@ app.post('/api/auth/2fa/validate', async (req, res) => {
             
             if (!decryptedSecret) return res.status(500).json({ error: "Security error: Could not read 2FA key." });
 
-            const verification = await verify({ token, secret: decryptedSecret });
-            isValid = verification.valid;
+            // Fix #11: verify() returns a boolean directly
+            isValid = verify({ token, secret: decryptedSecret });
 
         } else if (method === 'EMAIL') {
             if (!user.emailOtpCode || !user.emailOtpExpiresAt) return res.status(400).json({ error: "No email code requested." });
             if (new Date() > user.emailOtpExpiresAt) return res.status(400).json({ error: "Code expired. Please request a new one." });
-            if (token === user.emailOtpCode) isValid = true;
+            // Fix #3: Compare against the stored hash
+            isValid = await bcrypt.compare(token, user.emailOtpCode);
         }
 
         if (isValid) {
@@ -543,8 +585,9 @@ app.post('/api/patient/generate-code', authenticateToken, async (req, res) => {
 
         if (existingCode) {
             if (new Date() < existingCode.expiresAt) {
+                // Fix #6: decrypt and return the plaintext code, not the encrypted blob
                 const decryptedCode = decrypt(existingCode.code);
-                return res.json({ code: existingCode.code, expiresAt: existingCode.expiresAt });
+                return res.json({ code: decryptedCode, expiresAt: existingCode.expiresAt });
             } else {
                 await prisma.accessCode.delete({ where: { id: existingCode.id } });
             }
@@ -558,27 +601,29 @@ app.post('/api/patient/generate-code', authenticateToken, async (req, res) => {
         expiresAt.setMinutes(expiresAt.getMinutes() + 60);
 
         const newCode = await prisma.accessCode.create({
-            data: { 
-            code: encryptedCode,
-            expiresAt: expiresAt, 
-            patientId: patient.id 
+            data: {
+                code: encryptedCode,
+                expiresAt: expiresAt,
+                patientId: patient.id
             }
-    });
+        });
 
-
-    res.json({ code: uniqueCode, expiresAt: newCode.expiresAt });
+        res.json({ code: uniqueCode, expiresAt: newCode.expiresAt });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to generate access code" });
     }
 });
 
-app.post('/api/doctor/access-vault', authenticateToken, async (req, res) => {
+app.post('/api/doctor/access-vault', authenticateToken, vaultLimiter, async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
 
         const { code } = req.body;
         if (!code) return res.status(400).json({ error: "Please enter a 6-digit access code." });
+
+        // Fix #9: Sanitize — reject anything that isn't exactly 6 digits
+        if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: "Access code must be exactly 6 digits." });
 
         const activeCodes = await prisma.accessCode.findMany({
             where: { expiresAt: { gt: new Date() } }
@@ -591,36 +636,41 @@ app.post('/api/doctor/access-vault', authenticateToken, async (req, res) => {
                 validCode = record;
                 break;
             }
-        };
-        
+        }
+
         if (!validCode) return res.status(404).json({ error: "Invalid code." });
 
         const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
 
-        io.to(validCode.patientId).emit('auth-request', { 
-            doctorName: `Dr. ${doctor.lastName}`, 
-            code: code 
+        io.to(validCode.patientId).emit('auth-request', {
+            doctorName: `Dr. ${doctor.lastName}`,
+            code: code
         });
 
         let responded = false;
+        const eventName = `auth-resolved-${code}`;
 
+        // Fix #4: Always clean up the listener to prevent memory leaks
         const timeout = setTimeout(() => {
-            if (!responded) res.status(408).json({ error: "Patient did not respond to the approval request." });
+            if (!responded) {
+                app.removeAllListeners(eventName);
+                res.status(408).json({ error: "Patient did not respond to the approval request." });
+            }
         }, 30000);
 
-        app.once(`auth-resolved-${code}`, async (authData) => {
+        app.once(eventName, async (authData) => {
             responded = true;
             clearTimeout(timeout);
-            
+
             if (authData.approved) {
-                const patientData = await prisma.patient.findUnique({ 
+                const patientData = await prisma.patient.findUnique({
                     where: { id: validCode.patientId },
                     include: {
                         medicalRecords: { include: { doctor: true } }
                     }
                 });
 
-                patientData.medicalRecords = patientData.medicalRecords.filter(record => 
+                patientData.medicalRecords = patientData.medicalRecords.filter(record =>
                     authData.sharedRecordIds.includes(record.id)
                 );
 
@@ -641,6 +691,14 @@ app.post('/api/doctor/records', authenticateToken, async (req, res) => {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
 
         const { patientId, code, diagnosis, treatment, notes } = req.body;
+
+        // Fix #9: Validate and cap field lengths
+        if (!diagnosis || typeof diagnosis !== 'string' || diagnosis.trim().length === 0) {
+            return res.status(400).json({ error: "Diagnosis is required." });
+        }
+        if (diagnosis.length > 500) return res.status(400).json({ error: "Diagnosis too long (max 500 chars)." });
+        if (treatment && treatment.length > 1000) return res.status(400).json({ error: "Treatment too long (max 1000 chars)." });
+        if (notes && notes.length > 2000) return res.status(400).json({ error: "Notes too long (max 2000 chars)." });
 
         const patientCodes = await prisma.accessCode.findMany({ 
             where: { patientId: patientId } 
@@ -675,13 +733,13 @@ app.post('/api/doctor/records', authenticateToken, async (req, res) => {
         ]); 
 
         try {
-        const targetRoom = validCode.patientId.toString();
-        console.log(`🚨 PINGING PATIENT ROOM: ${targetRoom}`);
-
-        io.to(targetRoom).emit('vault-updated', { newRecord: savedRecord });
-      
+            const targetRoom = validCode.patientId.toString();
+            if (process.env.NODE_ENV !== 'production') {
+                console.log(`🚨 PINGING PATIENT ROOM: ${targetRoom}`);
+            }
+            io.to(targetRoom).emit('vault-updated', { newRecord: savedRecord });
         } catch (socketError) {
-            console.error("🚨 WEBSOCKET ERROR:", socketError);
+            console.error("WEBSOCKET ERROR:", socketError);
         }
 
         res.json({ message: "Record added successfully and vault locked." });

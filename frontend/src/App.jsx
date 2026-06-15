@@ -16,7 +16,7 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 
 function App() {
-  const API_URL = 'https://totalmed-backend.onrender.com'; 
+  const API_URL = 'https://totalmed-backend.onrender.com';
 
   const [isLoginView, setIsLoginView] = useState(true);
   const [loggedInToken, setLoggedInToken] = useState(localStorage.getItem('token') || null);
@@ -93,7 +93,8 @@ function App() {
       const newSocket = io(API_URL);
       setSocket(newSocket);
 
-      newSocket.emit('join-secure-room', patientData.id);
+      // Fix #5: Send the JWT so the server can authenticate the room join
+      newSocket.emit('join-secure-room', loggedInToken);
       newSocket.on('auth-request', (data) => setAuthRequest(data));
       newSocket.on('vault-updated', (data) => {
         setAccessCode(null);
@@ -117,7 +118,6 @@ function App() {
     if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/.test(formData.password)) {
       return setToast({ open: true, message: "Password must be 8+ characters, with 1 uppercase, 1 lowercase, 1 number, and 1 special character.", severity: 'error' });
     }
-
     setToast({ open: true, message: 'Registering...', severity: 'info' });
     try {
       const response = await fetch(`${API_URL}/api/auth/register`, {
@@ -351,6 +351,11 @@ const handleSendEmailCode = async (uid = savedUserId) => {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
+    // Fix #8: Explicitly close the WebSocket connection on logout
+    if (socket) {
+      socket.disconnect();
+      setSocket(null);
+    }
     setLoggedInToken(null);
     setUserRole(null);
     setPatientData(null);
@@ -378,7 +383,7 @@ const handleSendEmailCode = async (uid = savedUserId) => {
     setSelectedRecordIds([]);
   };
 
-  const handleDownloadPDF = (profileData, recordsToPrint, role) => {
+  const handleDownloadPDF = (profileData, recordsToPrint, role, patientProfile = null) => {
     if (!recordsToPrint || recordsToPrint.length === 0) {
       return setToast({ open: true, message: "No records to download.", severity: 'error' });
     }
@@ -390,15 +395,21 @@ const handleSendEmailCode = async (uid = savedUserId) => {
     doc.setTextColor(45, 52, 54); 
     doc.text(`Official Medical Records Report`, 14, 32);
     doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 38);
-    const titlePrefix = role === 'DOCTOR' ? 'Attending Physician: Dr.' : 'Patient File:';
-    doc.text(`${titlePrefix} ${profileData.firstName} ${profileData.lastName}`, 14, 48);
+    // Fix #12: Doctor exports show the patient's name; patient exports show their own name
+    if (role === 'DOCTOR' && patientProfile) {
+      doc.text(`Attending Physician: Dr. ${profileData.firstName} ${profileData.lastName}`, 14, 44);
+      doc.text(`Patient File: ${patientProfile.firstName} ${patientProfile.lastName}`, 14, 50);
+    } else {
+      doc.text(`Patient File: ${profileData.firstName} ${profileData.lastName}`, 14, 48);
+    }
+    const startY = role === 'DOCTOR' && patientProfile ? 57 : 55;
     const tableColumn = ["Date", "Diagnosis", "Treatment Plan", "Attending Dr.", "Clinical Notes"];
     const tableRows = [];
     recordsToPrint.forEach(record => {
       tableRows.push([new Date(record.createdAt).toLocaleDateString(), record.diagnosis, record.treatment || "N/A", `Dr. ${record.doctor?.lastName || 'Unknown'}`, record.notes || "None"]);
     });
     autoTable(doc, {
-      startY: 55, head: [tableColumn], body: tableRows, theme: 'grid',
+      startY, head: [tableColumn], body: tableRows, theme: 'grid',
       headStyles: { fillColor: [9, 132, 227], textColor: [255, 255, 255] }, styles: { fontSize: 9, cellPadding: 4 }, columnStyles: { 4: { cellWidth: 50 } } 
     });
     doc.save(`TotalMed_Export_${profileData.lastName}_${new Date().getTime()}.pdf`);
@@ -454,7 +465,7 @@ const handleSendEmailCode = async (uid = savedUserId) => {
                           📁 Shared Medical History ({unlockedPatient.medicalRecords.length} records)
                         </Typography>
                         {unlockedPatient.medicalRecords.length > 0 && (
-                          <Button variant="outlined" startIcon={<PictureAsPdfIcon />} onClick={() => handleDownloadPDF(doctorData, unlockedPatient.medicalRecords, 'DOCTOR')}>Export as PDF</Button>
+                          <Button variant="outlined" startIcon={<PictureAsPdfIcon />} onClick={() => handleDownloadPDF(doctorData, unlockedPatient.medicalRecords, 'DOCTOR', unlockedPatient)}>Export as PDF</Button>
                         )}
                       </Box>
                       

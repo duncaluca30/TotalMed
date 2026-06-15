@@ -642,7 +642,14 @@ app.post('/api/doctor/access-vault', authenticateToken, vaultLimiter, async (req
 
         const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
 
-        io.to(validCode.patientId).emit('auth-request', {
+        // The socket room is keyed on user.id (from JWT), not the Patient table id
+        const patientUser = await prisma.patient.findUnique({
+            where: { id: validCode.patientId },
+            select: { userId: true }
+        });
+        if (!patientUser) return res.status(404).json({ error: "Patient not found." });
+
+        io.to(patientUser.userId).emit('auth-request', {
             doctorName: `Dr. ${doctor.lastName}`,
             code: code
         });
@@ -733,11 +740,17 @@ app.post('/api/doctor/records', authenticateToken, async (req, res) => {
         ]); 
 
         try {
-            const targetRoom = validCode.patientId.toString();
-            if (process.env.NODE_ENV !== 'production') {
-                console.log(`🚨 PINGING PATIENT ROOM: ${targetRoom}`);
+            // Look up userId so we emit to the correct socket room
+            const patientForSocket = await prisma.patient.findUnique({
+                where: { id: validCode.patientId },
+                select: { userId: true }
+            });
+            if (patientForSocket) {
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log(`🚨 PINGING PATIENT ROOM: ${patientForSocket.userId}`);
+                }
+                io.to(patientForSocket.userId).emit('vault-updated', { newRecord: savedRecord });
             }
-            io.to(targetRoom).emit('vault-updated', { newRecord: savedRecord });
         } catch (socketError) {
             console.error("WEBSOCKET ERROR:", socketError);
         }

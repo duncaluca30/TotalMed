@@ -5,6 +5,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
+const path = require('path');
 
 // Modular imports
 const setupSocketHandlers = require('./src/socket/handler');
@@ -67,6 +68,17 @@ app.get('/api/status', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/patient', patientRoutes);
 app.use('/api/doctor', doctorRoutes);
+
+// --- SERVE FRONTEND IN PRODUCTION ---
+if (process.env.NODE_ENV === 'production') {
+    const frontendDistPath = path.join(__dirname, '../frontend/dist');
+    app.use(express.static(frontendDistPath));
+
+    // Catch-all route to serve index.html for React Router
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(frontendDistPath, 'index.html'));
+    });
+}
 
 // Background jobs
 startCleanupJob();

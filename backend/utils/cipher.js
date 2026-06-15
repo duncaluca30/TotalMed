@@ -28,6 +28,11 @@ function decrypt(text) {
     
     try {
         const parts = text.split(':');
+        if (parts.length !== 3) {
+            console.error("Decryption failed: Invalid format.");
+            return null;
+        }
+
         const iv = Buffer.from(parts[0], 'hex');
         const encryptedText = parts[1];
         const authTag = Buffer.from(parts[2], 'hex');

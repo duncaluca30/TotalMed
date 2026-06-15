@@ -114,6 +114,19 @@ router.post('/access-vault', authenticateToken, vaultLimiter, async (req, res) =
                 const totalRecords = approvedRecords.length;
                 const paginatedRecords = approvedRecords.slice(skip, skip + limit);
 
+                // Decrypt all fields for the doctor
+                paginatedRecords.forEach(record => {
+                    if (record.diagnosis) record.diagnosis = decrypt(record.diagnosis);
+                    if (record.treatment) record.treatment = decrypt(record.treatment);
+                    if (record.notes) {
+                        try {
+                            record.notes = decrypt(record.notes);
+                        } catch (e) {
+                            console.error("Failed to decrypt notes for record", record.id);
+                        }
+                    }
+                });
+
                 patientData.medicalRecords = paginatedRecords;
 
                 const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -174,8 +187,8 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
 
         const newRecord = await prisma.medicalRecord.create({
             data: {
-                diagnosis,
-                treatment,
+                diagnosis: encrypt(diagnosis),
+                treatment: encrypt(treatment),
                 notes: notes ? encrypt(notes) : null,
                 patientId: validCode.patientId,
                 doctorId: doctor.id

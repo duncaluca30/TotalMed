@@ -39,6 +39,19 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
             take: limit
         });
 
+        // Decrypt all fields for the patient
+        medicalRecords.forEach(record => {
+            if (record.diagnosis) record.diagnosis = decrypt(record.diagnosis);
+            if (record.treatment) record.treatment = decrypt(record.treatment);
+            if (record.notes) {
+                try {
+                    record.notes = decrypt(record.notes);
+                } catch (e) {
+                    console.error("Failed to decrypt notes for record", record.id);
+                }
+            }
+        });
+
         patientData.medicalRecords = medicalRecords;
 
         if (patientData.accessCode) {

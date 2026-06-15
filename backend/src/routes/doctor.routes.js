@@ -6,7 +6,7 @@ const authenticateToken = require('../middleware/authenticate');
 const { vaultLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 const { recordSchema } = require('../schemas/doctor.schema');
-const { decrypt } = require('../../utils/cipher');
+const { encrypt, decrypt } = require('../../utils/cipher');
 
 // GET /api/doctor/dashboard
 router.get('/dashboard', authenticateToken, async (req, res) => {

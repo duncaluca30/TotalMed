@@ -30,6 +30,7 @@ const LoginForm = () => {
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email: formData.email, password: formData.password })
       });
       const data = await response.json();
@@ -61,6 +62,7 @@ const LoginForm = () => {
       const response = await fetch(`${API_URL}/api/auth/2fa/send-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ userId: uid })
       });
       if (response.ok) {
@@ -81,11 +83,12 @@ const LoginForm = () => {
       const response = await fetch(`${API_URL}/api/auth/2fa/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }, 
+        credentials: 'include',
         body: JSON.stringify({ userId: savedUserId, token: twoFactorToken, method: selected2FAMethod })
       });
       const data = await response.json();
       if (response.ok) {
-        login(data.token, data.role);
+        login(data.role);
         showToast('Identity Verified! Welcome.', 'success');
         navigate(data.role === 'PATIENT' ? '/patient' : '/doctor');
       } else {
@@ -102,6 +105,7 @@ const LoginForm = () => {
       const optionsRes = await fetch(`${API_URL}/api/auth/webauthn/generate-authentication`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ userId: savedUserId })
       });
       const options = await optionsRes.json();
@@ -111,12 +115,13 @@ const LoginForm = () => {
       const verifyRes = await fetch(`${API_URL}/api/auth/webauthn/verify-authentication`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ userId: savedUserId, response: authResponse })
       });
       const data = await verifyRes.json();
 
       if (verifyRes.ok) {
-        login(data.token, data.role);
+        login(data.role);
         showToast('Identity Verified! Welcome.', 'success');
         navigate(data.role === 'PATIENT' ? '/patient' : '/doctor');
       } else {

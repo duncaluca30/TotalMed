@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Box, Tabs, Tab } from '@mui/material';
+import { Box, Tabs, Tab, Skeleton, Typography } from '@mui/material';
 import { fetchWithAuth } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import AppHeader from '../Layout/AppHeader';
@@ -60,7 +60,29 @@ const PatientLayout = () => {
     }
   }, [socket, navigate]);
 
-  if (!patientData) return <div className="container"><p>Loading your secure medical records...</p></div>;
+  if (!patientData) {
+    return (
+      <div className="container">
+        <AppHeader title="TotalMed Patient Portal" />
+        <Box sx={{ width: '100%', mt: 3 }}>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+            <Tabs value={currentTab} textColor="primary" indicatorColor="primary">
+              <Tab label="Dashboard & Vault Key" sx={{ fontWeight: 'bold' }} />
+              <Tab label="Medical History" sx={{ fontWeight: 'bold' }} />
+            </Tabs>
+          </Box>
+          <div className="card" style={{ marginBottom: '20px' }}>
+            <Skeleton variant="text" sx={{ fontSize: '2rem', mb: 1, width: '60%' }} />
+            <Skeleton variant="text" sx={{ fontSize: '1rem', width: '40%' }} />
+          </div>
+          <div className="card">
+            <Typography variant="h5" sx={{ mb: 2 }}><Skeleton width="30%" /></Typography>
+            <Skeleton variant="rectangular" height={100} sx={{ borderRadius: 2 }} />
+          </div>
+        </Box>
+      </div>
+    );
+  }
 
   const currentTab = location.pathname.includes('/history') ? 1 : 0;
 

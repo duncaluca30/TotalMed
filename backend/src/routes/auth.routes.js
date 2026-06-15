@@ -45,7 +45,16 @@ router.post('/register', validate(registerSchema), async (req, res) => {
             }
         });
 
-        res.status(201).json({ message: "Patient registered successfully!" });
+        const token = jwt.sign({ id: newUser.id, role: newUser.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
+
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            maxAge: 24 * 60 * 60 * 1000 // 1 day
+        });
+
+        res.status(201).json({ message: "Patient registered successfully!", role: newUser.role });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Registration failed" });
@@ -234,7 +243,13 @@ router.post('/2fa/validate', async (req, res) => {
             });
 
             const jwtToken = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
-            res.json({ token: jwtToken, message: "Logged in successfully", role: user.role });
+            res.cookie('token', jwtToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+                maxAge: 24 * 60 * 60 * 1000
+            });
+            res.json({ message: "Logged in successfully", role: user.role });
         } else {
             res.status(400).json({ error: "Invalid verification code." });
         }
@@ -402,7 +417,13 @@ router.post('/webauthn/verify-authentication', async (req, res) => {
 
             // LOG THEM IN!
             const jwtToken = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
-            res.json({ token: jwtToken, message: "Biometrics Verified! Welcome.", role: user.role });
+            res.cookie('token', jwtToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+                maxAge: 24 * 60 * 60 * 1000
+            });
+            res.json({ message: "Biometrics Verified! Welcome.", role: user.role });
         } else {
             res.status(400).json({ error: "Biometric verification failed." });
         }
@@ -410,6 +431,22 @@ router.post('/webauthn/verify-authentication', async (req, res) => {
         console.error("🚨 AUTH VERIFY ERROR:", error);
         res.status(500).json({ error: "Failed to verify biometrics." });
     }
+});
+
+// GET /api/auth/me
+router.get('/me', authenticateToken, (req, res) => {
+    // If the middleware passes, we know the user is authenticated via cookie
+    res.json({ role: req.user.role });
+});
+
+// POST /api/auth/logout
+router.post('/logout', (req, res) => {
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    });
+    res.json({ message: "Logged out successfully" });
 });
 
 module.exports = router;

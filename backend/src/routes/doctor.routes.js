@@ -116,6 +116,16 @@ router.post('/access-vault', authenticateToken, vaultLimiter, async (req, res) =
 
                 patientData.medicalRecords = paginatedRecords;
 
+                const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+                await prisma.auditLog.create({
+                    data: {
+                        userId: doctor.userId,
+                        action: 'VAULT_ACCESSED',
+                        details: JSON.stringify({ patientId: validCode.patientId, approvedRecords: authData.sharedRecordIds.length }),
+                        ipAddress: rawIp ? rawIp.split(',')[0].trim() : null
+                    }
+                });
+
                 res.json({ 
                     patient: patientData, 
                     vaultKey: code,
@@ -162,19 +172,27 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
 
         const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
 
-        const [savedRecord, deletedCode] = await prisma.$transaction([
-            prisma.medicalRecord.create({
-                data: {
-                diagnosis: diagnosis,
-                treatment: treatment,
-                notes: notes,
-                patientId: patientId,
+        const newRecord = await prisma.medicalRecord.create({
+            data: {
+                diagnosis,
+                treatment,
+                notes: notes ? encrypt(notes) : null,
+                patientId: validCode.patientId,
                 doctorId: doctor.id
-                },   
-                include: { doctor: true }
-            }),
-            prisma.accessCode.delete({ where: { id: validCode.id } })
-        ]); 
+            }
+        });
+
+        const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        await prisma.auditLog.create({
+            data: {
+                userId: req.user.id,
+                action: 'RECORD_ADDED',
+                details: JSON.stringify({ patientId: validCode.patientId, recordId: newRecord.id }),
+                ipAddress: rawIp ? rawIp.split(',')[0].trim() : null
+            }
+        });
+
+        await prisma.accessCode.delete({ where: { id: validCode.id } });
 
         try {
             const io = req.io;
@@ -187,7 +205,7 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
                 if (process.env.NODE_ENV !== 'production') {
                     console.log(`🚨 PINGING PATIENT ROOM: ${patientForSocket.userId}`);
                 }
-                io.to(patientForSocket.userId).emit('vault-updated', { newRecord: savedRecord });
+                io.to(patientForSocket.userId).emit('vault-updated', { newRecord });
             }
         } catch (socketError) {
             console.error("WEBSOCKET ERROR:", socketError);

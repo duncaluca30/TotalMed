@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, TextField } from '@mui/material';
+import { Box, Typography, Button, TextField, Skeleton } from '@mui/material';
 import { fetchWithAuth } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../hooks/useToast';
@@ -60,7 +60,22 @@ const DoctorDashboard = () => {
     }
   };
 
-  if (!doctorData) return <div className="container"><p>Loading system...</p></div>;
+  if (!doctorData) {
+    return (
+      <div className="container">
+        <AppHeader title="TotalMed Doctor Portal" />
+        <div className="card" style={{ backgroundColor: '#e8f4f8' }}>
+          <Skeleton variant="text" sx={{ fontSize: '1.5rem', width: '40%', mb: 1 }} />
+          <Skeleton variant="text" sx={{ fontSize: '1rem', width: '60%' }} />
+        </div>
+        <div className="card" style={{ marginTop: '30px', textAlign: 'center', padding: '30px' }}>
+          <Skeleton variant="text" sx={{ fontSize: '2rem', width: '50%', margin: '0 auto', mb: 2 }} />
+          <Skeleton variant="rectangular" height={60} sx={{ borderRadius: 2, mb: 2 }} />
+          <Skeleton variant="rectangular" height={40} width={150} sx={{ borderRadius: 2, margin: '0 auto' }} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container">

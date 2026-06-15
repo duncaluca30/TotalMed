@@ -4,6 +4,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 
 // Modular imports
 const setupSocketHandlers = require('./src/socket/handler');
@@ -34,6 +35,7 @@ setupSocketHandlers(io);
 app.use(cors({ origin: ALLOWED_ORIGIN, credentials: true }));
 app.set('trust proxy', 1);
 app.use(express.json());
+app.use(cookieParser());
 app.use(helmet());
 
 // Inject io into every request so route handlers can emit socket events

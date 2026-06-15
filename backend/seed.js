@@ -2,6 +2,7 @@ require('dotenv').config(); // Tells the script to read your .env file
 const { Pool } = require('pg');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcrypt');
 
 // Initialize the Prisma 7 Adapter just like we did in server.js
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -11,11 +12,14 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
     console.log("🌱 Starting the database seed...");
 
+    // Hash the seed password properly (same as registration flow)
+    const hashedPassword = await bcrypt.hash('Password123!', 10);
+
     // 1. Create a Fake Doctor
     const doctor = await prisma.user.create({
         data: {
             email: "dr.popescu@totalmed.com",
-            password: "password123", // We will secure this later!
+            password: hashedPassword,
             role: "DOCTOR",
             doctorProfile: {
                 create: {
@@ -34,7 +38,7 @@ async function main() {
     const patient = await prisma.user.create({
         data: {
             email: "maria.ionescu@email.com",
-            password: "password123",
+            password: hashedPassword,
             role: "PATIENT",
             patientProfile: {
                 create: {

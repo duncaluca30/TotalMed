@@ -1,7 +1,13 @@
 const crypto = require('crypto');
 
 const algorithm = 'aes-256-gcm'; 
-const secretKey = process.env.MASTER_ENCRYPTION_KEY;
+const rawKey = process.env.MASTER_ENCRYPTION_KEY;
+
+// Support both hex-encoded keys (64 hex chars = 32 bytes, recommended)
+// and legacy ASCII keys (exactly 32 ASCII chars = 32 bytes)
+const secretKey = rawKey.length === 64 && /^[0-9a-f]+$/i.test(rawKey)
+    ? Buffer.from(rawKey, 'hex')
+    : Buffer.from(rawKey);
 
 function encrypt(text) {
     if (!text) return text;

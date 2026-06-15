@@ -8,15 +8,40 @@ import AuthRequestDialog from './AuthRequestDialog';
 
 const PatientLayout = () => {
   const [patientData, setPatientData] = useState(null);
+  const [pagination, setPagination] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  
   const { logout, authRequest, setAuthRequest, socket } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     fetchWithAuth('/api/patient/dashboard')
-      .then(data => setPatientData(data))
+      .then(data => {
+        setPatientData(data);
+        setPagination(data.pagination);
+      })
       .catch(() => logout());
   }, [logout]);
+
+  const fetchMoreRecords = async () => {
+    if (!pagination || !pagination.hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = pagination.page + 1;
+      const data = await fetchWithAuth(`/api/patient/dashboard?page=${nextPage}&limit=${pagination.limit}`);
+      
+      setPatientData(prev => ({
+        ...prev,
+        medicalRecords: [...prev.medicalRecords, ...data.medicalRecords]
+      }));
+      setPagination(data.pagination);
+    } catch (error) {
+      console.error("Failed to load more records", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
     if (socket) {
@@ -56,7 +81,7 @@ const PatientLayout = () => {
           </Tabs>
         </Box>
 
-        <Outlet context={{ patientData, setPatientData }} />
+        <Outlet context={{ patientData, setPatientData, pagination, fetchMoreRecords, loadingMore }} />
       </Box>
 
       {authRequest && (

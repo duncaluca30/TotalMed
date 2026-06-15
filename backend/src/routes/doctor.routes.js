@@ -4,6 +4,8 @@ const router = express.Router();
 const prisma = require('../config/prisma');
 const authenticateToken = require('../middleware/authenticate');
 const { vaultLimiter } = require('../middleware/rateLimiter');
+const validate = require('../middleware/validate');
+const { recordSchema } = require('../schemas/doctor.schema');
 const { decrypt } = require('../../utils/cipher');
 
 // GET /api/doctor/dashboard
@@ -61,7 +63,6 @@ router.post('/access-vault', authenticateToken, vaultLimiter, async (req, res) =
 
         const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
 
-        // The socket room is keyed on user.id (from JWT), not the Patient table id
         const patientUser = await prisma.patient.findUnique({
             where: { id: validCode.patientId },
             select: { userId: true }
@@ -78,7 +79,6 @@ router.post('/access-vault', authenticateToken, vaultLimiter, async (req, res) =
         const eventName = `auth-resolved-${code}`;
         const app = req.app;
 
-        // Always clean up the listener to prevent memory leaks
         const timeout = setTimeout(() => {
             if (!responded) {
                 app.removeAllListeners(eventName);
@@ -91,18 +91,41 @@ router.post('/access-vault', authenticateToken, vaultLimiter, async (req, res) =
             clearTimeout(timeout);
 
             if (authData.approved) {
+                const page = parseInt(req.query.page) || 1;
+                const limit = parseInt(req.query.limit) || 10;
+                const skip = (page - 1) * limit;
+
                 const patientData = await prisma.patient.findUnique({
                     where: { id: validCode.patientId },
                     include: {
-                        medicalRecords: { include: { doctor: true } }
+                        medicalRecords: { 
+                            include: { doctor: true },
+                            orderBy: { createdAt: 'desc' }
+                        }
                     }
                 });
 
-                patientData.medicalRecords = patientData.medicalRecords.filter(record =>
+                // Filter to only the records the patient explicitly approved sharing
+                const approvedRecords = patientData.medicalRecords.filter(record =>
                     authData.sharedRecordIds.includes(record.id)
                 );
 
-                res.json({ patient: patientData, vaultKey: code });
+                // Paginate the approved records
+                const totalRecords = approvedRecords.length;
+                const paginatedRecords = approvedRecords.slice(skip, skip + limit);
+
+                patientData.medicalRecords = paginatedRecords;
+
+                res.json({ 
+                    patient: patientData, 
+                    vaultKey: code,
+                    pagination: {
+                        page,
+                        limit,
+                        total: totalRecords,
+                        hasMore: skip + limit < totalRecords
+                    }
+                });
             } else {
                 res.status(403).json({ error: "Access explicitly denied by patient." });
             }
@@ -115,19 +138,11 @@ router.post('/access-vault', authenticateToken, vaultLimiter, async (req, res) =
 });
 
 // POST /api/doctor/records
-router.post('/records', authenticateToken, async (req, res) => {
+router.post('/records', authenticateToken, validate(recordSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
 
         const { patientId, code, diagnosis, treatment, notes } = req.body;
-
-        // Validate and cap field lengths
-        if (!diagnosis || typeof diagnosis !== 'string' || diagnosis.trim().length === 0) {
-            return res.status(400).json({ error: "Diagnosis is required." });
-        }
-        if (diagnosis.length > 500) return res.status(400).json({ error: "Diagnosis too long (max 500 chars)." });
-        if (treatment && treatment.length > 1000) return res.status(400).json({ error: "Treatment too long (max 1000 chars)." });
-        if (notes && notes.length > 2000) return res.status(400).json({ error: "Notes too long (max 2000 chars)." });
 
         const patientCodes = await prisma.accessCode.findMany({ 
             where: { patientId: patientId } 

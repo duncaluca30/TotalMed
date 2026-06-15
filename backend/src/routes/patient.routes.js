@@ -11,25 +11,49 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied" });
 
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
         const patientData = await prisma.patient.findUnique({
             where: { userId: req.user.id },
             include: {
                 user: { select: { isTwoFactorEnabled: true } },
                 accessCode: true,
-                medicalRecords: {
-                    include: { doctor: true },
-                    orderBy: { createdAt: 'desc' }
-                }
             }
         });
 
         if (!patientData) return res.status(404).json({ error: "Profile not found" });
 
+        // Get total count for pagination
+        const totalRecords = await prisma.medicalRecord.count({
+            where: { patientId: patientData.id }
+        });
+
+        // Get paginated records
+        const medicalRecords = await prisma.medicalRecord.findMany({
+            where: { patientId: patientData.id },
+            include: { doctor: true },
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: limit
+        });
+
+        patientData.medicalRecords = medicalRecords;
+
         if (patientData.accessCode) {
             patientData.accessCode.code = decrypt(patientData.accessCode.code);
         }
 
-        res.json(patientData);
+        res.json({
+            ...patientData,
+            pagination: {
+                page,
+                limit,
+                total: totalRecords,
+                hasMore: skip + limit < totalRecords
+            }
+        });
     } catch (error) {
         res.status(500).json({ error: "Failed to fetch dashboard" });
     }

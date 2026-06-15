@@ -10,6 +10,8 @@ const DoctorDashboard = () => {
   const [doctorData, setDoctorData] = useState(null);
   const [vaultCode, setVaultCode] = useState('');
   const [unlockedPatient, setUnlockedPatient] = useState(null);
+  const [pagination, setPagination] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const { logout } = useAuth();
   const showToast = useToast();
@@ -28,9 +30,33 @@ const DoctorDashboard = () => {
         body: JSON.stringify({ code: vaultCode })
       });
       setUnlockedPatient(data.patient);
+      setPagination(data.pagination);
       showToast("Vault Unlocked", "success");
     } catch (error) { 
       showToast(error.message || "Failed to connect.", "error"); 
+    }
+  };
+
+  const fetchMoreRecords = async () => {
+    if (!pagination || !pagination.hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = pagination.page + 1;
+      const data = await fetchWithAuth(`/api/doctor/access-vault?page=${nextPage}&limit=${pagination.limit}`, {
+        method: 'POST',
+        body: JSON.stringify({ code: vaultCode })
+      });
+      
+      setUnlockedPatient(prev => ({
+        ...prev,
+        medicalRecords: [...prev.medicalRecords, ...data.patient.medicalRecords]
+      }));
+      setPagination(data.pagination);
+    } catch (error) {
+      console.error("Failed to load more records", error);
+      showToast("Failed to fetch more records.", "error");
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -69,8 +95,12 @@ const DoctorDashboard = () => {
           doctorData={doctorData}
           patient={unlockedPatient} 
           vaultCode={vaultCode} 
+          pagination={pagination}
+          fetchMoreRecords={fetchMoreRecords}
+          loadingMore={loadingMore}
           onClose={() => {
             setUnlockedPatient(null);
+            setPagination(null);
             setVaultCode('');
           }} 
         />

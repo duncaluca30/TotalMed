@@ -7,7 +7,7 @@ import autoTable from 'jspdf-autotable';
 import { useToast } from '../../hooks/useToast';
 
 const MedicalHistory = () => {
-  const { patientData } = useOutletContext();
+  const { patientData, pagination, fetchMoreRecords, loadingMore } = useOutletContext();
   const showToast = useToast();
 
   const handleDownloadPDF = () => {
@@ -68,6 +68,19 @@ const MedicalHistory = () => {
         ))
       ) : (
         <p style={{ color: '#636e72', fontStyle: 'italic' }}>Your medical vault is currently empty.</p>
+      )}
+
+      {pagination?.hasMore && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 4 }}>
+          <Button 
+            variant="outlined" 
+            onClick={fetchMoreRecords} 
+            disabled={loadingMore}
+            sx={{ fontWeight: 'bold' }}
+          >
+            {loadingMore ? "Loading..." : "Load More Records"}
+          </Button>
+        </Box>
       )}
     </Box>
   );

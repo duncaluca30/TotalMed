@@ -11,35 +11,19 @@ const { generateRegistrationOptions, verifyRegistrationResponse,
 const prisma = require('../config/prisma');
 const authenticateToken = require('../middleware/authenticate');
 const { authLimiter } = require('../middleware/rateLimiter');
+const validate = require('../middleware/validate');
+const { registerSchema, loginSchema } = require('../schemas/auth.schema');
 const { encrypt, decrypt } = require('../../utils/cipher');
 const { sendOTPEmail, sendSecurityAlertEmail } = require('../../utils/mailer');
 
 // POST /api/auth/register
-router.post('/register', async (req, res) => {
+router.post('/register', validate(registerSchema), async (req, res) => {
     try {
         const { email, password, firstName, lastName, dateOfBirth, phone } = req.body;
 
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) {
             return res.status(400).json({ error: "Email is already registered" });
-        }
-
-        if (dateOfBirth) {
-            const dob = new Date(dateOfBirth);
-            if (isNaN(dob.getTime())) {
-                return res.status(400).json({ error: "Invalid date of birth." });
-            }
-            const today = new Date();
-            if (dob > today) {
-                return res.status(400).json({ error: "Date of birth cannot be in the future." });
-            }
-        }
-
-        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
-        if (!passwordRegex.test(password)) {
-            return res.status(400).json({ 
-                error: "Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a special character." 
-            });
         }
 
         const salt = await bcrypt.genSalt(10);
@@ -69,7 +53,7 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /api/auth/login
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
     try {
         const { email, password } = req.body;
 

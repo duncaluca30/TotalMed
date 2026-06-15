@@ -9,11 +9,13 @@ import PatientLayout from './components/Patient/PatientLayout';
 import PatientDashboard from './components/Patient/PatientDashboard';
 import MedicalHistory from './components/Patient/MedicalHistory';
 import DoctorDashboard from './components/Doctor/DoctorDashboard';
+import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import './App.css';
 
 function App() {
   return (
-    <ToastProvider>
+    <GlobalErrorBoundary>
+      <ToastProvider>
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginForm />} />
@@ -45,6 +47,7 @@ function App() {
         </Routes>
       </AuthProvider>
     </ToastProvider>
+    </GlobalErrorBoundary>
   );
 }
 

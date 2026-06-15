@@ -3,7 +3,7 @@ import { Box, Typography, Button, TextField } from '@mui/material';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 
-const PatientVault = ({ doctorData, patient, vaultCode, onClose }) => {
+const PatientVault = ({ doctorData, patient, vaultCode, pagination, fetchMoreRecords, loadingMore, onClose }) => {
   const [newRecord, setNewRecord] = useState({ diagnosis: '', treatment: '', notes: '' });
   const showToast = useToast();
 
@@ -41,6 +41,20 @@ const PatientVault = ({ doctorData, patient, vaultCode, onClose }) => {
           </ul>
         ) : (
           <p style={{ color: '#636e72', margin: 0, fontStyle: 'italic' }}>No past records shared by patient.</p>
+        )}
+        
+        {pagination?.hasMore && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+            <Button 
+              variant="outlined" 
+              onClick={fetchMoreRecords} 
+              disabled={loadingMore}
+              size="small"
+              sx={{ fontWeight: 'bold' }}
+            >
+              {loadingMore ? "Loading..." : "Load More Records"}
+            </Button>
+          </Box>
         )}
       </div>
 

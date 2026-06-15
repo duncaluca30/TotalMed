@@ -1,4 +1,4 @@
-export const API_URL = 'https://totalmed-backend.onrender.com';
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export const fetchWithAuth = async (endpoint, options = {}) => {
   const headers = {

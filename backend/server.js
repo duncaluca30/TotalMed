@@ -18,7 +18,11 @@ const prisma = require('./src/config/prisma');
 const app = express();
 const server = http.createServer(app);
 
-const allowedOrigins = [process.env.FRONTEND_URL, 'http://localhost:5173'].filter(Boolean);
+const allowedOrigins = [
+    process.env.FRONTEND_URL, 
+    'http://localhost:5173',
+    'https://totalmed-backend.onrender.com'
+].filter(Boolean);
 
 const io = new Server(server, {
     cors: { origin: allowedOrigins, methods: ["GET", "POST"], credentials: true },

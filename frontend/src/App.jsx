@@ -96,6 +96,10 @@ function App() {
       // Fix #5: Send the JWT so the server can authenticate the room join
       newSocket.emit('join-secure-room', loggedInToken);
       newSocket.on('auth-request', (data) => setAuthRequest(data));
+      newSocket.on('session-replaced', () => {
+        handleLogout();
+        setToast({ open: true, message: 'You were logged in on another device. This session has ended.', severity: 'warning' });
+      });
       newSocket.on('vault-updated', (data) => {
         setAccessCode(null);
         setPatientData(prevData => ({ ...prevData, medicalRecords: [data.newRecord, ...prevData.medicalRecords] }));

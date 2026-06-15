@@ -41,11 +41,19 @@ io.on('connection', (socket) => {
         console.log('🟢 User connected to switchboard:', socket.id);
     }
 
-    socket.on('join-secure-room', (token) => {
+    socket.on('join-secure-room', async (token) => {
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             if (decoded.role !== 'PATIENT') return;
             const roomName = decoded.id.toString();
+
+            // Kick any existing sockets already in this room (previous sessions/tabs)
+            const socketsInRoom = await io.in(roomName).fetchSockets();
+            for (const existingSocket of socketsInRoom) {
+                existingSocket.emit('session-replaced');
+                existingSocket.leave(roomName);
+            }
+
             socket.join(roomName);
             socket._patientUserId = roomName;
             if (process.env.NODE_ENV !== 'production') {

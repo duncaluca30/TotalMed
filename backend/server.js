@@ -68,6 +68,7 @@ io.on('connection', (socket) => {
 });
 
 app.use(cors({ origin: ALLOWED_ORIGIN, credentials: true }));
+app.set('trust proxy', 1);
 app.use(express.json());
 
 // Fix #2: Rate limiters

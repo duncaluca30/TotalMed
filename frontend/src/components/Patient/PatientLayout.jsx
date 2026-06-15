@@ -60,6 +60,8 @@ const PatientLayout = () => {
     }
   }, [socket, navigate]);
 
+  const currentTab = location.pathname.includes('/history') ? 1 : 0;
+
   if (!patientData) {
     return (
       <div className="container">
@@ -83,8 +85,6 @@ const PatientLayout = () => {
       </div>
     );
   }
-
-  const currentTab = location.pathname.includes('/history') ? 1 : 0;
 
   const handleTabChange = (event, newValue) => {
     if (newValue === 0) navigate('/patient');

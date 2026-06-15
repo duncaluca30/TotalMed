@@ -17,10 +17,10 @@ const prisma = require('./src/config/prisma');
 const app = express();
 const server = http.createServer(app);
 
-const ALLOWED_ORIGIN = process.env.FRONTEND_URL || 'http://localhost:5173';
+const allowedOrigins = [process.env.FRONTEND_URL, 'http://localhost:5173'].filter(Boolean);
 
 const io = new Server(server, {
-    cors: { origin: ALLOWED_ORIGIN, methods: ["GET", "POST"] },
+    cors: { origin: allowedOrigins, methods: ["GET", "POST"], credentials: true },
     pingInterval: 25000,
     pingTimeout: 60000
 });
@@ -32,7 +32,16 @@ io._expressApp = app;
 setupSocketHandlers(io);
 
 // Express middleware
-app.use(cors({ origin: ALLOWED_ORIGIN, credentials: true }));
+app.use(cors({ 
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }, 
+    credentials: true 
+}));
 app.set('trust proxy', 1);
 app.use(express.json());
 app.use(cookieParser());

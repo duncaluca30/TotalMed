@@ -50,8 +50,8 @@ const MedicalHistory = () => {
   return (
     <Box>
       <Box className="page-heading">
-        <h3 style={{ margin: 0 }}>📁 Your Medical History</h3>
-        <Button variant="contained" startIcon={<PictureAsPdfIcon />} onClick={handleDownloadPDF} sx={{ backgroundColor: '#5b4fe6' }}>Download Vault PDF</Button>
+        <h3 style={{ margin: 0 }}>Your medical history</h3>
+        <Button variant="contained" startIcon={<PictureAsPdfIcon />} onClick={handleDownloadPDF}>Download PDF</Button>
       </Box>
       
       {patientData.medicalRecords && patientData.medicalRecords.length > 0 ? (

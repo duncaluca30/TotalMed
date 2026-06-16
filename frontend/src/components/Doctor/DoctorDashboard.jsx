@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Box, Typography, Button, TextField } from '@mui/material';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 import PatientVault from './PatientVault';
@@ -60,8 +61,19 @@ const DoctorDashboard = () => {
   return (
     <>
       <div className="card card--profile-doctor">
-        <h3>Physician Profile</h3>
-        <p><strong>Dr. {doctorData.firstName} {doctorData.lastName}</strong> | {doctorData.specialty}</p>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <Box sx={{ width: 48, height: 48, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '1.05rem' }}>
+            {`${doctorData.firstName?.[0] || ''}${doctorData.lastName?.[0] || ''}`.toUpperCase()}
+          </Box>
+          <Box>
+            <Typography sx={{ fontWeight: 600, fontSize: '1.15rem', color: 'var(--dark-text)', lineHeight: 1.25 }}>
+              Dr. {doctorData.firstName} {doctorData.lastName}
+            </Typography>
+            <Typography sx={{ fontSize: '0.9rem', color: 'var(--light-text)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <MedicalServicesOutlinedIcon sx={{ fontSize: 16 }} /> {doctorData.specialty}
+            </Typography>
+          </Box>
+        </Box>
       </div>
 
       {isWaiting ? (

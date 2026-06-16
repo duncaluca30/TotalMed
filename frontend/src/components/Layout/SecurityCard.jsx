@@ -1,8 +1,27 @@
 import React, { useState } from 'react';
 import { Box, Typography, Button, TextField } from '@mui/material';
+import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
+import FingerprintIcon from '@mui/icons-material/Fingerprint';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import { startRegistration } from '@simplewebauthn/browser';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
+
+const StatusPill = ({ children }) => (
+  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, background: 'rgba(0, 184, 148, 0.12)', color: '#0f6e56', px: 1.25, py: 0.5, borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, flexShrink: 0 }}>
+    <CheckCircleOutlineIcon sx={{ fontSize: 15 }} /> {children}
+  </Box>
+);
+
+const SectionHeader = ({ icon, title, pill }) => (
+  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      {icon}
+      <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>{title}</Typography>
+    </Box>
+    {pill}
+  </Box>
+);
 
 /**
  * Reusable security settings card: TOTP 2FA setup + WebAuthn biometric login.
@@ -83,14 +102,14 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
   return (
     <div className="card card--security" style={{ marginTop: '20px' }}>
       {/* ---- Two-Factor Authentication ---- */}
-      <h3>🔐 Two-Factor Authentication</h3>
+      <SectionHeader
+        icon={<ShieldOutlinedIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />}
+        title="Two-factor authentication"
+        pill={twoFactorActive ? <StatusPill>Enabled</StatusPill> : null}
+      />
       <p className="text-muted">Protect your account with an authenticator app.</p>
 
-      {twoFactorActive ? (
-        <Typography sx={{ color: '#00b894', fontWeight: 'bold', mt: 2, fontSize: '1.2em' }}>
-          ✅ 2FA is securely enabled on this account.
-        </Typography>
-      ) : (
+      {!twoFactorActive && (
         <>
           {setupStep === 'initial' && (
             <Button variant="outlined" onClick={handleStart2FASetup} sx={{ mt: 1 }}>Enable 2FA</Button>
@@ -113,12 +132,14 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
       <hr className="section-divider" />
 
       {/* ---- Biometric Login ---- */}
-      <h3>👆 Biometric Login</h3>
+      <SectionHeader
+        icon={<FingerprintIcon sx={{ fontSize: 22, color: '#7c3aed' }} />}
+        title="Biometric login"
+        pill={hasPasskeys ? <StatusPill>{passkeys.length} device{passkeys.length > 1 ? 's' : ''}</StatusPill> : null}
+      />
       {hasPasskeys ? (
         <>
-          <Typography sx={{ color: '#00b894', fontWeight: 'bold', mt: 1 }}>
-            ✅ Biometric login is enabled ({passkeys.length} device{passkeys.length > 1 ? 's' : ''} registered).
-          </Typography>
+          <p className="text-muted">Sign in with Fingerprint, Face ID, or Windows Hello on your registered devices.</p>
           <Button
             variant="outlined"
             onClick={handleEnableBiometrics}

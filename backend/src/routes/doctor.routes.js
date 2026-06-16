@@ -1,12 +1,15 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 
 const prisma = require('../config/prisma');
 const authenticateToken = require('../middleware/authenticate');
 const { vaultLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 const { recordSchema } = require('../schemas/doctor.schema');
-const { encrypt, decrypt } = require('../../utils/cipher');
+const { vaultAccessSchema } = require('../schemas/vault.schema');
+
+const { lookupAccessCode, decryptRecords, createEncryptedRecord, createAuditLog } = require('../services/vault.service');
 
 // GET /api/doctor/dashboard
 router.get('/dashboard', authenticateToken, async (req, res) => {
@@ -36,29 +39,13 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 });
 
 // POST /api/doctor/access-vault
-router.post('/access-vault', authenticateToken, vaultLimiter, async (req, res) => {
+router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAccessSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
 
         const { code } = req.body;
-        if (!code) return res.status(400).json({ error: "Please enter a 6-digit access code." });
 
-        // Sanitize — reject anything that isn't exactly 6 digits
-        if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: "Access code must be exactly 6 digits." });
-
-        const activeCodes = await prisma.accessCode.findMany({
-            where: { expiresAt: { gt: new Date() } }
-        });
-
-        let validCode = null;
-        for (const record of activeCodes) {
-            const decryptedCode = decrypt(record.code);
-            if (decryptedCode === code) {
-                validCode = record;
-                break;
-            }
-        }
-
+        const validCode = await lookupAccessCode(code);
         if (!validCode) return res.status(404).json({ error: "Invalid code." });
 
         const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
@@ -91,6 +78,9 @@ router.post('/access-vault', authenticateToken, vaultLimiter, async (req, res) =
             clearTimeout(timeout);
 
             if (authData.approved) {
+                // Immediately consume the access code — it can never be reused
+                await prisma.accessCode.delete({ where: { id: validCode.id } });
+
                 const page = parseInt(req.query.page) || 1;
                 const limit = parseInt(req.query.limit) || 10;
                 const skip = (page - 1) * limit;
@@ -110,38 +100,31 @@ router.post('/access-vault', authenticateToken, vaultLimiter, async (req, res) =
                     authData.sharedRecordIds.includes(record.id)
                 );
 
-                // Paginate the approved records
+                // Paginate and decrypt the approved records
                 const totalRecords = approvedRecords.length;
                 const paginatedRecords = approvedRecords.slice(skip, skip + limit);
-
-                // Decrypt all fields for the doctor
-                paginatedRecords.forEach(record => {
-                    if (record.diagnosis) record.diagnosis = decrypt(record.diagnosis);
-                    if (record.treatment) record.treatment = decrypt(record.treatment);
-                    if (record.notes) {
-                        try {
-                            record.notes = decrypt(record.notes);
-                        } catch (e) {
-                            console.error("Failed to decrypt notes for record", record.id);
-                        }
-                    }
-                });
-
+                decryptRecords(paginatedRecords);
                 patientData.medicalRecords = paginatedRecords;
 
                 const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-                await prisma.auditLog.create({
-                    data: {
-                        userId: doctor.userId,
-                        action: 'VAULT_ACCESSED',
-                        details: JSON.stringify({ patientId: validCode.patientId, approvedRecords: authData.sharedRecordIds.length }),
-                        ipAddress: rawIp ? rawIp.split(',')[0].trim() : null
-                    }
+                await createAuditLog({
+                    userId: doctor.userId,
+                    action: 'VAULT_ACCESSED',
+                    details: { patientId: validCode.patientId, approvedRecords: authData.sharedRecordIds.length },
+                    ipAddress: rawIp
                 });
+
+                // Issue a short-lived vault session token so the doctor can add records
+                // even though the access code is now consumed
+                const vaultToken = jwt.sign(
+                    { patientId: validCode.patientId, doctorId: doctor.id },
+                    process.env.JWT_SECRET,
+                    { expiresIn: '15m' }
+                );
 
                 res.json({ 
                     patient: patientData, 
-                    vaultKey: code,
+                    vaultToken,
                     pagination: {
                         page,
                         limit,
@@ -165,53 +148,40 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
 
-        const { patientId, code, diagnosis, treatment, notes } = req.body;
+        const { patientId, vaultToken, diagnosis, treatment, notes } = req.body;
 
-        const patientCodes = await prisma.accessCode.findMany({ 
-            where: { patientId: patientId } 
-        });
-
-        let validCode = null;
-        for (const record of patientCodes) {
-            if (decrypt(record.code) === code) {
-                validCode = record;
-                break;
-            }
+        // Validate the vault session token (issued during access-vault)
+        let vaultSession;
+        try {
+            vaultSession = jwt.verify(vaultToken, process.env.JWT_SECRET);
+        } catch (err) {
+            return res.status(403).json({ error: "Vault session expired. Please re-enter a new access code." });
         }
 
-        if (!validCode) {
-            return res.status(403).json({ error: "Invalid or expired authorization code." });
-        }
-
+        // Ensure the token matches the claimed patient and the requesting doctor
         const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+        if (vaultSession.patientId !== patientId || vaultSession.doctorId !== doctor.id) {
+            return res.status(403).json({ error: "Vault session mismatch. Access denied." });
+        }
 
-        const newRecord = await prisma.medicalRecord.create({
-            data: {
-                diagnosis: encrypt(diagnosis),
-                treatment: encrypt(treatment),
-                notes: notes ? encrypt(notes) : null,
-                patientId: validCode.patientId,
-                doctorId: doctor.id
-            }
+        const newRecord = await createEncryptedRecord({
+            diagnosis, treatment, notes,
+            patientId: vaultSession.patientId,
+            doctorId: doctor.id
         });
 
         const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-        await prisma.auditLog.create({
-            data: {
-                userId: req.user.id,
-                action: 'RECORD_ADDED',
-                details: JSON.stringify({ patientId: validCode.patientId, recordId: newRecord.id }),
-                ipAddress: rawIp ? rawIp.split(',')[0].trim() : null
-            }
+        await createAuditLog({
+            userId: req.user.id,
+            action: 'RECORD_ADDED',
+            details: { patientId: vaultSession.patientId, recordId: newRecord.id },
+            ipAddress: rawIp
         });
-
-        await prisma.accessCode.delete({ where: { id: validCode.id } });
 
         try {
             const io = req.io;
-            // Look up userId so we emit to the correct socket room
             const patientForSocket = await prisma.patient.findUnique({
-                where: { id: validCode.patientId },
+                where: { id: vaultSession.patientId },
                 select: { userId: true }
             });
             if (patientForSocket) {
@@ -229,7 +199,7 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to add record." });
-      } 
+    }
 });
 
 module.exports = router;

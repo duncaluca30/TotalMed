@@ -135,9 +135,9 @@ const LoginForm = () => {
 
   return (
     <div className="container">
-      <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-        <h1 style={{ color: '#0984e3', fontSize: '2.5em', margin: 0 }}>TotalMed</h1>
-        <p style={{ color: '#636e72', marginTop: '5px' }}>Secure Ephemeral Health Vault</p>
+      <div className="login-branding">
+        <h1>TotalMed</h1>
+        <p>Secure Ephemeral Health Vault</p>
       </div>
 
       <div className="card" style={{ maxWidth: '400px', margin: '0 auto', padding: '30px' }}>

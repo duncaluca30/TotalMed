@@ -73,16 +73,16 @@ const PatientDashboard = () => {
 
   return (
     <Box>
-      <div className="card" style={{ backgroundColor: '#f8f9fa', color: '#2d3436' }}>
+      <div className="card card--profile">
         <h3>Patient Profile</h3>
         <p><strong>Name:</strong> {patientData.firstName} {patientData.lastName}</p>
         <p><strong>DOB:</strong> {new Date(patientData.dateOfBirth).toLocaleDateString()}</p>
       </div>
 
       {/* 2FA SECURITY DASHBOARD CARD */}
-      <div className="card" style={{ backgroundColor: '#fdfbfb', marginTop: '20px', border: '1px solid #dfe6e9' }}>
+      <div className="card card--security" style={{ marginTop: '20px' }}>
         <h3>🔐 Two-Factor Authentication</h3>
-        <p style={{ color: '#636e72', fontSize: '0.9em' }}>Protect your vault with Google Authenticator.</p>
+        <p className="text-muted">Protect your vault with Google Authenticator.</p>
         
         {patientData?.user?.isTwoFactorEnabled || setupStep === 'success' ? (
           <Typography sx={{ color: '#00b894', fontWeight: 'bold', mt: 2, fontSize: '1.2em' }}>
@@ -107,10 +107,10 @@ const PatientDashboard = () => {
             )}
           </>
         )}
-        <hr style={{ border: 'none', borderTop: '1px dashed #dfe6e9', margin: '30px 0 20px 0' }} />
+        <hr className="section-divider" />
         
         <h3>👆 Biometric Login</h3>
-        <p style={{ color: '#636e72', fontSize: '0.9em' }}>Register this device to log in with Fingerprint, Face ID, or Windows Hello.</p>
+        <p className="text-muted">Register this device to log in with Fingerprint, Face ID, or Windows Hello.</p>
         <Button 
           variant="contained" 
           onClick={handleEnableBiometrics} 
@@ -120,17 +120,17 @@ const PatientDashboard = () => {
         </Button>
       </div>
 
-      <div className="card" style={{ backgroundColor: '#fff3cd', color: '#856404', marginTop: '20px', border: '2px dashed #ffeeba' }}>
+      <div className="card card--access-code" style={{ marginTop: '20px' }}>
         <h3>🔐 Share Medical File</h3>
         <p>Generate a temporary 6-digit code to allow a doctor to view your history and add new records. This code expires in 60 minutes.</p>
         
         {!patientData.accessCode ? (
           <button onClick={handleGenerateCode} style={{ backgroundColor: '#f39c12', color: 'white', fontWeight: 'bold' }}>Generate Access Code</button>
         ) : (
-          <div style={{ textAlign: 'center', margin: '15px 0' }}>
+          <div className="access-code-display">
             <p style={{ fontSize: '1.2em', marginBottom: '5px' }}>Your Secure Code:</p>
-            <h1 style={{ letterSpacing: '5px', color: '#d35400', fontSize: '3em', margin: '0' }}>{patientData.accessCode.code}</h1>
-            <p style={{ fontSize: '0.8em', color: '#e74c3c' }}>Show this to your doctor. Do not close this window.</p>
+            <h1 className="access-code-value">{patientData.accessCode.code}</h1>
+            <p className="text-danger">Show this to your doctor. Do not close this window.</p>
           </div>
         )}
       </div>

@@ -14,6 +14,7 @@ const authRoutes = require('./src/routes/auth.routes');
 const patientRoutes = require('./src/routes/patient.routes');
 const doctorRoutes = require('./src/routes/doctor.routes');
 const prisma = require('./src/config/prisma');
+const { csrfProtection } = require('./src/middleware/csrf');
 
 const app = express();
 const server = http.createServer(app);
@@ -57,6 +58,9 @@ app.use((req, res, next) => {
     req.io = io;
     next();
 });
+
+// CSRF protection (double-submit cookie pattern)
+app.use(csrfProtection);
 
 // Health check
 app.get('/api/status', async (req, res) => {

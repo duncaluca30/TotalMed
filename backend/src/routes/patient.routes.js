@@ -3,8 +3,8 @@ const router = express.Router();
 
 const prisma = require('../config/prisma');
 const authenticateToken = require('../middleware/authenticate');
+const { getDecryptedRecords, generateAccessCode } = require('../services/vault.service');
 const { decrypt } = require('../../utils/cipher');
-const { encrypt } = require('../../utils/cipher');
 
 // GET /api/patient/dashboard
 router.get('/dashboard', authenticateToken, async (req, res) => {
@@ -13,7 +13,6 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
-        const skip = (page - 1) * limit;
 
         const patientData = await prisma.patient.findUnique({
             where: { userId: req.user.id },
@@ -25,34 +24,9 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 
         if (!patientData) return res.status(404).json({ error: "Profile not found" });
 
-        // Get total count for pagination
-        const totalRecords = await prisma.medicalRecord.count({
-            where: { patientId: patientData.id }
-        });
-
-        // Get paginated records
-        const medicalRecords = await prisma.medicalRecord.findMany({
-            where: { patientId: patientData.id },
-            include: { doctor: true },
-            orderBy: { createdAt: 'desc' },
-            skip,
-            take: limit
-        });
-
-        // Decrypt all fields for the patient
-        medicalRecords.forEach(record => {
-            if (record.diagnosis) record.diagnosis = decrypt(record.diagnosis);
-            if (record.treatment) record.treatment = decrypt(record.treatment);
-            if (record.notes) {
-                try {
-                    record.notes = decrypt(record.notes);
-                } catch (e) {
-                    console.error("Failed to decrypt notes for record", record.id);
-                }
-            }
-        });
-
-        patientData.medicalRecords = medicalRecords;
+        // Fetch decrypted, paginated records via service
+        const { records, total } = await getDecryptedRecords(patientData.id, page, limit);
+        patientData.medicalRecords = records;
 
         if (patientData.accessCode) {
             patientData.accessCode.code = decrypt(patientData.accessCode.code);
@@ -63,8 +37,8 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
             pagination: {
                 page,
                 limit,
-                total: totalRecords,
-                hasMore: skip + limit < totalRecords
+                total,
+                hasMore: (page - 1) * limit + limit < total
             }
         });
     } catch (error) {
@@ -80,35 +54,8 @@ router.post('/generate-code', authenticateToken, async (req, res) => {
         const patient = await prisma.patient.findUnique({ where: { userId: req.user.id } });
         if (!patient) return res.status(404).json({ error: "Patient profile not found." });
 
-        const existingCode = await prisma.accessCode.findUnique({
-            where: { patientId: patient.id }
-        });
-
-        if (existingCode) {
-            if (new Date() < existingCode.expiresAt) {
-                const decryptedCode = decrypt(existingCode.code);
-                return res.json({ code: decryptedCode, expiresAt: existingCode.expiresAt });
-            } else {
-                await prisma.accessCode.delete({ where: { id: existingCode.id } });
-            }
-        }
-
-        const generatePin = () => Math.floor(100000 + Math.random() * 900000).toString();
-        let uniqueCode = generatePin();
-        let encryptedCode = encrypt(uniqueCode);
-
-        const expiresAt = new Date();
-        expiresAt.setMinutes(expiresAt.getMinutes() + 60);
-
-        const newCode = await prisma.accessCode.create({
-            data: {
-                code: encryptedCode,
-                expiresAt: expiresAt,
-                patientId: patient.id
-            }
-        });
-
-        res.json({ code: uniqueCode, expiresAt: newCode.expiresAt });
+        const result = await generateAccessCode(patient.id);
+        res.json(result);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to generate access code" });

@@ -8,6 +8,7 @@ import RegisterForm from './components/Auth/RegisterForm';
 import PatientLayout from './components/Patient/PatientLayout';
 import PatientDashboard from './components/Patient/PatientDashboard';
 import MedicalHistory from './components/Patient/MedicalHistory';
+import DoctorLayout from './components/Doctor/DoctorLayout';
 import DoctorDashboard from './components/Doctor/DoctorDashboard';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import './App.css';
@@ -37,10 +38,12 @@ function App() {
             path="/doctor" 
             element={
               <ProtectedRoute allowedRoles={['DOCTOR']}>
-                <DoctorDashboard />
+                <DoctorLayout />
               </ProtectedRoute>
-            } 
-          />
+            }
+          >
+            <Route index element={<DoctorDashboard />} />
+          </Route>
           
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />

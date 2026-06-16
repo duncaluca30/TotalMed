@@ -3,7 +3,7 @@ import { Box, Typography, Button, TextField } from '@mui/material';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 
-const PatientVault = ({ doctorData, patient, vaultCode, pagination, fetchMoreRecords, loadingMore, onClose }) => {
+const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) => {
   const [newRecord, setNewRecord] = useState({ diagnosis: '', treatment: '', notes: '' });
   const showToast = useToast();
 
@@ -12,7 +12,7 @@ const PatientVault = ({ doctorData, patient, vaultCode, pagination, fetchMoreRec
     try {
       await fetchWithAuth('/api/doctor/records', {
         method: 'POST',
-        body: JSON.stringify({ ...newRecord, patientId: patient.id, code: vaultCode })
+        body: JSON.stringify({ ...newRecord, patientId: patient.id, vaultToken })
       });
       showToast("Record successfully secured in the vault.", "success");
       onClose();
@@ -22,38 +22,32 @@ const PatientVault = ({ doctorData, patient, vaultCode, pagination, fetchMoreRec
   };
 
   return (
-    <div className="card" style={{ marginTop: '20px', backgroundColor: '#ffffff', border: '2px solid #00b894' }}>
+    <div className="card card--vault" style={{ marginTop: '20px' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <h3 style={{ margin: 0, color: '#00b894' }}>🔓 Vault Unlocked: {patient.firstName} {patient.lastName}</h3>
         <Button onClick={onClose} variant="outlined" color="error" size="small">Lock Vault & Exit</Button>
       </Box>
 
-      <div style={{ padding: '15px', backgroundColor: '#f1f2f6', borderRadius: '4px', marginBottom: '20px' }}>
-        <h4 style={{ margin: '0 0 10px 0', color: '#2d3436' }}>Patient History</h4>
+      <div className="records-list">
+        <h4 style={{ margin: '0 0 10px 0' }}>Patient History</h4>
         {patient.medicalRecords && patient.medicalRecords.length > 0 ? (
           <ul style={{ paddingLeft: '20px', margin: 0 }}>
             {patient.medicalRecords.map(record => (
               <li key={record.id} style={{ marginBottom: '10px' }}>
                 <strong>{new Date(record.createdAt).toLocaleDateString()} - {record.diagnosis}</strong> (Dr. {record.doctor?.lastName || 'Unknown'})
-                {record.treatment && <div style={{ fontSize: '0.9em', color: '#636e72' }}>Treatment: {record.treatment}</div>}
+                {record.treatment && <div className="text-muted">Treatment: {record.treatment}</div>}
               </li>
             ))}
           </ul>
         ) : (
-          <p style={{ color: '#636e72', margin: 0, fontStyle: 'italic' }}>No past records shared by patient.</p>
+          <p className="text-muted" style={{ margin: 0, fontStyle: 'italic' }}>No past records shared by patient.</p>
         )}
         
         {pagination?.hasMore && (
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-            <Button 
-              variant="outlined" 
-              onClick={fetchMoreRecords} 
-              disabled={loadingMore}
-              size="small"
-              sx={{ fontWeight: 'bold' }}
-            >
-              {loadingMore ? "Loading..." : "Load More Records"}
-            </Button>
+            <Typography sx={{ color: '#636e72', fontSize: '0.85em', fontStyle: 'italic' }}>
+              {pagination.total - patient.medicalRecords.length} more record(s) not shown.
+            </Typography>
           </Box>
         )}
       </div>

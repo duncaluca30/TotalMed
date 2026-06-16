@@ -49,25 +49,25 @@ const MedicalHistory = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, width: '100%', borderBottom: '2px solid #dfe6e9', paddingBottom: '10px', mb: 2 }}>
-        <h3 style={{ margin: 0, color: '#2d3436' }}>📁 Your Medical History</h3>
+      <Box className="page-heading">
+        <h3 style={{ margin: 0 }}>📁 Your Medical History</h3>
         <Button variant="contained" startIcon={<PictureAsPdfIcon />} onClick={handleDownloadPDF} sx={{ backgroundColor: '#0984e3' }}>Download Vault PDF</Button>
       </Box>
       
       {patientData.medicalRecords && patientData.medicalRecords.length > 0 ? (
         patientData.medicalRecords.map((record) => (
-          <div key={record.id} className="card" style={{ borderLeft: '5px solid #0984e3', marginBottom: '15px', backgroundColor: '#ffffff' }}>
+          <div key={record.id} className="card card--record" style={{ marginBottom: '15px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <h4 style={{ margin: 0, color: '#2d3436' }}>{record.diagnosis}</h4>
-              <span style={{ fontSize: '0.9em', color: '#636e72' }}>{new Date(record.createdAt).toLocaleDateString()}</span>
+              <h4 style={{ margin: 0 }}>{record.diagnosis}</h4>
+              <span className="text-muted">{new Date(record.createdAt).toLocaleDateString()}</span>
             </div>
             <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Attending Physician:</strong> Dr. {record.doctor?.lastName || 'Unknown'}</p>
             {record.treatment && <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Treatment Plan:</strong> {record.treatment}</p>}
-            {record.notes && <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f1f2f6', borderRadius: '4px', fontSize: '0.9em', fontStyle: 'italic' }}>"{record.notes}"</div>}
+            {record.notes && <div className="record-notes">"{record.notes}"</div>}
           </div>
         ))
       ) : (
-        <p style={{ color: '#636e72', fontStyle: 'italic' }}>Your medical vault is currently empty.</p>
+        <p className="text-muted" style={{ fontStyle: 'italic' }}>Your medical vault is currently empty.</p>
       )}
 
       {pagination?.hasMore && (

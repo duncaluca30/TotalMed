@@ -102,3 +102,120 @@ button:active {
 
 .btn-secondary { background-color: #b2bec3; color: var(--dark-text); }
 .btn-secondary:hover { background-color: #dfe6e9; }
+
+/* Card Variants */
+.card--profile {
+  background-color: #f8f9fa;
+  color: var(--dark-text);
+}
+
+.card--profile-doctor {
+  background-color: #e8f4f8;
+  color: var(--dark-text);
+}
+
+.card--security {
+  background-color: #fdfbfb;
+  border: 1px solid #dfe6e9;
+}
+
+.card--access-code {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 2px dashed #ffeeba;
+}
+
+.card--record {
+  border-left: 5px solid var(--primary-blue);
+  background-color: var(--card-bg);
+}
+
+.card--vault {
+  border: 2px solid var(--success-teal);
+  background-color: var(--card-bg);
+}
+
+.card--centered {
+  text-align: center;
+  padding: 30px;
+}
+
+/* Text Utilities */
+.text-muted {
+  color: var(--light-text);
+  font-size: 0.9em;
+}
+
+.text-danger {
+  color: var(--danger-red);
+  font-size: 0.8em;
+}
+
+.text-success {
+  color: var(--success-teal);
+  font-weight: bold;
+}
+
+/* Layout */
+.section-divider {
+  border: none;
+  border-top: 1px dashed #dfe6e9;
+  margin: 30px 0 20px 0;
+}
+
+.page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  border-bottom: 2px solid #dfe6e9;
+  padding-bottom: 10px;
+  margin-bottom: 16px;
+}
+
+.records-list {
+  padding: 15px;
+  background-color: #f1f2f6;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.access-code-display {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.access-code-value {
+  letter-spacing: 5px;
+  color: #d35400;
+  font-size: 3em;
+  font-weight: bold;
+  margin: 0;
+}
+
+.record-notes {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #f1f2f6;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-style: italic;
+}
+
+.login-branding {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.login-branding h1 {
+  color: var(--primary-blue);
+  font-size: 2.5em;
+  margin: 0;
+}
+
+.login-branding p {
+  color: var(--light-text);
+  margin-top: 5px;
+}

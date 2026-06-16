@@ -1,26 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, TextField, Skeleton } from '@mui/material';
+import React, { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import { Box, Typography, Button, TextField } from '@mui/material';
 import { fetchWithAuth } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../hooks/useToast';
-import AppHeader from '../Layout/AppHeader';
 import PatientVault from './PatientVault';
 
 const DoctorDashboard = () => {
-  const [doctorData, setDoctorData] = useState(null);
+  const { doctorData } = useOutletContext();
   const [vaultCode, setVaultCode] = useState('');
   const [unlockedPatient, setUnlockedPatient] = useState(null);
+  const [vaultToken, setVaultToken] = useState(null);
   const [pagination, setPagination] = useState(null);
-  const [loadingMore, setLoadingMore] = useState(false);
 
-  const { logout } = useAuth();
   const showToast = useToast();
-
-  useEffect(() => {
-    fetchWithAuth('/api/doctor/dashboard')
-      .then(data => setDoctorData(data))
-      .catch(() => logout());
-  }, [logout]);
 
   const handleUnlockVault = async (e) => {
     e.preventDefault();
@@ -30,6 +22,7 @@ const DoctorDashboard = () => {
         body: JSON.stringify({ code: vaultCode })
       });
       setUnlockedPatient(data.patient);
+      setVaultToken(data.vaultToken);
       setPagination(data.pagination);
       showToast("Vault Unlocked", "success");
     } catch (error) { 
@@ -37,57 +30,15 @@ const DoctorDashboard = () => {
     }
   };
 
-  const fetchMoreRecords = async () => {
-    if (!pagination || !pagination.hasMore || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const nextPage = pagination.page + 1;
-      const data = await fetchWithAuth(`/api/doctor/access-vault?page=${nextPage}&limit=${pagination.limit}`, {
-        method: 'POST',
-        body: JSON.stringify({ code: vaultCode })
-      });
-      
-      setUnlockedPatient(prev => ({
-        ...prev,
-        medicalRecords: [...prev.medicalRecords, ...data.patient.medicalRecords]
-      }));
-      setPagination(data.pagination);
-    } catch (error) {
-      console.error("Failed to load more records", error);
-      showToast("Failed to fetch more records.", "error");
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
-  if (!doctorData) {
-    return (
-      <div className="container">
-        <AppHeader title="TotalMed Doctor Portal" />
-        <div className="card" style={{ backgroundColor: '#e8f4f8' }}>
-          <Skeleton variant="text" sx={{ fontSize: '1.5rem', width: '40%', mb: 1 }} />
-          <Skeleton variant="text" sx={{ fontSize: '1rem', width: '60%' }} />
-        </div>
-        <div className="card" style={{ marginTop: '30px', textAlign: 'center', padding: '30px' }}>
-          <Skeleton variant="text" sx={{ fontSize: '2rem', width: '50%', margin: '0 auto', mb: 2 }} />
-          <Skeleton variant="rectangular" height={60} sx={{ borderRadius: 2, mb: 2 }} />
-          <Skeleton variant="rectangular" height={40} width={150} sx={{ borderRadius: 2, margin: '0 auto' }} />
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="container">
-      <AppHeader title="TotalMed Doctor Portal" />
-      
-      <div className="card" style={{ backgroundColor: '#e8f4f8', color: '#2d3436' }}>
+    <>
+      <div className="card card--profile-doctor">
         <h3>Physician Profile</h3>
         <p><strong>Dr. {doctorData.firstName} {doctorData.lastName}</strong> | {doctorData.specialty}</p>
       </div>
 
       {!unlockedPatient ? (
-        <div className="card" style={{ marginTop: '30px', backgroundColor: '#ffffff', textAlign: 'center', padding: '30px' }}>
+        <div className="card card--centered" style={{ marginTop: '30px' }}>
           <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1, color: '#2d3436' }}>🔑 Unlock Patient File</Typography>
           <Typography sx={{ color: '#636e72', mb: 3 }}>Enter the 6-digit access code provided by the patient.</Typography>
           
@@ -109,18 +60,17 @@ const DoctorDashboard = () => {
         <PatientVault 
           doctorData={doctorData}
           patient={unlockedPatient} 
-          vaultCode={vaultCode} 
+          vaultToken={vaultToken} 
           pagination={pagination}
-          fetchMoreRecords={fetchMoreRecords}
-          loadingMore={loadingMore}
           onClose={() => {
             setUnlockedPatient(null);
+            setVaultToken(null);
             setPagination(null);
             setVaultCode('');
           }} 
         />
       )}
-    </div>
+    </>
   );
 };
 

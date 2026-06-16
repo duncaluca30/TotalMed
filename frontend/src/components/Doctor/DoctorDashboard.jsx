@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Box, Typography, Button, TextField } from '@mui/material';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 import PatientVault from './PatientVault';
+import VaultWaitingScreen from './VaultWaitingScreen';
 
 const DoctorDashboard = () => {
   const { doctorData } = useOutletContext();
@@ -11,23 +13,47 @@ const DoctorDashboard = () => {
   const [unlockedPatient, setUnlockedPatient] = useState(null);
   const [vaultToken, setVaultToken] = useState(null);
   const [pagination, setPagination] = useState(null);
+  const [isWaiting, setIsWaiting] = useState(false);
+  const abortRef = useRef(null);
 
   const showToast = useToast();
 
   const handleUnlockVault = async (e) => {
     e.preventDefault();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setIsWaiting(true);
     try {
       const data = await fetchWithAuth('/api/doctor/access-vault', {
         method: 'POST',
-        body: JSON.stringify({ code: vaultCode })
+        body: JSON.stringify({ code: vaultCode }),
+        signal: controller.signal,
       });
       setUnlockedPatient(data.patient);
       setVaultToken(data.vaultToken);
       setPagination(data.pagination);
       showToast("Vault Unlocked", "success");
-    } catch (error) { 
-      showToast(error.message || "Failed to connect.", "error"); 
+    } catch (error) {
+      // Aborts are user-initiated (Cancel button) — no error toast needed.
+      if (error.name !== 'AbortError') {
+        showToast(error.message || "Failed to connect.", "error");
+      }
+    } finally {
+      setIsWaiting(false);
+      abortRef.current = null;
     }
+  };
+
+  const handleCancelWait = () => {
+    if (abortRef.current) abortRef.current.abort();
+    showToast("Request cancelled.", "info");
+  };
+
+  const resetVault = () => {
+    setUnlockedPatient(null);
+    setVaultToken(null);
+    setPagination(null);
+    setVaultCode('');
   };
 
   return (
@@ -37,37 +63,44 @@ const DoctorDashboard = () => {
         <p><strong>Dr. {doctorData.firstName} {doctorData.lastName}</strong> | {doctorData.specialty}</p>
       </div>
 
-      {!unlockedPatient ? (
+      {isWaiting ? (
+        <VaultWaitingScreen onCancel={handleCancelWait} />
+      ) : !unlockedPatient ? (
         <div className="card card--centered" style={{ marginTop: '30px' }}>
-          <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1, color: '#2d3436' }}>🔑 Unlock Patient File</Typography>
-          <Typography sx={{ color: '#636e72', mb: 3 }}>Enter the 6-digit access code provided by the patient.</Typography>
-          
+          <Box sx={{
+            width: 64, height: 64, borderRadius: '50%', mx: 'auto', mb: 2,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backgroundColor: 'rgba(9, 132, 227, 0.1)',
+          }}>
+            <LockOpenIcon sx={{ fontSize: 32, color: '#0984e3' }} />
+          </Box>
+          <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1, color: '#2d3436' }}>Unlock Patient File</Typography>
+          <Typography sx={{ color: '#636e72', mb: 3, maxWidth: 380, mx: 'auto' }}>
+            Enter the 6-digit access code provided by the patient. They'll be asked to
+            approve and select which records to share.
+          </Typography>
+
           <Box component="form" onSubmit={handleUnlockVault} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-            <TextField 
-              label="6-Digit Vault Code" 
-              variant="outlined" 
-              value={vaultCode} 
-              onChange={(e) => setVaultCode(e.target.value)} 
-              inputProps={{ maxLength: 6, style: { fontSize: '1.5em', letterSpacing: '8px', textAlign: 'center' } }} 
-              required 
+            <TextField
+              label="6-Digit Vault Code"
+              variant="outlined"
+              value={vaultCode}
+              onChange={(e) => setVaultCode(e.target.value)}
+              inputProps={{ maxLength: 6, style: { fontSize: '1.5em', letterSpacing: '8px', textAlign: 'center' } }}
+              required
             />
             <Button type="submit" variant="contained" size="large" sx={{ backgroundColor: '#0984e3', px: 4 }}>
-              Access Vault
+              Request Access
             </Button>
           </Box>
         </div>
       ) : (
-        <PatientVault 
+        <PatientVault
           doctorData={doctorData}
-          patient={unlockedPatient} 
-          vaultToken={vaultToken} 
+          patient={unlockedPatient}
+          vaultToken={vaultToken}
           pagination={pagination}
-          onClose={() => {
-            setUnlockedPatient(null);
-            setVaultToken(null);
-            setPagination(null);
-            setVaultCode('');
-          }} 
+          onClose={resetVault}
         />
       )}
     </>

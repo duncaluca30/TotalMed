@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Typography, Button, TextField } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { fetchWithAuth } from '../../services/api';
@@ -57,10 +58,29 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
     }
   };
 
+  const records = patient.medicalRecords || [];
+
   return (
-    <div className="card card--vault" style={{ marginTop: '20px' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2, mb: 3 }}>
-        <h3 style={{ margin: 0, color: '#00b894' }}>🔓 Vault Unlocked: {patient.firstName} {patient.lastName}</h3>
+    <div className="card card--vault" style={{ marginTop: '30px', padding: 0, overflow: 'hidden' }}>
+      {/* Header strip */}
+      <Box sx={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        flexWrap: 'wrap', gap: 2,
+        backgroundColor: 'rgba(0, 184, 148, 0.08)',
+        borderBottom: '1px solid rgba(0, 184, 148, 0.2)',
+        px: 3, py: 2.5,
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <LockOpenIcon sx={{ fontSize: 30, color: '#00b894' }} />
+          <Box>
+            <Typography sx={{ fontSize: '0.8em', fontWeight: 700, letterSpacing: '1px', color: '#00b894', textTransform: 'uppercase' }}>
+              Vault Unlocked
+            </Typography>
+            <Typography sx={{ fontSize: '1.35em', fontWeight: 700, lineHeight: 1.2, color: 'var(--dark-text)' }}>
+              {patient.firstName} {patient.lastName}
+            </Typography>
+          </Box>
+        </Box>
         <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
           <Button
             variant="outlined"
@@ -75,59 +95,86 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
         </Box>
       </Box>
 
-      <div className="records-list">
-        <h4 style={{ margin: '0 0 10px 0' }}>Patient History</h4>
-        {patient.medicalRecords && patient.medicalRecords.length > 0 ? (
-          <ul style={{ paddingLeft: '20px', margin: 0 }}>
-            {patient.medicalRecords.map(record => (
-              <li key={record.id} style={{ marginBottom: '10px' }}>
-                <strong>{new Date(record.createdAt).toLocaleDateString()} - {record.diagnosis}</strong> (Dr. {record.doctor?.lastName || 'Unknown'})
-                {record.treatment && <div className="text-muted">Treatment: {record.treatment}</div>}
-              </li>
-            ))}
-          </ul>
+      <Box sx={{ p: 3 }}>
+        {/* Shared records */}
+        <Typography variant="h6" sx={{ color: 'var(--dark-text)', mb: 2 }}>
+          Patient History
+          <Typography component="span" sx={{ color: 'var(--light-text)', fontSize: '0.7em', fontWeight: 400, ml: 1 }}>
+            ({records.length} record{records.length === 1 ? '' : 's'} shared)
+          </Typography>
+        </Typography>
+
+        {records.length > 0 ? (
+          records.map(record => (
+            <div key={record.id} className="card card--record" style={{ marginBottom: '12px', boxShadow: 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: '6px' }}>
+                <h4 style={{ margin: 0 }}>{record.diagnosis}</h4>
+                <span className="text-muted" style={{ whiteSpace: 'nowrap' }}>{new Date(record.createdAt).toLocaleDateString()}</span>
+              </div>
+              <p style={{ margin: '4px 0', fontSize: '0.9em' }}><strong>Attending:</strong> Dr. {record.doctor?.lastName || 'Unknown'}</p>
+              {record.treatment && <p style={{ margin: '4px 0', fontSize: '0.9em' }}><strong>Treatment:</strong> {record.treatment}</p>}
+              {record.notes && <div className="record-notes">"{record.notes}"</div>}
+            </div>
+          ))
         ) : (
-          <p className="text-muted" style={{ margin: 0, fontStyle: 'italic' }}>No past records shared by patient.</p>
-        )}
-        
-        {pagination?.hasMore && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-            <Typography sx={{ color: '#636e72', fontSize: '0.85em', fontStyle: 'italic' }}>
-              {pagination.total - patient.medicalRecords.length} more record(s) not shown.
+          <Box sx={{
+            textAlign: 'center', py: 4, px: 2,
+            backgroundColor: '#f8f9fa', borderRadius: '8px',
+            border: '1px dashed #dfe6e9',
+          }}>
+            <Typography sx={{ color: 'var(--light-text)', fontStyle: 'italic' }}>
+              The patient chose not to share any past records.
             </Typography>
           </Box>
         )}
-      </div>
 
-      <Box component="form" onSubmit={handleAddRecord} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Typography variant="h6" sx={{ color: '#2d3436' }}>Add New Record</Typography>
-        <Typography sx={{ fontSize: '0.85em', color: '#e74c3c', mb: 1 }}>
-          * Adding a record will instantly secure and re-lock the patient's vault.
-        </Typography>
-        <TextField 
-          label="Diagnosis" 
-          required 
-          fullWidth 
-          value={newRecord.diagnosis} 
-          onChange={(e) => setNewRecord({...newRecord, diagnosis: e.target.value})} 
-        />
-        <TextField 
-          label="Treatment Plan" 
-          multiline rows={2} 
-          fullWidth 
-          value={newRecord.treatment} 
-          onChange={(e) => setNewRecord({...newRecord, treatment: e.target.value})} 
-        />
-        <TextField 
-          label="Clinical Notes (Private/Encrypted)" 
-          multiline rows={3} 
-          fullWidth 
-          value={newRecord.notes} 
-          onChange={(e) => setNewRecord({...newRecord, notes: e.target.value})} 
-        />
-        <Button type="submit" variant="contained" size="large" sx={{ backgroundColor: '#00b894', mt: 1 }}>
-          Inject Record & Lock Vault
-        </Button>
+        {pagination?.hasMore && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+            <Typography sx={{ color: '#636e72', fontSize: '0.85em', fontStyle: 'italic' }}>
+              {pagination.total - records.length} more record(s) not shown.
+            </Typography>
+          </Box>
+        )}
+
+        <hr className="section-divider" />
+
+        {/* Add record */}
+        <Box component="form" onSubmit={handleAddRecord} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Typography variant="h6" sx={{ color: 'var(--dark-text)', mb: 0 }}>Add New Record</Typography>
+          <Box sx={{
+            display: 'flex', alignItems: 'center', gap: 1,
+            backgroundColor: '#fff3f3', border: '1px solid #ffd6d6',
+            borderRadius: '8px', px: 2, py: 1.2,
+          }}>
+            <Typography sx={{ fontSize: '0.85em', color: '#c0392b' }}>
+              ⚠️ Adding a record will instantly secure and re-lock the patient's vault.
+            </Typography>
+          </Box>
+          <TextField
+            label="Diagnosis"
+            required
+            fullWidth
+            value={newRecord.diagnosis}
+            onChange={(e) => setNewRecord({...newRecord, diagnosis: e.target.value})}
+          />
+          <TextField
+            label="Treatment Plan"
+            multiline rows={2}
+            fullWidth
+            value={newRecord.treatment}
+            onChange={(e) => setNewRecord({...newRecord, treatment: e.target.value})}
+          />
+          <TextField
+            label="Clinical Notes (Private/Encrypted)"
+            multiline rows={3}
+            fullWidth
+            value={newRecord.notes}
+            onChange={(e) => setNewRecord({...newRecord, notes: e.target.value})}
+          />
+          <Button type="submit" variant="contained" size="large" sx={{ backgroundColor: '#00b894', mt: 1 }}>
+            Save Record &amp; Lock Vault
+          </Button>
+        </Box>
       </Box>
     </div>
   );

@@ -23,7 +23,13 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
             include: {
                 appointments: {
                     include: { patient: true }
-                }
+                },
+                user: {
+                    select: {
+                        isTwoFactorEnabled: true,
+                        passkeys: { select: { id: true, deviceType: true } },
+                    },
+                },
             }
         });
 
@@ -132,8 +138,14 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                     { expiresIn: '15m' }
                 );
 
-                res.json({ 
-                    patient: patientData, 
+                // Let the patient know their doctor is now actively viewing the records
+                // they just shared.
+                req.io.to(patientUser.userId).emit('vault-viewing-started', {
+                    doctorName: `Dr. ${doctor.lastName}`
+                });
+
+                res.json({
+                    patient: patientData,
                     vaultToken,
                     pagination: {
                         page,
@@ -223,6 +235,37 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to add record." });
+    }
+});
+
+// POST /api/doctor/lock-vault
+// Best-effort notification that the doctor has stopped viewing — clears the
+// "doctor is viewing" banner on the patient's screen. Never errors hard.
+router.post('/lock-vault', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+
+        const { vaultToken } = req.body;
+        let session;
+        try {
+            session = jwt.verify(vaultToken, process.env.JWT_SECRET);
+        } catch (err) {
+            // Token already expired — nothing left to notify about.
+            return res.json({ ok: true });
+        }
+
+        const patient = await prisma.patient.findUnique({
+            where: { id: session.patientId },
+            select: { userId: true }
+        });
+        if (patient) {
+            req.io.to(patient.userId).emit('vault-viewing-ended');
+        }
+
+        res.json({ ok: true });
+    } catch (error) {
+        console.error("lock-vault notification failed:", error);
+        res.json({ ok: true });
     }
 });
 

@@ -10,6 +10,7 @@ const PatientLayout = () => {
   const [patientData, setPatientData] = useState(null);
   const [pagination, setPagination] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [viewingDoctor, setViewingDoctor] = useState(null);
   
   const { logout, authRequest, setAuthRequest, socket } = useAuth();
   const navigate = useNavigate();
@@ -44,21 +45,37 @@ const PatientLayout = () => {
   };
 
   useEffect(() => {
-    if (socket) {
-      const handleVaultUpdated = (data) => {
-        setPatientData(prev => prev ? { 
-          ...prev, 
-          medicalRecords: [data.newRecord, ...prev.medicalRecords],
-          accessCode: null
-        } : prev);
-        navigate('/patient/history');
-      };
-      socket.on('vault-updated', handleVaultUpdated);
-      return () => {
-        socket.off('vault-updated', handleVaultUpdated);
-      };
-    }
+    if (!socket) return;
+
+    const handleVaultUpdated = (data) => {
+      setPatientData(prev => prev ? {
+        ...prev,
+        medicalRecords: [data.newRecord, ...prev.medicalRecords],
+        accessCode: null
+      } : prev);
+      setViewingDoctor(null); // adding a record ends the viewing session
+      navigate('/patient/history');
+    };
+    const handleViewingStarted = (data) => setViewingDoctor(data?.doctorName || 'Your doctor');
+    const handleViewingEnded = () => setViewingDoctor(null);
+
+    socket.on('vault-updated', handleVaultUpdated);
+    socket.on('vault-viewing-started', handleViewingStarted);
+    socket.on('vault-viewing-ended', handleViewingEnded);
+    return () => {
+      socket.off('vault-updated', handleVaultUpdated);
+      socket.off('vault-viewing-started', handleViewingStarted);
+      socket.off('vault-viewing-ended', handleViewingEnded);
+    };
   }, [socket, navigate]);
+
+  // Fallback: never let the "doctor is viewing" banner get stuck — the vault
+  // session token expires after 15 minutes anyway.
+  useEffect(() => {
+    if (!viewingDoctor) return;
+    const t = setTimeout(() => setViewingDoctor(null), 15 * 60 * 1000);
+    return () => clearTimeout(t);
+  }, [viewingDoctor]);
 
   const currentTab = location.pathname.includes('/history') ? 1 : 0;
 
@@ -94,7 +111,27 @@ const PatientLayout = () => {
   return (
     <div className="container">
       <AppHeader title="TotalMed Patient Portal" />
-      
+
+      {viewingDoctor && (
+        <Box sx={{
+          display: 'flex', alignItems: 'center', gap: 1.5,
+          backgroundColor: '#e8f4fd', border: '1px solid #b6e0fe',
+          borderRadius: '10px', px: 2.5, py: 1.5, mb: 2,
+        }}>
+          <Box sx={{
+            width: 10, height: 10, borderRadius: '50%', backgroundColor: '#0984e3', flexShrink: 0,
+            animation: 'tmPulse 1.4s ease-in-out infinite',
+            '@keyframes tmPulse': {
+              '0%, 100%': { opacity: 1, transform: 'scale(1)' },
+              '50%': { opacity: 0.3, transform: 'scale(0.8)' },
+            },
+          }} />
+          <Typography sx={{ color: '#0984e3', fontWeight: 600 }}>
+            {viewingDoctor} is currently viewing the records you shared.
+          </Typography>
+        </Box>
+      )}
+
       <Box sx={{ width: '100%' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
           <Tabs value={currentTab} onChange={handleTabChange} textColor="primary" indicatorColor="primary">

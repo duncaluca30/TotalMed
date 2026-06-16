@@ -6,9 +6,10 @@ import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 import PatientVault from './PatientVault';
 import VaultWaitingScreen from './VaultWaitingScreen';
+import SecurityCard from '../Layout/SecurityCard';
 
 const DoctorDashboard = () => {
-  const { doctorData } = useOutletContext();
+  const { doctorData, setDoctorData } = useOutletContext();
   const [vaultCode, setVaultCode] = useState('');
   const [unlockedPatient, setUnlockedPatient] = useState(null);
   const [vaultToken, setVaultToken] = useState(null);
@@ -103,6 +104,16 @@ const DoctorDashboard = () => {
           onClose={resetVault}
         />
       )}
+
+      <SecurityCard
+        isTwoFactorEnabled={doctorData?.user?.isTwoFactorEnabled}
+        passkeys={doctorData?.user?.passkeys || []}
+        onTwoFactorEnabled={() => setDoctorData({ ...doctorData, user: { ...doctorData.user, isTwoFactorEnabled: true } })}
+        onPasskeyAdded={() => setDoctorData({
+          ...doctorData,
+          user: { ...doctorData.user, passkeys: [...(doctorData.user?.passkeys || []), { id: `local-${Date.now()}`, deviceType: 'platform' }] },
+        })}
+      />
     </>
   );
 };

@@ -44,6 +44,20 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
     doc.save(`TotalMed_${patient.lastName}_${patient.firstName}_${new Date().getTime()}.pdf`);
   };
 
+  const handleLockAndExit = async () => {
+    // Best-effort: tell the server we're done so the patient's "doctor is viewing"
+    // banner clears. Never block the UI on it.
+    try {
+      await fetchWithAuth('/api/doctor/lock-vault', {
+        method: 'POST',
+        body: JSON.stringify({ vaultToken }),
+      });
+    } catch (err) {
+      /* non-critical */
+    }
+    onClose();
+  };
+
   const handleAddRecord = async (e) => {
     e.preventDefault();
     try {
@@ -91,7 +105,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
           >
             Download PDF
           </Button>
-          <Button onClick={onClose} variant="outlined" color="error" size="small">Lock Vault & Exit</Button>
+          <Button onClick={handleLockAndExit} variant="outlined" color="error" size="small">Lock Vault & Exit</Button>
         </Box>
       </Box>
 

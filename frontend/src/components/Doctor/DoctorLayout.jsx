@@ -35,7 +35,7 @@ const DoctorLayout = () => {
   return (
     <div className="container">
       <AppHeader title="TotalMed Doctor Portal" />
-      <Outlet context={{ doctorData }} />
+      <Outlet context={{ doctorData, setDoctorData }} />
     </div>
   );
 };

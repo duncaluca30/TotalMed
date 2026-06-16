@@ -1,0 +1,148 @@
+import React, { useState } from 'react';
+import { Box, Typography, Button, TextField } from '@mui/material';
+import { startRegistration } from '@simplewebauthn/browser';
+import { fetchWithAuth } from '../../services/api';
+import { useToast } from '../../hooks/useToast';
+
+/**
+ * Reusable security settings card: TOTP 2FA setup + WebAuthn biometric login.
+ * Used by both the patient and doctor dashboards (2FA is per-user, not per-role).
+ *
+ * Props:
+ *  - isTwoFactorEnabled: boolean
+ *  - passkeys: array of registered passkeys (length used to reflect state)
+ *  - onTwoFactorEnabled():  called after 2FA is successfully activated
+ *  - onPasskeyAdded():      called after a new device is registered
+ */
+const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, onPasskeyAdded }) => {
+  const showToast = useToast();
+
+  const [setupStep, setSetupStep] = useState('initial'); // initial | scan
+  const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [twoFactorSecret, setTwoFactorSecret] = useState('');
+  const [setupPin, setSetupPin] = useState('');
+  const [registering, setRegistering] = useState(false);
+
+  const hasPasskeys = passkeys.length > 0;
+  const twoFactorActive = isTwoFactorEnabled;
+
+  const handleStart2FASetup = async () => {
+    try {
+      const data = await fetchWithAuth('/api/auth/2fa/generate', { method: 'POST' });
+      setQrCodeUrl(data.qrCodeUrl);
+      setTwoFactorSecret(data.secret);
+      setSetupStep('scan');
+    } catch (err) {
+      showToast(err.message || 'Failed to generate 2FA', 'error');
+    }
+  };
+
+  const handleVerify2FASetup = async (e) => {
+    e.preventDefault();
+    try {
+      await fetchWithAuth('/api/auth/2fa/verify-setup', {
+        method: 'POST',
+        body: JSON.stringify({ token: setupPin }),
+      });
+      setSetupStep('initial');
+      setSetupPin('');
+      showToast('2FA activated successfully!', 'success');
+      onTwoFactorEnabled?.();
+    } catch (err) {
+      showToast(err.message || 'Failed to verify 2FA', 'error');
+    }
+  };
+
+  const handleEnableBiometrics = async () => {
+    setRegistering(true);
+    showToast('Initiating biometric setup...', 'info');
+    try {
+      const options = await fetchWithAuth('/api/auth/webauthn/generate-registration');
+      const attestationResponse = await startRegistration({ optionsJSON: options });
+
+      await fetchWithAuth('/api/auth/webauthn/verify-registration', {
+        method: 'POST',
+        body: JSON.stringify(attestationResponse),
+      });
+
+      showToast('Fingerprint/Face ID securely registered!', 'success');
+      onPasskeyAdded?.();
+    } catch (error) {
+      if (error.name === 'NotAllowedError') {
+        showToast('Biometric setup cancelled.', 'warning');
+      } else if (error.name === 'InvalidStateError') {
+        showToast('This device is already registered.', 'info');
+      } else {
+        showToast(`Failed: ${error.message || error.name}`, 'error');
+      }
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  return (
+    <div className="card card--security" style={{ marginTop: '20px' }}>
+      {/* ---- Two-Factor Authentication ---- */}
+      <h3>🔐 Two-Factor Authentication</h3>
+      <p className="text-muted">Protect your account with an authenticator app.</p>
+
+      {twoFactorActive ? (
+        <Typography sx={{ color: '#00b894', fontWeight: 'bold', mt: 2, fontSize: '1.2em' }}>
+          ✅ 2FA is securely enabled on this account.
+        </Typography>
+      ) : (
+        <>
+          {setupStep === 'initial' && (
+            <Button variant="outlined" onClick={handleStart2FASetup} sx={{ mt: 1 }}>Enable 2FA</Button>
+          )}
+          {setupStep === 'scan' && (
+            <Box sx={{ textAlign: 'center', mt: 2 }}>
+              <Typography sx={{ mb: 2 }}>Scan this QR code with your Authenticator App:</Typography>
+              <img src={qrCodeUrl} alt="QR Code" style={{ width: '180px', border: '10px solid white', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
+              <Typography sx={{ mt: 1, fontSize: '0.85em', color: '#636e72' }}>Manual Key: <strong>{twoFactorSecret}</strong></Typography>
+
+              <Box component="form" onSubmit={handleVerify2FASetup} sx={{ display: 'flex', gap: 1, mt: 3, justifyContent: 'center' }}>
+                <TextField size="small" label="Enter 6-digit code" value={setupPin} onChange={(e) => setSetupPin(e.target.value.replace(/\D/g, ''))} inputProps={{ maxLength: 6 }} required />
+                <Button type="submit" variant="contained" sx={{ backgroundColor: '#0984e3' }}>Verify</Button>
+              </Box>
+            </Box>
+          )}
+        </>
+      )}
+
+      <hr className="section-divider" />
+
+      {/* ---- Biometric Login ---- */}
+      <h3>👆 Biometric Login</h3>
+      {hasPasskeys ? (
+        <>
+          <Typography sx={{ color: '#00b894', fontWeight: 'bold', mt: 1 }}>
+            ✅ Biometric login is enabled ({passkeys.length} device{passkeys.length > 1 ? 's' : ''} registered).
+          </Typography>
+          <Button
+            variant="outlined"
+            onClick={handleEnableBiometrics}
+            disabled={registering}
+            sx={{ mt: 1.5, textTransform: 'none', borderColor: '#6c5ce7', color: '#6c5ce7' }}
+          >
+            {registering ? 'Registering…' : 'Register another device'}
+          </Button>
+        </>
+      ) : (
+        <>
+          <p className="text-muted">Register this device to log in with Fingerprint, Face ID, or Windows Hello.</p>
+          <Button
+            variant="contained"
+            onClick={handleEnableBiometrics}
+            disabled={registering}
+            sx={{ mt: 1, backgroundColor: '#6c5ce7', '&:hover': { backgroundColor: '#a29bfe' }, textTransform: 'none' }}
+          >
+            {registering ? 'Registering…' : 'Register Current Device'}
+          </Button>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default SecurityCard;

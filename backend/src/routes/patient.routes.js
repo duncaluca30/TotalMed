@@ -17,7 +17,12 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         const patientData = await prisma.patient.findUnique({
             where: { userId: req.user.id },
             include: {
-                user: { select: { isTwoFactorEnabled: true } },
+                user: {
+                    select: {
+                        isTwoFactorEnabled: true,
+                        passkeys: { select: { id: true, deviceType: true } },
+                    },
+                },
                 accessCode: true,
             }
         });

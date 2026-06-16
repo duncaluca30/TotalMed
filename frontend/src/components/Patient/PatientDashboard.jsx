@@ -42,7 +42,7 @@ const PatientDashboard = () => {
         <p>Generate a temporary 6-digit code to allow a doctor to view your history and add new records. This code expires in 60 minutes.</p>
         
         {!patientData.accessCode ? (
-          <button onClick={handleGenerateCode} style={{ backgroundColor: '#f39c12', color: 'white', fontWeight: 'bold' }}>Generate Access Code</button>
+          <button onClick={handleGenerateCode} style={{ color: 'white', fontWeight: 'bold' }}>Generate Access Code</button>
         ) : (
           <div className="access-code-display">
             <p style={{ fontSize: '1.2em', marginBottom: '5px' }}>Your Secure Code:</p>

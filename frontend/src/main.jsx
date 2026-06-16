@@ -9,6 +9,8 @@ import App from './App.jsx'
 
 // Brand theme so MUI components (Tabs, DatePicker, color="primary" buttons, etc.)
 // match the indigo-violet palette used across the app.
+const gradient = 'linear-gradient(135deg, #4f46e5, #7c3aed)'
+
 const theme = createTheme({
   palette: {
     primary: { main: '#5b4fe6' },
@@ -17,6 +19,20 @@ const theme = createTheme({
   },
   shape: { borderRadius: 10 },
   typography: { fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: { textTransform: 'none', fontWeight: 600 },
+        // Primary contained buttons get the brand gradient (matches the rest of the app).
+        // backgroundImage layers cleanly over any background-color set via sx.
+        containedPrimary: {
+          backgroundImage: gradient,
+          boxShadow: '0 6px 16px rgba(79, 70, 229, 0.28)',
+          '&:hover': { backgroundImage: gradient, filter: 'brightness(1.07)', boxShadow: '0 8px 22px rgba(79, 70, 229, 0.34)' },
+        },
+      },
+    },
+  },
 })
 
 createRoot(document.getElementById('root')).render(

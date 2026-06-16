@@ -63,7 +63,9 @@ h3 { font-size: 1.5em; }
   box-shadow: 0 16px 40px rgba(79, 70, 229, 0.18);
 }
 
-input, select, textarea {
+/* :not([class*="Mui"]) keeps these globals from bleeding into MUI components
+   (MUI buttons/tabs/inputs are styled by the MUI theme, not by these rules). */
+input:not([class*="Mui"]), select:not([class*="Mui"]), textarea:not([class*="Mui"]) {
   width: 100%;
   padding: 12px 16px;
   margin: 8px 0;
@@ -74,14 +76,14 @@ input, select, textarea {
   transition: border 0.25s, box-shadow 0.25s;
 }
 
-input:focus, textarea:focus {
+input:not([class*="Mui"]):focus, textarea:not([class*="Mui"]):focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
   background-color: white;
 }
 
-button {
+button:not([class*="Mui"]) {
   background: var(--primary-grad);
   color: white;
   border: none;
@@ -94,12 +96,12 @@ button {
   transition: filter 0.2s, transform 0.1s, box-shadow 0.2s;
 }
 
-button:hover {
+button:not([class*="Mui"]):hover {
   filter: brightness(1.07);
   box-shadow: 0 8px 22px rgba(79, 70, 229, 0.32);
 }
 
-button:active {
+button:not([class*="Mui"]):active {
   transform: scale(0.98);
 }
 

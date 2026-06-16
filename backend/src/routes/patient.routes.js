@@ -4,6 +4,7 @@ const router = express.Router();
 const prisma = require('../config/prisma');
 const authenticateToken = require('../middleware/authenticate');
 const { getDecryptedRecords, generateAccessCode } = require('../services/vault.service');
+const { revokeVaultAccess } = require('../services/vaultRevocations');
 const { decrypt } = require('../../utils/cipher');
 
 // GET /api/patient/dashboard
@@ -64,6 +65,28 @@ router.post('/generate-code', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to generate access code" });
+    }
+});
+
+// POST /api/patient/revoke-access
+// Immediately invalidates any active vault session for this patient, so a doctor
+// who was mid-visit can no longer add records. Already-loaded records on the
+// doctor's screen cannot be recalled (they were transmitted on grant).
+router.post('/revoke-access', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+
+        const patient = await prisma.patient.findUnique({
+            where: { userId: req.user.id },
+            select: { id: true }
+        });
+        if (!patient) return res.status(404).json({ error: "Patient profile not found." });
+
+        revokeVaultAccess(patient.id);
+        res.json({ message: "Access revoked." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to revoke access." });
     }
 });
 

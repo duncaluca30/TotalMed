@@ -157,7 +157,10 @@ async function validate2FA(userId, token, method) {
             throw error;
         }
 
-        isValid = verify({ token, secret: decryptedSecret });
+        // otplib v13's verify() is async and resolves to an object ({ valid, ... }),
+        // not a boolean — must await and read `.valid`.
+        const result = await verify({ token, secret: decryptedSecret });
+        isValid = result.valid;
     } else if (method === 'EMAIL') {
         if (!user.emailOtpCode || !user.emailOtpExpiresAt) {
             const error = new Error("No email code requested.");
@@ -242,7 +245,7 @@ async function verify2FASetup(userId, token) {
         throw error;
     }
 
-    const isValid = verify({ token, secret: decryptedSecret });
+    const isValid = (await verify({ token, secret: decryptedSecret })).valid;
 
     if (!isValid) {
         const error = new Error("Invalid authenticator code. Please try again.");

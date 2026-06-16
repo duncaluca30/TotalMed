@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Box, Tabs, Tab, Skeleton, Typography } from '@mui/material';
+import { Box, Tabs, Tab, Skeleton, Typography, Button } from '@mui/material';
 import { fetchWithAuth } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../hooks/useToast';
 import AppHeader from '../Layout/AppHeader';
 import AuthRequestDialog from './AuthRequestDialog';
 
@@ -13,6 +14,7 @@ const PatientLayout = () => {
   const [viewingDoctor, setViewingDoctor] = useState(null);
   
   const { logout, authRequest, setAuthRequest, socket } = useAuth();
+  const showToast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -56,7 +58,13 @@ const PatientLayout = () => {
       setViewingDoctor(null); // adding a record ends the viewing session
       navigate('/patient/history');
     };
-    const handleViewingStarted = (data) => setViewingDoctor(data?.doctorName || 'Your doctor');
+    const handleViewingStarted = (data) => {
+      setViewingDoctor(data?.doctorName || 'Your doctor');
+      // The access code was consumed on the server the moment access was granted.
+      // Clear it locally so we don't keep showing a dead code, and so the
+      // "Generate Access Code" button reappears for the next share.
+      setPatientData(prev => prev ? { ...prev, accessCode: null } : prev);
+    };
     const handleViewingEnded = () => setViewingDoctor(null);
 
     socket.on('vault-updated', handleVaultUpdated);
@@ -76,6 +84,16 @@ const PatientLayout = () => {
     const t = setTimeout(() => setViewingDoctor(null), 15 * 60 * 1000);
     return () => clearTimeout(t);
   }, [viewingDoctor]);
+
+  const handleRevokeAccess = async () => {
+    try {
+      await fetchWithAuth('/api/patient/revoke-access', { method: 'POST' });
+      setViewingDoctor(null);
+      showToast('Access revoked. The doctor can no longer add records.', 'success');
+    } catch (error) {
+      showToast(error.message || 'Failed to revoke access.', 'error');
+    }
+  };
 
   const currentTab = location.pathname.includes('/history') ? 1 : 0;
 
@@ -129,6 +147,15 @@ const PatientLayout = () => {
           <Typography sx={{ color: '#0984e3', fontWeight: 600 }}>
             {viewingDoctor} is currently viewing the records you shared.
           </Typography>
+          <Button
+            onClick={handleRevokeAccess}
+            variant="outlined"
+            color="error"
+            size="small"
+            sx={{ ml: 'auto', flexShrink: 0 }}
+          >
+            Revoke Access
+          </Button>
         </Box>
       )}
 

@@ -10,6 +10,7 @@ const { recordSchema } = require('../schemas/doctor.schema');
 const { vaultAccessSchema } = require('../schemas/vault.schema');
 
 const { lookupAccessCode, decryptRecords, createEncryptedRecord, createAuditLog } = require('../services/vault.service');
+const { isVaultTokenRevoked } = require('../services/vaultRevocations');
 
 // GET /api/doctor/dashboard
 router.get('/dashboard', authenticateToken, async (req, res) => {
@@ -190,6 +191,11 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
         const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
         if (vaultSession.patientId !== patientId || vaultSession.doctorId !== doctor.id) {
             return res.status(403).json({ error: "Vault session mismatch. Access denied." });
+        }
+
+        // Reject if the patient revoked this session after the token was issued.
+        if (isVaultTokenRevoked(vaultSession.patientId, vaultSession.iat)) {
+            return res.status(403).json({ error: "Access was revoked by the patient." });
         }
 
         const newRecord = await createEncryptedRecord({

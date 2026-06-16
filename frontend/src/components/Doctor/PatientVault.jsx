@@ -1,11 +1,47 @@
 import React, { useState } from 'react';
 import { Box, Typography, Button, TextField } from '@mui/material';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 
 const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) => {
   const [newRecord, setNewRecord] = useState({ diagnosis: '', treatment: '', notes: '' });
   const showToast = useToast();
+
+  const handleDownloadPDF = () => {
+    const records = patient.medicalRecords;
+    if (!records || records.length === 0) {
+      return showToast("No records to download.", "error");
+    }
+    const doc = new jsPDF();
+    doc.setFontSize(22);
+    doc.setTextColor(9, 132, 227);
+    doc.text("TotalMed Secure Health Vault", 14, 22);
+    doc.setFontSize(11);
+    doc.setTextColor(45, 52, 54);
+    doc.text("Official Medical Records Report", 14, 32);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 38);
+    doc.text(`Patient File: ${patient.firstName} ${patient.lastName}`, 14, 48);
+    doc.text(`Attending Physician: Dr. ${doctorData.firstName} ${doctorData.lastName} (${doctorData.specialty})`, 14, 54);
+    autoTable(doc, {
+      startY: 62,
+      head: [["Date", "Diagnosis", "Treatment Plan", "Attending Dr.", "Clinical Notes"]],
+      body: records.map(record => [
+        new Date(record.createdAt).toLocaleDateString(),
+        record.diagnosis,
+        record.treatment || "N/A",
+        `Dr. ${record.doctor?.lastName || 'Unknown'}`,
+        record.notes || "None"
+      ]),
+      theme: 'grid',
+      headStyles: { fillColor: [9, 132, 227], textColor: [255, 255, 255] },
+      styles: { fontSize: 9, cellPadding: 4 },
+      columnStyles: { 4: { cellWidth: 50 } }
+    });
+    doc.save(`TotalMed_${patient.lastName}_${patient.firstName}_${new Date().getTime()}.pdf`);
+  };
 
   const handleAddRecord = async (e) => {
     e.preventDefault();
@@ -23,9 +59,20 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
 
   return (
     <div className="card card--vault" style={{ marginTop: '20px' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2, mb: 3 }}>
         <h3 style={{ margin: 0, color: '#00b894' }}>🔓 Vault Unlocked: {patient.firstName} {patient.lastName}</h3>
-        <Button onClick={onClose} variant="outlined" color="error" size="small">Lock Vault & Exit</Button>
+        <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+          <Button
+            variant="outlined"
+            startIcon={<PictureAsPdfIcon />}
+            onClick={handleDownloadPDF}
+            size="small"
+            sx={{ borderColor: '#0984e3', color: '#0984e3' }}
+          >
+            Download PDF
+          </Button>
+          <Button onClick={onClose} variant="outlined" color="error" size="small">Lock Vault & Exit</Button>
+        </Box>
       </Box>
 
       <div className="records-list">

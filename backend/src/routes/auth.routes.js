@@ -107,7 +107,9 @@ router.post('/2fa/validate', twoFactorLimiter, async (req, res) => {
 // GET /api/auth/webauthn/generate-registration
 router.get('/webauthn/generate-registration', authenticateToken, async (req, res) => {
     try {
-        const origin = req.headers.origin || 'http://localhost:5173';
+        // GET requests don't carry an Origin header; fall back to the actual host.
+        // req.protocol respects the X-Forwarded-Proto header because trust proxy is set.
+        const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
         const options = await generateWebAuthnRegistration(req.user.id, origin);
         res.json(options);
     } catch (error) {
@@ -119,7 +121,7 @@ router.get('/webauthn/generate-registration', authenticateToken, async (req, res
 // POST /api/auth/webauthn/verify-registration
 router.post('/webauthn/verify-registration', authenticateToken, async (req, res) => {
     try {
-        const origin = req.headers.origin || 'http://localhost:5173';
+        const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
         await verifyWebAuthnRegistration(req.user.id, req.body, origin);
         res.json({ message: "Biometrics successfully registered!" });
     } catch (error) {
@@ -131,7 +133,7 @@ router.post('/webauthn/verify-registration', authenticateToken, async (req, res)
 // POST /api/auth/webauthn/generate-authentication
 router.post('/webauthn/generate-authentication', async (req, res) => {
     try {
-        const origin = req.headers.origin || 'http://localhost:5173';
+        const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
         const options = await generateWebAuthnAuthentication(req.body.userId, origin);
         res.json(options);
     } catch (error) {
@@ -144,7 +146,7 @@ router.post('/webauthn/generate-authentication', async (req, res) => {
 router.post('/webauthn/verify-authentication', async (req, res) => {
     try {
         const { userId, response } = req.body;
-        const origin = req.headers.origin || 'http://localhost:5173';
+        const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
         const user = await verifyWebAuthnAuthentication(userId, response, origin);
         completeLogin(res, user, "Biometrics Verified! Welcome.");
     } catch (error) {

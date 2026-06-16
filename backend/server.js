@@ -19,6 +19,13 @@ const { csrfProtection } = require('./src/middleware/csrf');
 const app = express();
 const server = http.createServer(app);
 
+// Safety net: a stray rejection (e.g. from an async event listener that runs
+// outside any try/catch) must never take the whole server down and disconnect
+// every connected user. Log it loudly instead of crashing.
+process.on('unhandledRejection', (reason) => {
+    console.error('🚨 UNHANDLED REJECTION (server kept alive):', reason);
+});
+
 const allowedOrigins = [
     process.env.FRONTEND_URL, 
     'http://localhost:5173',

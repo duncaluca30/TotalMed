@@ -77,9 +77,18 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
             responded = true;
             clearTimeout(timeout);
 
-            if (authData.approved) {
-                // Immediately consume the access code — it can never be reused
-                await prisma.accessCode.delete({ where: { id: validCode.id } });
+            // This callback runs OUTSIDE the route's try/catch (it fires later, on an
+            // event). Any throw here would be an unhandled rejection and crash the whole
+            // server, so it must guard itself.
+            try {
+                if (authData.approved) {
+                    // Consume the access code — it can never be reused. deleteMany is
+                    // idempotent: if the code was already consumed (e.g. a duplicate
+                    // request), it returns count 0 instead of throwing P2025.
+                    const consumed = await prisma.accessCode.deleteMany({ where: { id: validCode.id } });
+                    if (consumed.count === 0) {
+                        return res.status(409).json({ error: "This access request was already used. Please ask the patient for a new code." });
+                    }
 
                 const page = parseInt(req.query.page) || 1;
                 const limit = parseInt(req.query.limit) || 10;
@@ -133,8 +142,14 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                         hasMore: skip + limit < totalRecords
                     }
                 });
-            } else {
-                res.status(403).json({ error: "Access explicitly denied by patient." });
+                } else {
+                    res.status(403).json({ error: "Access explicitly denied by patient." });
+                }
+            } catch (err) {
+                console.error("🚨 Vault approval handler failed:", err);
+                if (!res.headersSent) {
+                    res.status(500).json({ error: "Failed to finalize vault access." });
+                }
             }
         });
 

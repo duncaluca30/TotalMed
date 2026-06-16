@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
-import { API_URL, fetchWithAuth } from '../services/api';
+import { API_URL, fetchWithAuth, clearCsrfToken } from '../services/api';
 import { useToast } from '../hooks/useToast';
 
 const AuthContext = createContext(null);
@@ -46,6 +46,7 @@ export const AuthProvider = ({ children }) => {
       socket.disconnect();
       setSocket(null);
     }
+    clearCsrfToken();
     setIsAuthenticated(false);
     setRole(null);
     setAuthRequest(null);

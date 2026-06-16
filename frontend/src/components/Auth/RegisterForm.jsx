@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Typography, Box, TextField, Button } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
-import { API_URL } from '../../services/api';
+import { API_URL, setCsrfToken } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 
 const RegisterForm = () => {
@@ -44,6 +44,7 @@ const RegisterForm = () => {
       const data = await response.json();
       
       if (response.ok) {
+        setCsrfToken(data.csrfToken);
         showToast('✅ Registration successful! You can now log in.', 'success');
         navigate('/login');
       } else {
@@ -56,9 +57,9 @@ const RegisterForm = () => {
 
   return (
     <div className="container">
-      <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-        <h1 style={{ color: '#0984e3', fontSize: '2.5em', margin: 0 }}>TotalMed</h1>
-        <p style={{ color: '#636e72', marginTop: '5px' }}>Secure Ephemeral Health Vault</p>
+      <div className="login-branding">
+        <h1>TotalMed</h1>
+        <p>Secure Ephemeral Health Vault</p>
       </div>
 
       <div className="card" style={{ maxWidth: '400px', margin: '0 auto', padding: '30px' }}>

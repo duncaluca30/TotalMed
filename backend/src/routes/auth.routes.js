@@ -23,19 +23,19 @@ const {
 } = require('../services/auth.service');
 
 // Helper: complete login by setting cookies and responding
-function completeLogin(res, user, message) {
+function completeLogin(res, user, message, statusCode = 200) {
     const token = signUserToken(user);
+    const csrfToken = generateCsrfToken();
     setAuthCookie(res, token);
-    setCsrfCookie(res, generateCsrfToken());
-    res.json({ message, role: user.role });
+    setCsrfCookie(res, csrfToken);
+    res.status(statusCode).json({ message, role: user.role, csrfToken });
 }
 
 // POST /api/auth/register
 router.post('/register', validate(registerSchema), async (req, res) => {
     try {
         const newUser = await registerUser(req.body);
-        completeLogin(res, newUser, "Patient registered successfully!");
-        res.statusCode = 201; // Override after json() won't work, but register still returns 201
+        completeLogin(res, newUser, "Patient registered successfully!", 201);
     } catch (error) {
         console.error(error);
         res.status(error.status || 500).json({ error: error.message || "Registration failed" });

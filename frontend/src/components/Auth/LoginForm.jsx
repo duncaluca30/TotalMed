@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Typography, Box, TextField, Button, Tabs, Tab } from '@mui/material';
 import { startAuthentication } from '@simplewebauthn/browser';
-import { API_URL } from '../../services/api';
+import { API_URL, setCsrfToken } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../hooks/useToast';
 
@@ -88,6 +88,7 @@ const LoginForm = () => {
       });
       const data = await response.json();
       if (response.ok) {
+        setCsrfToken(data.csrfToken);
         login(data.role);
         showToast('Identity Verified! Welcome.', 'success');
         navigate(data.role === 'PATIENT' ? '/patient' : '/doctor');
@@ -121,6 +122,7 @@ const LoginForm = () => {
       const data = await verifyRes.json();
 
       if (verifyRes.ok) {
+        setCsrfToken(data.csrfToken);
         login(data.role);
         showToast('Identity Verified! Welcome.', 'success');
         navigate(data.role === 'PATIENT' ? '/patient' : '/doctor');

@@ -57,12 +57,14 @@ function csrfProtection(req, res, next) {
     const headerToken = req.headers['x-csrf-token'];
 
     if (!cookieToken || !headerToken) {
+        console.warn(`⚠️ CSRF REJECTED (missing token) — ${req.method} ${req.path} | cookie: ${!!cookieToken}, header: ${!!headerToken}`);
         return res.status(403).json({ error: "CSRF validation failed: missing token." });
     }
 
     // Constant-time comparison to prevent timing attacks
     if (cookieToken.length !== headerToken.length ||
         !crypto.timingSafeEqual(Buffer.from(cookieToken), Buffer.from(headerToken))) {
+        console.warn(`⚠️ CSRF REJECTED (mismatch) — ${req.method} ${req.path}`);
         return res.status(403).json({ error: "CSRF validation failed: token mismatch." });
     }
 

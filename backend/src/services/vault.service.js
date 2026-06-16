@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const prisma = require('../config/prisma');
 const { encrypt, decrypt } = require('../../utils/cipher');
 
@@ -39,7 +40,8 @@ async function generateAccessCode(patientId) {
         }
     }
 
-    const rawCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // crypto.randomInt is cryptographically secure and unbiased over [100000, 999999]
+    const rawCode = crypto.randomInt(100000, 1000000).toString();
     const encryptedCode = encrypt(rawCode);
 
     const expiresAt = new Date();

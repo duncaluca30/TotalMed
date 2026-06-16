@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const authenticateToken = require('../middleware/authenticate');
-const { authLimiter } = require('../middleware/rateLimiter');
+const { authLimiter, twoFactorLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 const { registerSchema, loginSchema } = require('../schemas/auth.schema');
 const { generateCsrfToken, setCsrfCookie } = require('../middleware/csrf');
@@ -93,7 +93,7 @@ router.post('/2fa/verify-setup', authenticateToken, async (req, res) => {
 });
 
 // POST /api/auth/2fa/validate
-router.post('/2fa/validate', async (req, res) => {
+router.post('/2fa/validate', twoFactorLimiter, async (req, res) => {
     try {
         const { userId, token, method } = req.body;
         const user = await validate2FA(userId, token, method);

@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { generateSecret, generateURI, verify } = require('otplib');
@@ -116,7 +117,7 @@ async function sendEmailOTP(userId) {
         throw error;
     }
 
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60000);
     const hashedOtp = await bcrypt.hash(otpCode, 10);
 
@@ -204,9 +205,11 @@ async function generate2FASetup(userId) {
 
     const secret = generateSecret();
 
+    // Store the secret encrypted from the start — it should never sit in plaintext,
+    // not even during the setup window before verification.
     await prisma.user.update({
         where: { id: userId },
-        data: { twoFactorSecret: secret }
+        data: { twoFactorSecret: encrypt(secret) }
     });
 
     const otpauth = generateURI({
@@ -231,7 +234,15 @@ async function verify2FASetup(userId, token) {
         throw error;
     }
 
-    const isValid = verify({ token, secret: user.twoFactorSecret });
+    // The secret is stored encrypted (since generate2FASetup) — decrypt to verify.
+    const decryptedSecret = decrypt(user.twoFactorSecret);
+    if (!decryptedSecret) {
+        const error = new Error("Security error: Could not read 2FA key.");
+        error.status = 500;
+        throw error;
+    }
+
+    const isValid = verify({ token, secret: decryptedSecret });
 
     if (!isValid) {
         const error = new Error("Invalid authenticator code. Please try again.");
@@ -241,10 +252,7 @@ async function verify2FASetup(userId, token) {
 
     await prisma.user.update({
         where: { id: userId },
-        data: {
-            isTwoFactorEnabled: true,
-            twoFactorSecret: encrypt(user.twoFactorSecret)
-        }
+        data: { isTwoFactorEnabled: true }
     });
 }
 
@@ -270,7 +278,7 @@ async function generateWebAuthnRegistration(userId, origin) {
         })),
         authenticatorSelection: {
             residentKey: 'preferred',
-            userVerification: 'preferred',
+            userVerification: 'required',
             authenticatorAttachment: 'platform',
         },
     });
@@ -303,6 +311,7 @@ async function verifyWebAuthnRegistration(userId, body, origin) {
         expectedChallenge,
         expectedOrigin: origin,
         expectedRPID: rpID,
+        requireUserVerification: true,
     });
 
     if (!verification.verified) {
@@ -349,7 +358,7 @@ async function generateWebAuthnAuthentication(userId, origin) {
             id: passkey.credentialId,
             type: 'public-key',
         })),
-        userVerification: 'preferred',
+        userVerification: 'required',
     });
 
     await prisma.user.update({
@@ -386,6 +395,7 @@ async function verifyWebAuthnAuthentication(userId, response, origin) {
         expectedChallenge,
         expectedOrigin: origin,
         expectedRPID: rpID,
+        requireUserVerification: true,
         credential: {
             id: passkey.credentialId,
             publicKey: passkey.credentialPublicKey,

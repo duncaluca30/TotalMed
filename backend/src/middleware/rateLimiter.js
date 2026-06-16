@@ -16,4 +16,15 @@ const vaultLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-module.exports = { authLimiter, vaultLimiter };
+// Protects the second factor from brute-force. A 6-digit code has only 1M
+// combinations, so without a limit here an attacker who already has the password
+// could try to guess the OTP/TOTP.
+const twoFactorLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: "Too many verification attempts. Please try again later." },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+module.exports = { authLimiter, vaultLimiter, twoFactorLimiter };

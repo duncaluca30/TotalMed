@@ -96,8 +96,9 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                 });
 
                 // Filter to only the records the patient explicitly approved sharing
+                const sharedRecordIds = Array.isArray(authData.sharedRecordIds) ? authData.sharedRecordIds : [];
                 const approvedRecords = patientData.medicalRecords.filter(record =>
-                    authData.sharedRecordIds.includes(record.id)
+                    sharedRecordIds.includes(record.id)
                 );
 
                 // Paginate and decrypt the approved records
@@ -110,7 +111,7 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                 await createAuditLog({
                     userId: doctor.userId,
                     action: 'VAULT_ACCESSED',
-                    details: { patientId: validCode.patientId, approvedRecords: authData.sharedRecordIds.length },
+                    details: { patientId: validCode.patientId, approvedRecords: sharedRecordIds.length },
                     ipAddress: rawIp
                 });
 
@@ -188,7 +189,15 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
                 if (process.env.NODE_ENV !== 'production') {
                     console.log(`🚨 PINGING PATIENT ROOM: ${patientForSocket.userId}`);
                 }
-                io.to(patientForSocket.userId).emit('vault-updated', { newRecord });
+                // Emit the decrypted record — newRecord contains ciphertext from the DB
+                const decryptedRecord = {
+                    ...newRecord,
+                    diagnosis,
+                    treatment,
+                    notes: notes || null,
+                    doctor: { lastName: doctor.lastName }
+                };
+                io.to(patientForSocket.userId).emit('vault-updated', { newRecord: decryptedRecord });
             }
         } catch (socketError) {
             console.error("WEBSOCKET ERROR:", socketError);

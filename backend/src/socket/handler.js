@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const cookie = require('cookie');
+const prisma = require('../config/prisma');
+const { lookupAccessCode } = require('../services/vault.service');
 
 function setupSocketHandlers(io) {
     // Middleware to authenticate socket connections via httpOnly cookie
@@ -42,9 +44,30 @@ function setupSocketHandlers(io) {
             }
         });
 
-        socket.on('auth-response', (data) => {
-            // Emit on the app-level EventEmitter so the doctor's pending HTTP request resolves
-            io._expressApp.emit(`auth-resolved-${data.code}`, data);
+        socket.on('auth-response', async (data) => {
+            // SECURITY: an approval is only valid if it comes from the PATIENT who
+            // actually owns the access code. Without this check, any authenticated
+            // socket (including the requesting doctor) could forge an approval and
+            // bypass patient consent entirely.
+            try {
+                if (!socket.user || socket.user.role !== 'PATIENT') return;
+                if (!data || typeof data.code !== 'string') return;
+
+                const accessCode = await lookupAccessCode(data.code);
+                if (!accessCode) return;
+
+                const patient = await prisma.patient.findUnique({
+                    where: { id: accessCode.patientId },
+                    select: { userId: true }
+                });
+                if (!patient || patient.userId !== socket.user.id) return;
+
+                // Verified: this socket belongs to the patient who owns the code.
+                // Emit on the app-level EventEmitter so the doctor's pending HTTP request resolves.
+                io._expressApp.emit(`auth-resolved-${data.code}`, data);
+            } catch (err) {
+                console.error('🚨 auth-response handling failed:', err);
+            }
         });
 
         socket.on('disconnect', () => {

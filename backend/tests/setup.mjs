@@ -20,12 +20,18 @@ export async function startTestDb({ port = 5544 } = {}) {
   process.env.MASTER_ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
   process.env.JWT_SECRET = 'test-secret';
 
-  // Stub network so the mailer (Brevo) and geo-IP lookups in auth.service are no-ops.
-  global.fetch = async (url) => {
+  // Stub ONLY the external calls (Brevo mailer, geo-IP). Everything else —
+  // including real HTTP to our own test server in the socket tests — passes through.
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
     const u = String(url);
     if (u.includes('geojs.io')) return { ok: true, json: async () => ({ city: 'Testville', country: 'TestLand' }) };
-    return { ok: true, json: async () => ({ messageId: 'test' }) };
+    if (u.includes('api.brevo.com')) return { ok: true, json: async () => ({ messageId: 'test' }) };
+    return realFetch(url, opts);
   };
+
+  // A stray rejection should never abort the whole test run.
+  process.on('unhandledRejection', (reason) => console.error('⚠️  unhandledRejection in test:', reason));
 
   return { db, server };
 }

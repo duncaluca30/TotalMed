@@ -16,7 +16,7 @@ const AuthRequestDialog = ({ authRequest, patientData, onClose, socket }) => {
 
   return (
     <Dialog open={!!authRequest} disableEscapeKeyDown maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ backgroundColor: '#0984e3', color: 'white', fontWeight: 'bold' }}>
+      <DialogTitle sx={{ backgroundColor: '#5b4fe6', color: 'white', fontWeight: 'bold' }}>
         🚨 Access Request: {authRequest?.doctorName}
       </DialogTitle>
       <DialogContent sx={{ mt: 2 }}>

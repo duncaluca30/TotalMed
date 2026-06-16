@@ -103,7 +103,7 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
 
               <Box component="form" onSubmit={handleVerify2FASetup} sx={{ display: 'flex', gap: 1, mt: 3, justifyContent: 'center' }}>
                 <TextField size="small" label="Enter 6-digit code" value={setupPin} onChange={(e) => setSetupPin(e.target.value.replace(/\D/g, ''))} inputProps={{ maxLength: 6 }} required />
-                <Button type="submit" variant="contained" sx={{ backgroundColor: '#0984e3' }}>Verify</Button>
+                <Button type="submit" variant="contained" sx={{ backgroundColor: '#5b4fe6' }}>Verify</Button>
               </Box>
             </Box>
           )}
@@ -123,7 +123,7 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
             variant="outlined"
             onClick={handleEnableBiometrics}
             disabled={registering}
-            sx={{ mt: 1.5, textTransform: 'none', borderColor: '#6c5ce7', color: '#6c5ce7' }}
+            sx={{ mt: 1.5, textTransform: 'none', borderColor: '#7c3aed', color: '#7c3aed' }}
           >
             {registering ? 'Registering…' : 'Register another device'}
           </Button>
@@ -135,7 +135,7 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
             variant="contained"
             onClick={handleEnableBiometrics}
             disabled={registering}
-            sx={{ mt: 1, backgroundColor: '#6c5ce7', '&:hover': { backgroundColor: '#a29bfe' }, textTransform: 'none' }}
+            sx={{ mt: 1, backgroundColor: '#7c3aed', '&:hover': { backgroundColor: '#a29bfe' }, textTransform: 'none' }}
           >
             {registering ? 'Registering…' : 'Register Current Device'}
           </Button>

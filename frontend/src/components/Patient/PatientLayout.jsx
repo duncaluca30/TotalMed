@@ -133,18 +133,18 @@ const PatientLayout = () => {
       {viewingDoctor && (
         <Box sx={{
           display: 'flex', alignItems: 'center', gap: 1.5,
-          backgroundColor: '#e8f4fd', border: '1px solid #b6e0fe',
+          backgroundColor: 'rgba(124, 58, 237, 0.08)', border: '1px solid rgba(124, 58, 237, 0.25)',
           borderRadius: '10px', px: 2.5, py: 1.5, mb: 2,
         }}>
           <Box sx={{
-            width: 10, height: 10, borderRadius: '50%', backgroundColor: '#0984e3', flexShrink: 0,
+            width: 10, height: 10, borderRadius: '50%', backgroundColor: '#5b4fe6', flexShrink: 0,
             animation: 'tmPulse 1.4s ease-in-out infinite',
             '@keyframes tmPulse': {
               '0%, 100%': { opacity: 1, transform: 'scale(1)' },
               '50%': { opacity: 0.3, transform: 'scale(0.8)' },
             },
           }} />
-          <Typography sx={{ color: '#0984e3', fontWeight: 600 }}>
+          <Typography sx={{ color: '#5b4fe6', fontWeight: 600 }}>
             {viewingDoctor} is currently viewing the records you shared.
           </Typography>
           <Button

@@ -18,7 +18,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
     }
     const doc = new jsPDF();
     doc.setFontSize(22);
-    doc.setTextColor(9, 132, 227);
+    doc.setTextColor(91, 79, 230);
     doc.text("TotalMed Secure Health Vault", 14, 22);
     doc.setFontSize(11);
     doc.setTextColor(45, 52, 54);
@@ -37,7 +37,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
         record.notes || "None"
       ]),
       theme: 'grid',
-      headStyles: { fillColor: [9, 132, 227], textColor: [255, 255, 255] },
+      headStyles: { fillColor: [91, 79, 230], textColor: [255, 255, 255] },
       styles: { fontSize: 9, cellPadding: 4 },
       columnStyles: { 4: { cellWidth: 50 } }
     });
@@ -101,7 +101,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
             startIcon={<PictureAsPdfIcon />}
             onClick={handleDownloadPDF}
             size="small"
-            sx={{ borderColor: '#0984e3', color: '#0984e3' }}
+            sx={{ borderColor: '#5b4fe6', color: '#5b4fe6' }}
           >
             Download PDF
           </Button>

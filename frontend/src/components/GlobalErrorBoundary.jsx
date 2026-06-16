@@ -29,7 +29,7 @@ const ErrorFallback = ({ error, resetErrorBoundary }) => {
         <Button 
           variant="contained" 
           onClick={resetErrorBoundary}
-          sx={{ backgroundColor: '#0984e3', textTransform: 'none', fontSize: '1.1rem' }}
+          sx={{ backgroundColor: '#5b4fe6', textTransform: 'none', fontSize: '1.1rem' }}
         >
           Reload Application
         </Button>

@@ -38,6 +38,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.4.1",
     "@electric-sql/pglite-socket": "^0.1.1",
-    "@types/node": "^25.6.0"
+    "@types/node": "^25.6.0",
+    "socket.io-client": "^4.8.3"
   }
 }

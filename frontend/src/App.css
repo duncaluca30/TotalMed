@@ -1,15 +1,18 @@
 :root {
-  --primary-blue: #0984e3;
-  --primary-hover: #74b9ff;
+  --primary: #5b4fe6;
+  --primary-end: #7c3aed;
+  --primary-grad: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  --primary-hover: #6d28d9;
   --success-teal: #00b894;
   --warning-orange: #f39c12;
-  --danger-red: #ff4757;
-  --dark-text: #2d3436;
-  --light-text: #636e72;
-  --bg-color: #f1f2f6;
-  --card-bg: #ffffff;
-  --border-radius: 12px;
-  --soft-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+  --danger-red: #ef4444;
+  --dark-text: #1f2240;
+  --light-text: #6b6f8a;
+  --bg-color: #f5f6ff;
+  --card-bg: rgba(255, 255, 255, 0.72);
+  --card-border: rgba(255, 255, 255, 0.9);
+  --border-radius: 16px;
+  --soft-shadow: 0 10px 30px rgba(79, 70, 229, 0.12), 0 2px 6px rgba(79, 70, 229, 0.06);
 }
 
 * {
@@ -20,16 +23,18 @@
 }
 
 body {
-  background-color: var(--bg-color);
+  background: radial-gradient(125% 125% at 0% 0%, #ece8ff 0%, #f5f6ff 55%) fixed;
   color: var(--dark-text);
   line-height: 1.6;
   padding: 20px;
+  min-height: 100vh;
 }
 
 h1, h2, h3, h4 {
   font-weight: 600;
   color: var(--dark-text);
   margin-bottom: 10px;
+  letter-spacing: -0.01em;
 }
 
 h2 { font-size: 2em; }
@@ -42,97 +47,100 @@ h3 { font-size: 1.5em; }
 }
 
 .card {
-  background-color: var(--card-bg);
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-radius: var(--border-radius);
   padding: 24px;
   box-shadow: var(--soft-shadow);
   margin-bottom: 20px;
-  border: 1px solid rgba(0,0,0,0.05);
-  transition: transform 0.2s ease-in-out;
+  border: 1px solid var(--card-border);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 16px 40px rgba(79, 70, 229, 0.18);
 }
 
 input, select, textarea {
   width: 100%;
   padding: 12px 16px;
   margin: 8px 0;
-  border: 1px solid #dfe6e9;
-  border-radius: 8px;
+  border: 1px solid #e2e0f5;
+  border-radius: 10px;
   font-size: 1em;
-  background-color: #f8f9fa;
-  transition: border 0.3s, box-shadow 0.3s;
+  background-color: rgba(255, 255, 255, 0.8);
+  transition: border 0.25s, box-shadow 0.25s;
 }
 
 input:focus, textarea:focus {
   outline: none;
-  border-color: var(--primary-blue);
-  box-shadow: 0 0 0 3px rgba(9, 132, 227, 0.2);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
   background-color: white;
 }
 
 button {
-  background-color: var(--primary-blue);
+  background: var(--primary-grad);
   color: white;
   border: none;
   padding: 12px 24px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 1em;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.1s;
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.25);
+  transition: filter 0.2s, transform 0.1s, box-shadow 0.2s;
 }
 
 button:hover {
-  background-color: var(--primary-hover);
+  filter: brightness(1.07);
+  box-shadow: 0 8px 22px rgba(79, 70, 229, 0.32);
 }
 
 button:active {
   transform: scale(0.98);
 }
 
-.btn-danger { background-color: var(--danger-red); }
-.btn-danger:hover { background-color: #ff6b81; }
+.btn-danger { background: var(--danger-red); }
+.btn-danger:hover { filter: brightness(1.07); }
 
-.btn-success { background-color: var(--success-teal); }
-.btn-success:hover { background-color: #55efc4; }
+.btn-success { background: var(--success-teal); }
+.btn-success:hover { filter: brightness(1.07); }
 
-.btn-secondary { background-color: #b2bec3; color: var(--dark-text); }
-.btn-secondary:hover { background-color: #dfe6e9; }
+.btn-secondary { background: #eceaf6; color: var(--dark-text); box-shadow: none; }
+.btn-secondary:hover { background: #e0ddf2; filter: none; }
 
 /* Card Variants */
 .card--profile {
-  background-color: #f8f9fa;
+  background: var(--card-bg);
   color: var(--dark-text);
 }
 
 .card--profile-doctor {
-  background-color: #e8f4f8;
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(124, 58, 237, 0.05));
   color: var(--dark-text);
 }
 
 .card--security {
-  background-color: #fdfbfb;
-  border: 1px solid #dfe6e9;
+  background: var(--card-bg);
 }
 
 .card--access-code {
-  background-color: #fff3cd;
-  color: #856404;
-  border: 2px dashed #ffeeba;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(79, 70, 229, 0.06));
+  color: #4c1d95;
+  border: 1px solid rgba(124, 58, 237, 0.25);
 }
 
 .card--record {
-  border-left: 5px solid var(--primary-blue);
-  background-color: var(--card-bg);
+  border-left: 4px solid var(--primary);
+  background: var(--card-bg);
 }
 
 .card--vault {
-  border: 2px solid var(--success-teal);
-  background-color: var(--card-bg);
+  border: 1px solid rgba(0, 184, 148, 0.5);
+  background: var(--card-bg);
 }
 
 .card--centered {
@@ -159,7 +167,7 @@ button:active {
 /* Layout */
 .section-divider {
   border: none;
-  border-top: 1px dashed #dfe6e9;
+  border-top: 1px solid rgba(124, 58, 237, 0.15);
   margin: 30px 0 20px 0;
 }
 
@@ -170,15 +178,15 @@ button:active {
   flex-wrap: wrap;
   gap: 8px;
   width: 100%;
-  border-bottom: 2px solid #dfe6e9;
+  border-bottom: 1px solid rgba(124, 58, 237, 0.15);
   padding-bottom: 10px;
   margin-bottom: 16px;
 }
 
 .records-list {
   padding: 15px;
-  background-color: #f1f2f6;
-  border-radius: 4px;
+  background-color: rgba(124, 58, 237, 0.05);
+  border-radius: 12px;
   margin-bottom: 20px;
 }
 
@@ -188,18 +196,18 @@ button:active {
 }
 
 .access-code-value {
-  letter-spacing: 5px;
-  color: #d35400;
+  letter-spacing: 6px;
+  color: var(--primary-end);
   font-size: 3em;
-  font-weight: bold;
+  font-weight: 700;
   margin: 0;
 }
 
 .record-notes {
   margin-top: 10px;
   padding: 10px;
-  background-color: #f1f2f6;
-  border-radius: 4px;
+  background-color: rgba(124, 58, 237, 0.05);
+  border-radius: 10px;
   font-size: 0.9em;
   font-style: italic;
 }
@@ -210,9 +218,14 @@ button:active {
 }
 
 .login-branding h1 {
-  color: var(--primary-blue);
-  font-size: 2.5em;
-  margin: 0;
+  background: var(--primary-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  font-size: 2.8em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .login-branding p {

@@ -82,7 +82,7 @@ const RegisterForm = () => {
           <TextField label="Password" name="password" type="password" onChange={handleChange} required fullWidth />
           <TextField label="Confirm Password" type="password" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} required fullWidth />
           
-          <Button type="submit" variant="contained" size="large" sx={{ mt: 1, backgroundColor: '#0984e3', py: 1.5, fontSize: '1.1rem', textTransform: 'none', borderRadius: '8px' }}>
+          <Button type="submit" variant="contained" size="large" sx={{ mt: 1, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', boxShadow: '0 6px 16px rgba(79,70,229,0.3)', py: 1.5, fontSize: '1.1rem', textTransform: 'none', borderRadius: '10px' }}>
             Register Patient
           </Button>
         </Box>

@@ -71,9 +71,9 @@ const DoctorDashboard = () => {
           <Box sx={{
             width: 64, height: 64, borderRadius: '50%', mx: 'auto', mb: 2,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            backgroundColor: 'rgba(9, 132, 227, 0.1)',
+            backgroundColor: 'rgba(91, 79, 230, 0.1)',
           }}>
-            <LockOpenIcon sx={{ fontSize: 32, color: '#0984e3' }} />
+            <LockOpenIcon sx={{ fontSize: 32, color: '#5b4fe6' }} />
           </Box>
           <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1, color: '#2d3436' }}>Unlock Patient File</Typography>
           <Typography sx={{ color: '#636e72', mb: 3, maxWidth: 380, mx: 'auto' }}>
@@ -90,7 +90,7 @@ const DoctorDashboard = () => {
               inputProps={{ maxLength: 6, style: { fontSize: '1.5em', letterSpacing: '8px', textAlign: 'center' } }}
               required
             />
-            <Button type="submit" variant="contained" size="large" sx={{ backgroundColor: '#0984e3', px: 4 }}>
+            <Button type="submit" variant="contained" size="large" sx={{ backgroundColor: '#5b4fe6', px: 4 }}>
               Request Access
             </Button>
           </Box>

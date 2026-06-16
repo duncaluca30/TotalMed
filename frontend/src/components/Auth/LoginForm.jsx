@@ -171,7 +171,7 @@ const LoginForm = () => {
                 <Button 
                   variant="contained" 
                   onClick={handleBiometricLogin} 
-                  sx={{ backgroundColor: '#6c5ce7', py: 1.5, fontSize: '1.1rem', width: '100%', textTransform: 'none' }}
+                  sx={{ backgroundColor: '#7c3aed', py: 1.5, fontSize: '1.1rem', width: '100%', textTransform: 'none' }}
                 >
                   👆 Scan Fingerprint / Face ID
                 </Button>
@@ -199,7 +199,7 @@ const LoginForm = () => {
                 </Button>
 
                 {selected2FAMethod === 'EMAIL' && (
-                   <Button onClick={() => handleSendEmailCode()} variant="text" sx={{ color: '#0984e3', textTransform: 'none' }}>
+                   <Button onClick={() => handleSendEmailCode()} variant="text" sx={{ color: '#5b4fe6', textTransform: 'none' }}>
                      Didn't receive it? Resend Email
                    </Button>
                 )}
@@ -214,7 +214,7 @@ const LoginForm = () => {
           <Box component="form" onSubmit={handleLogin} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField label="Email Address" name="email" type="email" onChange={handleChange} required fullWidth />
             <TextField label="Password" name="password" type="password" onChange={handleChange} required fullWidth />
-            <Button type="submit" variant="contained" size="large" sx={{ mt: 1, backgroundColor: '#0984e3', py: 1.5, fontSize: '1.1rem', textTransform: 'none', borderRadius: '8px' }}>
+            <Button type="submit" variant="contained" size="large" sx={{ mt: 1, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', boxShadow: '0 6px 16px rgba(79,70,229,0.3)', py: 1.5, fontSize: '1.1rem', textTransform: 'none', borderRadius: '10px' }}>
               Secure Login
             </Button>
           </Box>

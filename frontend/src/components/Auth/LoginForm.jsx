@@ -173,15 +173,15 @@ const LoginForm = () => {
                   onClick={handleBiometricLogin} 
                   sx={{ backgroundColor: '#7c3aed', py: 1.5, fontSize: '1.1rem', width: '100%', textTransform: 'none' }}
                 >
-                  👆 Scan Fingerprint / Face ID
+                  Scan Fingerprint / Face ID
                 </Button>
               </Box>
             ) : (
               <>
                 <Typography sx={{ textAlign: 'center', color: '#2d3436', mb: 1, fontWeight: 'bold' }}>
-                  {selected2FAMethod === 'APP' 
-                    ? "🔒 Enter the 6-digit code from Google Authenticator" 
-                    : "📧 Enter the 6-digit code sent to your email"}
+                  {selected2FAMethod === 'APP'
+                    ? "Enter the 6-digit code from your authenticator app"
+                    : "Enter the 6-digit code sent to your email"}
                 </Typography>
 
                 <TextField 

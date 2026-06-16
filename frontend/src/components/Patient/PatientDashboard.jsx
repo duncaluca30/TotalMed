@@ -72,16 +72,14 @@ const PatientDashboard = () => {
         </Typography>
 
         {!patientData.accessCode ? (
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
             <button onClick={handleGenerateCode} style={{ color: 'white', fontWeight: 600 }}>Generate code</button>
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
-            <Box>
-              <Typography sx={{ fontSize: '0.78rem', color: '#6b5ca8', mb: 0.5 }}>Your secure code</Typography>
-              <Typography sx={{ fontSize: '2.1rem', fontWeight: 700, letterSpacing: '6px', color: '#7c3aed', lineHeight: 1 }}>{prettyCode}</Typography>
-            </Box>
-            <Typography sx={{ fontSize: '0.8rem', color: '#c0392b', maxWidth: 220 }}>
+          <Box sx={{ textAlign: 'center' }}>
+            <Typography sx={{ fontSize: '0.78rem', color: '#6b5ca8', mb: 0.5 }}>Your secure code</Typography>
+            <Typography sx={{ fontSize: '2.4rem', fontWeight: 700, letterSpacing: '8px', color: '#7c3aed', lineHeight: 1 }}>{prettyCode}</Typography>
+            <Typography sx={{ fontSize: '0.8rem', color: '#c0392b', mt: 1 }}>
               Show this to your doctor. Keep this window open.
             </Typography>
           </Box>

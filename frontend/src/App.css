@@ -23,7 +23,7 @@
 }
 
 body {
-  background: radial-gradient(125% 125% at 0% 0%, #ece8ff 0%, #f5f6ff 55%) fixed;
+  background: radial-gradient(120% 120% at 50% 0%, #eef0f9 0%, #f8f9fc 55%) fixed;
   color: var(--dark-text);
   line-height: 1.6;
   padding: 20px;
@@ -130,9 +130,9 @@ button:not([class*="Mui"]):active {
 }
 
 .card--access-code {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(79, 70, 229, 0.06));
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.06), rgba(79, 70, 229, 0.03));
   color: #4c1d95;
-  border: 1px solid rgba(124, 58, 237, 0.25);
+  border: 1px solid rgba(124, 58, 237, 0.16);
 }
 
 .card--record {

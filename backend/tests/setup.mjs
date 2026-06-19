@@ -43,6 +43,7 @@ export function loadApp() {
     cipher: require('../utils/cipher'),
     vault: require('../src/services/vault.service'),
     auth: require('../src/services/auth.service'),
+    health: require('../src/services/health.service'),
     revocations: require('../src/services/vaultRevocations'),
     schemas: {
       auth: require('../src/schemas/auth.schema'),

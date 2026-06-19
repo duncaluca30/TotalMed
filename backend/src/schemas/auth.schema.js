@@ -25,13 +25,20 @@ const forgotPasswordSchema = z.object({
   email: z.string().email("Invalid email format")
 });
 
+const strongPassword = z.string()
+  .min(8, "Password must be at least 8 characters long")
+  .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/,
+    "Password must include an uppercase letter, a lowercase letter, a number, and a special character"
+  );
+
 const resetPasswordSchema = z.object({
   token: z.string().min(1, "Reset token is required"),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters long")
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/,
-      "Password must include an uppercase letter, a lowercase letter, a number, and a special character"
-    )
+  password: strongPassword
 });
 
-module.exports = { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema };
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: strongPassword
+});
+
+module.exports = { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema };

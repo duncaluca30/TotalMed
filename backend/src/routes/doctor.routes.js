@@ -8,7 +8,7 @@ const { vaultLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 const { recordSchema } = require('../schemas/doctor.schema');
 const { vaultAccessSchema } = require('../schemas/vault.schema');
-const { doctorAllergySchema, doctorMedicationSchema, doctorBirthSchema, doctorPatientProfileSchema } = require('../schemas/health.schema');
+const { doctorAllergySchema, doctorMedicationSchema, doctorBirthSchema, doctorPatientProfileSchema, doctorAppointmentSchema } = require('../schemas/health.schema');
 
 const { lookupAccessCode, decryptRecords, createEncryptedRecord, createAuditLog } = require('../services/vault.service');
 const health = require('../services/health.service');
@@ -152,6 +152,7 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                 patientData.allergies = await health.getDecryptedAllergies(validCode.patientId);
                 patientData.medications = await health.getDecryptedMedications(validCode.patientId);
                 patientData.births = await health.getBirths(validCode.patientId);
+                patientData.appointments = await health.getDecryptedAppointments(validCode.patientId);
 
                 const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
                 await createAuditLog({
@@ -471,6 +472,64 @@ router.delete('/births/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to remove birth." });
+    }
+});
+
+// ── Appointment reminders (doctor, during an active vault session) ───────────
+
+// POST /api/doctor/appointments
+router.post('/appointments', authenticateToken, validate(doctorAppointmentSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        const { patientId, vaultToken, dateTime, specialty, location, reason } = req.body;
+        const check = verifyVaultSession(vaultToken, doctor.id, patientId);
+        if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+        const appointment = await health.createAppointment({ patientId, doctorId: doctor.id, dateTime, specialty, location, reason });
+        res.status(201).json(appointment);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to add appointment." });
+    }
+});
+
+// PUT /api/doctor/appointments/:id
+router.put('/appointments/:id', authenticateToken, validate(doctorAppointmentSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        const { patientId, vaultToken, dateTime, specialty, location, reason } = req.body;
+        const check = verifyVaultSession(vaultToken, doctor.id, patientId);
+        if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+        const appointment = await health.updateAppointment({ id: req.params.id, patientId, dateTime, specialty, location, reason });
+        if (!appointment) return res.status(404).json({ error: "Appointment not found." });
+        res.json(appointment);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update appointment." });
+    }
+});
+
+// DELETE /api/doctor/appointments/:id
+router.delete('/appointments/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        const { patientId, vaultToken } = req.body;
+        const check = verifyVaultSession(vaultToken, doctor.id, patientId);
+        if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+        const deleted = await health.deleteAppointment({ id: req.params.id, patientId });
+        if (!deleted) return res.status(404).json({ error: "Appointment not found." });
+        res.json({ message: "Appointment removed." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to remove appointment." });
     }
 });
 

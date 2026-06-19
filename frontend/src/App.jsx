@@ -7,10 +7,12 @@ import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
 import ForgotPasswordForm from './components/Auth/ForgotPasswordForm';
 import ResetPasswordForm from './components/Auth/ResetPasswordForm';
+import VerifyEmail from './components/Auth/VerifyEmail';
 import PatientLayout from './components/Patient/PatientLayout';
 import PatientDashboard from './components/Patient/PatientDashboard';
 import MedicalHistory from './components/Patient/MedicalHistory';
 import HealthProfile from './components/Patient/HealthProfile';
+import AccessLog from './components/Patient/AccessLog';
 import DoctorLayout from './components/Doctor/DoctorLayout';
 import DoctorDashboard from './components/Doctor/DoctorDashboard';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
@@ -26,6 +28,7 @@ function App() {
           <Route path="/register" element={<RegisterForm />} />
           <Route path="/forgot-password" element={<ForgotPasswordForm />} />
           <Route path="/reset-password" element={<ResetPasswordForm />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           
           <Route 
             path="/patient" 
@@ -38,6 +41,7 @@ function App() {
             <Route index element={<PatientDashboard />} />
             <Route path="health" element={<HealthProfile />} />
             <Route path="history" element={<MedicalHistory />} />
+            <Route path="access-log" element={<AccessLog />} />
           </Route>
           
           <Route 

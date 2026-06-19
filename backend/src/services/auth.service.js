@@ -8,16 +8,18 @@ const { generateRegistrationOptions, verifyRegistrationResponse,
 
 const prisma = require('../config/prisma');
 const { encrypt, decrypt } = require('../../utils/cipher');
-const { sendOTPEmail, sendSecurityAlertEmail, sendPasswordResetEmail } = require('../../utils/mailer');
+const { sendOTPEmail, sendSecurityAlertEmail, sendPasswordResetEmail, sendVerificationEmail } = require('../../utils/mailer');
 
 // Tokens are emailed in the clear (in the link) but stored only as a SHA-256 hash.
-const hashResetToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+// Back-compat alias used by the reset flow.
+const hashResetToken = hashToken;
 
 /**
  * Register a new patient user.
  * Returns the created user object.
  */
-async function registerUser({ email, password, firstName, lastName, dateOfBirth, phone }) {
+async function registerUser({ email, password, firstName, lastName, dateOfBirth, phone }, baseUrl) {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
         const error = new Error("Email is already registered");
@@ -28,11 +30,18 @@ async function registerUser({ email, password, firstName, lastName, dateOfBirth,
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    return prisma.user.create({
+    // New accounts start unverified and must confirm their email before logging in.
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60000); // 24h
+
+    const user = await prisma.user.create({
         data: {
             email,
             password: hashedPassword,
             role: "PATIENT",
+            isEmailVerified: false,
+            emailVerificationToken: hashToken(rawToken),
+            emailVerificationExpiresAt: expiresAt,
             patientProfile: {
                 create: {
                     firstName,
@@ -43,6 +52,64 @@ async function registerUser({ email, password, firstName, lastName, dateOfBirth,
             }
         }
     });
+
+    if (baseUrl) {
+        const verifyUrl = `${baseUrl.replace(/\/$/, '')}/verify-email?token=${rawToken}`;
+        await sendVerificationEmail(user.email, verifyUrl);
+    }
+
+    return user;
+}
+
+/**
+ * Confirm an email using the token from the verification link.
+ */
+async function verifyEmail(token) {
+    if (!token) {
+        const error = new Error("Invalid or expired verification link.");
+        error.status = 400;
+        throw error;
+    }
+
+    const user = await prisma.user.findFirst({
+        where: {
+            emailVerificationToken: hashToken(token),
+            emailVerificationExpiresAt: { gt: new Date() }
+        }
+    });
+
+    if (!user) {
+        const error = new Error("Invalid or expired verification link. Please request a new one.");
+        error.status = 400;
+        throw error;
+    }
+
+    await prisma.user.update({
+        where: { id: user.id },
+        data: { isEmailVerified: true, emailVerificationToken: null, emailVerificationExpiresAt: null }
+    });
+}
+
+/**
+ * Re-send a verification email. Silent when the email is unknown or already
+ * verified, to avoid leaking which addresses are registered.
+ */
+async function resendVerification(email, baseUrl) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || user.isEmailVerified) return;
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60000);
+
+    await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerificationToken: hashToken(rawToken), emailVerificationExpiresAt: expiresAt }
+    });
+
+    if (baseUrl) {
+        const verifyUrl = `${baseUrl.replace(/\/$/, '')}/verify-email?token=${rawToken}`;
+        await sendVerificationEmail(user.email, verifyUrl);
+    }
 }
 
 /**
@@ -66,6 +133,12 @@ async function authenticateUser(email, password, req) {
     if (!isMatch) {
         const error = new Error("Invalid email or password");
         error.status = 400;
+        throw error;
+    }
+
+    if (!user.isEmailVerified) {
+        const error = new Error("Please verify your email before signing in. Check your inbox for the confirmation link.");
+        error.status = 403;
         throw error;
     }
 
@@ -481,8 +554,39 @@ async function resetPassword(token, newPassword) {
         data: {
             password: hashedPassword,
             passwordResetToken: null,
-            passwordResetExpiresAt: null
+            passwordResetExpiresAt: null,
+            // Log out every existing session — a reset usually means the old
+            // password (and any active session) may be compromised.
+            sessionValidAfter: new Date()
         }
+    });
+}
+
+/**
+ * Change the password of a logged-in user after re-confirming the current one.
+ * Invalidates other active sessions.
+ */
+async function changePassword(userId, currentPassword, newPassword) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+        const error = new Error("User not found.");
+        error.status = 404;
+        throw error;
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+        const error = new Error("Current password is incorrect.");
+        error.status = 400;
+        throw error;
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword, sessionValidAfter: new Date() }
     });
 }
 
@@ -516,8 +620,11 @@ module.exports = {
     verifyWebAuthnRegistration,
     generateWebAuthnAuthentication,
     verifyWebAuthnAuthentication,
+    verifyEmail,
+    resendVerification,
     requestPasswordReset,
     resetPassword,
+    changePassword,
     signUserToken,
     setAuthCookie
 };

@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Typography, Box, TextField, Button } from '@mui/material';
 import { API_URL } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
+import PasswordChecklist from './PasswordChecklist';
+import { isPasswordValid } from '../../utils/passwordRules';
 
 const ResetPasswordForm = () => {
   const [searchParams] = useSearchParams();
@@ -71,12 +73,14 @@ const ResetPasswordForm = () => {
                 label="New password" type="password" value={password}
                 onChange={(e) => setPassword(e.target.value)} required fullWidth autoFocus
               />
+              <PasswordChecklist password={password} />
               <TextField
                 label="Confirm new password" type="password" value={confirm}
                 onChange={(e) => setConfirm(e.target.value)} required fullWidth
               />
-              <Button type="submit" variant="contained" size="large" disabled={submitting}
-                sx={{ mt: 1, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', py: 1.5, fontSize: '1.1rem', textTransform: 'none', borderRadius: '10px' }}>
+              <Button type="submit" variant="contained" size="large"
+                disabled={submitting || !isPasswordValid(password) || password !== confirm}
+                sx={{ mt: 1, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', py: 1.5, fontSize: '1.1rem', textTransform: 'none', borderRadius: '10px', '&.Mui-disabled': { background: '#c7c9d9', color: '#fff' } }}>
                 {submitting ? 'Updating…' : 'Update password'}
               </Button>
             </Box>

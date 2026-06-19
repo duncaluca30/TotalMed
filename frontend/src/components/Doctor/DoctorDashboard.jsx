@@ -99,7 +99,7 @@ const DoctorDashboard = () => {
               variant="outlined"
               value={vaultCode}
               onChange={(e) => setVaultCode(e.target.value)}
-              inputProps={{ maxLength: 6, style: { fontSize: '1.5em', letterSpacing: '8px', textAlign: 'center' } }}
+              slotProps={{ htmlInput: { maxLength: 6, style: { fontSize: '1.5em', letterSpacing: '8px', textAlign: 'center' } } }}
               required
             />
             <Button type="submit" variant="contained" size="large" sx={{ backgroundColor: '#5b4fe6', px: 4 }}>

@@ -120,4 +120,45 @@ const sendPasswordResetEmail = async (targetEmail, resetUrl) => {
     }
 };
 
-module.exports = { sendOTPEmail, sendSecurityAlertEmail, sendPasswordResetEmail };
+const sendVerificationEmail = async (targetEmail, verifyUrl) => {
+    try {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'api-key': process.env.BREVO_API_KEY,
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                sender: { name: "TotalMed Security", email: "duncaluca@gmail.com" },
+                to: [{ email: targetEmail }],
+                subject: '✅ Confirm your TotalMed email',
+                htmlContent: `
+                    <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #dfe6e9; padding: 20px; border-radius: 8px;">
+                        <h2 style="color: #0984e3; text-align: center;">Welcome to TotalMed</h2>
+                        <p>Please confirm your email address to activate your account:</p>
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${verifyUrl}" style="display: inline-block; background-color: #00b894; color: #ffffff; text-decoration: none; font-weight: bold; padding: 12px 28px; border-radius: 8px;">
+                                Confirm Email
+                            </a>
+                        </div>
+                        <p style="color: #636e72; font-size: 0.85em;">This link expires in 24 hours. If you didn't create a TotalMed account, you can ignore this email.</p>
+                        <p style="color: #b2bec3; font-size: 0.75em; word-break: break-all;">If the button doesn't work, paste this link into your browser:<br/>${verifyUrl}</p>
+                    </div>
+                `
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(JSON.stringify(errorData));
+        }
+
+        console.log(`✅ Verification email sent via Brevo API to ${targetEmail}`);
+    } catch (error) {
+        console.error("🚨 BREVO VERIFY ERROR:", error);
+        throw error;
+    }
+};
+
+module.exports = { sendOTPEmail, sendSecurityAlertEmail, sendPasswordResetEmail, sendVerificationEmail };

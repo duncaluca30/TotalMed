@@ -27,6 +27,13 @@ const patientProfileFields = {
   menarcheDate: z.string().min(1).optional().nullable()
 };
 
+const appointmentFields = {
+  dateTime: z.string().min(1, 'Date is required'),
+  specialty: z.string().min(1, 'Specialty / title is required').max(200, 'Too long (max 200 chars)'),
+  location: z.string().max(200, 'Location too long (max 200 chars)').optional().nullable(),
+  reason: z.string().max(500, 'Note too long (max 500 chars)').optional().nullable()
+};
+
 // Doctor-side requests carry the active vault session + the target patient.
 const vaultFields = {
   patientId: z.string().uuid('Invalid patient ID format'),
@@ -37,19 +44,23 @@ const allergySchema = z.object(allergyFields);
 const medicationSchema = z.object(medicationFields);
 const birthSchema = z.object(birthFields);
 const patientProfileSchema = z.object(patientProfileFields);
+const appointmentSchema = z.object(appointmentFields);
 
 const doctorAllergySchema = z.object({ ...allergyFields, ...vaultFields });
 const doctorMedicationSchema = z.object({ ...medicationFields, ...vaultFields });
 const doctorBirthSchema = z.object({ ...birthFields, ...vaultFields });
 const doctorPatientProfileSchema = z.object({ ...patientProfileFields, ...vaultFields });
+const doctorAppointmentSchema = z.object({ ...appointmentFields, ...vaultFields });
 
 module.exports = {
   allergySchema,
   medicationSchema,
   birthSchema,
   patientProfileSchema,
+  appointmentSchema,
   doctorAllergySchema,
   doctorMedicationSchema,
   doctorBirthSchema,
-  doctorPatientProfileSchema
+  doctorPatientProfileSchema,
+  doctorAppointmentSchema
 };

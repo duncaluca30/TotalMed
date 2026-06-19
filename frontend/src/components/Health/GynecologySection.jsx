@@ -87,6 +87,8 @@ const GynecologySection = ({
   };
 
   const sexLabel = SEX_OPTIONS.find((o) => o.value === sex)?.label || 'Not specified';
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const currentYear = new Date().getFullYear();
 
   return (
     <Box>
@@ -118,10 +120,10 @@ const GynecologySection = ({
             <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
               <TextField
                 size="small" type="date" label="First menstruation (menarche)"
-                InputLabelProps={{ shrink: true }}
                 value={profileDraft.menarcheDate}
                 onChange={(e) => setProfileDraft({ ...profileDraft, menarcheDate: e.target.value })}
-                sx={{ minWidth: 220 }}
+                slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayStr } }}
+                sx={{ minWidth: 240 }}
               />
               <FormControlLabel
                 control={<Checkbox checked={profileDraft.atMenopause}
@@ -180,7 +182,7 @@ const GynecologySection = ({
               </TextField>
               <TextField size="small" type="number" label="Year (optional)" value={birthDraft.year}
                 onChange={(e) => setBirthDraft({ ...birthDraft, year: e.target.value })}
-                inputProps={{ min: 1900, max: new Date().getFullYear() }} sx={{ flex: '0 0 140px' }} />
+                slotProps={{ htmlInput: { min: 1900, max: currentYear } }} sx={{ flex: '0 0 140px' }} />
               <Button type="submit" variant="contained" disabled={birthBusy} startIcon={editingBirthId ? null : <AddIcon />} sx={{ flexShrink: 0 }}>
                 {editingBirthId ? 'Save' : 'Add'}
               </Button>

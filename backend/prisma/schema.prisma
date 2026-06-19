@@ -54,6 +54,16 @@ model User {
   passwordResetToken     String?
   passwordResetExpiresAt DateTime?
 
+  // Email verification. Defaults to true so existing accounts stay usable; new
+  // registrations are created with false until the emailed link is opened.
+  isEmailVerified            Boolean   @default(true)
+  emailVerificationToken     String?
+  emailVerificationExpiresAt DateTime?
+
+  // Any JWT issued before this instant is rejected by the auth middleware. Bumped
+  // on password reset/change to log the account out everywhere.
+  sessionValidAfter DateTime?
+
   lastLoginIp       String?
   lastLoginDevice   String?
 
@@ -100,17 +110,23 @@ model Doctor {
   medicalRecords MedicalRecord[]
 }
 
+// A reminder on the patient's calendar (e.g. "Cardiology check-up · 12.06.2027 ·
+// Clinica Sfânta Maria"), NOT a clinic booking. The patient manages these; a
+// doctor can also add one while in the vault (doctorId records who created it).
+// Free-text fields are stored encrypted at rest.
 model Appointment {
   id        String            @id @default(uuid())
   dateTime  DateTime
   status    AppointmentStatus @default(SCHEDULED)
+  specialty String?
+  location  String?
   reason    String?
 
   patientId String
   patient   Patient  @relation(fields: [patientId], references: [id])
 
-  doctorId  String
-  doctor    Doctor   @relation(fields: [doctorId], references: [id])
+  doctorId  String?
+  doctor    Doctor?  @relation(fields: [doctorId], references: [id])
 }
 
 model MedicalRecord {

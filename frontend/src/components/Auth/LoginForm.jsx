@@ -14,6 +14,7 @@ const LoginForm = () => {
   const [available2FAMethods, setAvailable2FAMethods] = useState(['EMAIL']);
   const [selected2FAMethod, setSelected2FAMethod] = useState('EMAIL');
   const [emailCodeSent, setEmailCodeSent] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
 
   const { login } = useAuth();
   const showToast = useToast();
@@ -34,8 +35,13 @@ const LoginForm = () => {
         body: JSON.stringify({ email: formData.email, password: formData.password })
       });
       const data = await response.json();
-      
-      if (!response.ok) return showToast(data.error, 'error');
+
+      if (!response.ok) {
+        // 403 from an unverified account — offer to resend the confirmation link.
+        setNeedsVerification(response.status === 403 && /verify/i.test(data.error || ''));
+        return showToast(data.error, 'error');
+      }
+      setNeedsVerification(false);
 
       if (data.requires2FA) {
         setSavedUserId(data.userId);
@@ -53,6 +59,20 @@ const LoginForm = () => {
       }
     } catch (error) { 
       showToast('Failed to connect.', 'error'); 
+    }
+  };
+
+  const handleResendVerification = async () => {
+    try {
+      await fetch(`${API_URL}/api/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: formData.email })
+      });
+      showToast('Confirmation email re-sent. Check your inbox.', 'success');
+    } catch {
+      showToast('Failed to resend email.', 'error');
     }
   };
 
@@ -188,7 +208,7 @@ const LoginForm = () => {
                   label="6-Digit Code" 
                   value={twoFactorToken}
                   onChange={(e) => setTwoFactorToken(e.target.value.replace(/\D/g, ''))}
-                  inputProps={{ maxLength: 6, style: { letterSpacing: '8px', textAlign: 'center', fontSize: '1.5em', fontWeight: 'bold' } }}
+                  slotProps={{ htmlInput: { maxLength: 6, style: { letterSpacing: '8px', textAlign: 'center', fontSize: '1.5em', fontWeight: 'bold' } } }}
                   required 
                   fullWidth 
                   autoFocus
@@ -216,6 +236,17 @@ const LoginForm = () => {
             <TextField label="Password" name="password" type="password" onChange={handleChange} required fullWidth />
             <Button type="submit" variant="contained" size="large" sx={{ mt: 1, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', boxShadow: '0 6px 16px rgba(79,70,229,0.3)', py: 1.5, fontSize: '1.1rem', textTransform: 'none', borderRadius: '10px' }}>
               Secure Login
+            </Button>
+          </Box>
+        )}
+
+        {!requires2FA && needsVerification && (
+          <Box sx={{ mt: 2, p: 1.5, borderRadius: '8px', backgroundColor: '#fff8e1', border: '1px solid #ffe0a3', textAlign: 'center' }}>
+            <Typography sx={{ fontSize: '0.85rem', color: '#8a6d3b', mb: 0.5 }}>
+              Your email isn't confirmed yet.
+            </Typography>
+            <Button onClick={handleResendVerification} variant="text" sx={{ textTransform: 'none', color: '#b7791f', fontWeight: 600 }}>
+              Resend confirmation email
             </Button>
           </Box>
         )}

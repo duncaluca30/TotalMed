@@ -10,6 +10,7 @@ import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 import HealthLists from '../Health/HealthLists';
 import GynecologySection from '../Health/GynecologySection';
+import AppointmentReminders from '../Health/AppointmentReminders';
 import { filterRecords } from '../../utils/recordSearch';
 
 const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) => {
@@ -18,6 +19,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
   const [allergies, setAllergies] = useState(patient.allergies || []);
   const [medications, setMedications] = useState(patient.medications || []);
   const [births, setBirths] = useState(patient.births || []);
+  const [appointments, setAppointments] = useState(patient.appointments || []);
   const [profile, setProfile] = useState({
     sex: patient.sex || null,
     menarcheDate: patient.menarcheDate || null,
@@ -99,6 +101,29 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
       setBirths((prev) => prev.filter((b) => b.id !== id));
       showToast('Birth removed.', 'success');
     } catch (e) { showToast(e.message || 'Failed to remove birth.', 'error'); }
+  };
+
+  const sortByDate = (list) => [...list].sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+  const addAppointment = async (payload) => {
+    try {
+      const created = await fetchWithAuth('/api/doctor/appointments', { method: 'POST', body: vaultBody(payload) });
+      setAppointments((prev) => sortByDate([...prev, created]));
+      showToast('Appointment added.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to add appointment.', 'error'); throw e; }
+  };
+  const updateAppointment = async (id, payload) => {
+    try {
+      const updated = await fetchWithAuth(`/api/doctor/appointments/${id}`, { method: 'PUT', body: vaultBody(payload) });
+      setAppointments((prev) => sortByDate(prev.map((a) => (a.id === id ? updated : a))));
+      showToast('Appointment updated.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to update appointment.', 'error'); throw e; }
+  };
+  const deleteAppointment = async (id) => {
+    try {
+      await fetchWithAuth(`/api/doctor/appointments/${id}`, { method: 'DELETE', body: vaultBody({}) });
+      setAppointments((prev) => prev.filter((a) => a.id !== id));
+      showToast('Appointment removed.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to remove appointment.', 'error'); }
   };
 
   const handleDownloadPDF = () => {
@@ -274,6 +299,14 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
               onDeleteBirth={deleteBirth}
             />
           </Box>
+          <Box sx={{ borderTop: '1px solid rgba(231, 76, 60, 0.15)', mt: 3, pt: 3 }}>
+            <AppointmentReminders
+              appointments={appointments}
+              onAdd={addAppointment}
+              onUpdate={updateAppointment}
+              onDelete={deleteAppointment}
+            />
+          </Box>
         </Box>
 
         {/* Shared records */}
@@ -289,7 +322,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
             fullWidth size="small" placeholder="Search by diagnosis, treatment, notes, doctor or date…"
             value={recordSearch} onChange={(e) => setRecordSearch(e.target.value)}
             sx={{ mb: 2 }}
-            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
           />
         )}
 

@@ -4,7 +4,7 @@ const router = express.Router();
 const authenticateToken = require('../middleware/authenticate');
 const { authLimiter, twoFactorLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
-const { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } = require('../schemas/auth.schema');
+const { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema } = require('../schemas/auth.schema');
 const { generateCsrfToken, setCsrfCookie } = require('../middleware/csrf');
 
 const {
@@ -18,11 +18,22 @@ const {
     verifyWebAuthnRegistration,
     generateWebAuthnAuthentication,
     verifyWebAuthnAuthentication,
+    verifyEmail,
+    resendVerification,
     requestPasswordReset,
     resetPassword,
+    changePassword,
     signUserToken,
     setAuthCookie
 } = require('../services/auth.service');
+
+// Base URL of wherever the user opened the app — used to build email links that
+// point back to a real page.
+function appBaseUrl(req) {
+    return req.headers.origin
+        || process.env.FRONTEND_URL
+        || `${req.protocol}://${req.get('host')}`;
+}
 
 // Helper: complete login by setting cookies and responding
 function completeLogin(res, user, message, statusCode = 200) {
@@ -36,11 +47,49 @@ function completeLogin(res, user, message, statusCode = 200) {
 // POST /api/auth/register
 router.post('/register', validate(registerSchema), async (req, res) => {
     try {
-        const newUser = await registerUser(req.body);
-        completeLogin(res, newUser, "Patient registered successfully!", 201);
+        await registerUser(req.body, appBaseUrl(req));
+        // No auto-login: the account must confirm its email first.
+        res.status(201).json({ message: "Account created. Check your email for a confirmation link to activate it." });
     } catch (error) {
         console.error(error);
         res.status(error.status || 500).json({ error: error.message || "Registration failed" });
+    }
+});
+
+// POST /api/auth/verify-email
+router.post('/verify-email', authLimiter, async (req, res) => {
+    try {
+        await verifyEmail(req.body.token);
+        res.json({ message: "Email confirmed. You can now sign in." });
+    } catch (error) {
+        console.error("🚨 VERIFY EMAIL ERROR:", error);
+        res.status(error.status || 500).json({ error: error.message || "Failed to verify email." });
+    }
+});
+
+// POST /api/auth/resend-verification
+router.post('/resend-verification', authLimiter, validate(forgotPasswordSchema), async (req, res) => {
+    try {
+        await resendVerification(req.body.email, appBaseUrl(req));
+    } catch (error) {
+        console.error("🚨 RESEND VERIFICATION ERROR:", error);
+    }
+    // Always generic — never reveal whether the email exists / is already verified.
+    res.json({ message: "If that email needs confirming, a new link has been sent." });
+});
+
+// POST /api/auth/change-password (authenticated)
+router.post('/change-password', authenticateToken, validate(changePasswordSchema), async (req, res) => {
+    try {
+        await changePassword(req.user.id, req.body.currentPassword, req.body.newPassword);
+        // changePassword bumps sessionValidAfter, which would invalidate THIS session
+        // too — re-issue a fresh token so the current device stays logged in while
+        // any other sessions are logged out.
+        const freshUser = { id: req.user.id, role: req.user.role };
+        completeLogin(res, freshUser, "Password changed. Other devices have been signed out.");
+    } catch (error) {
+        console.error("🚨 CHANGE PASSWORD ERROR:", error);
+        res.status(error.status || 500).json({ error: error.message || "Failed to change password." });
     }
 });
 

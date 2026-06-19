@@ -95,7 +95,8 @@ const PatientLayout = () => {
     }
   };
 
-  const currentTab = location.pathname.includes('/history') ? 2
+  const currentTab = location.pathname.includes('/access-log') ? 3
+    : location.pathname.includes('/history') ? 2
     : location.pathname.includes('/health') ? 1
     : 0;
 
@@ -109,6 +110,7 @@ const PatientLayout = () => {
               <Tab label="Dashboard & Vault Key" sx={{ fontWeight: 'bold' }} />
               <Tab label="Health Profile" sx={{ fontWeight: 'bold' }} />
               <Tab label="Medical History" sx={{ fontWeight: 'bold' }} />
+              <Tab label="Access Log" sx={{ fontWeight: 'bold' }} />
             </Tabs>
           </Box>
           <div className="card" style={{ marginBottom: '20px' }}>
@@ -128,6 +130,7 @@ const PatientLayout = () => {
     if (newValue === 0) navigate('/patient');
     if (newValue === 1) navigate('/patient/health');
     if (newValue === 2) navigate('/patient/history');
+    if (newValue === 3) navigate('/patient/access-log');
   };
 
   return (
@@ -169,6 +172,7 @@ const PatientLayout = () => {
             <Tab label="Dashboard & Vault Key" sx={{ fontWeight: 'bold' }} />
             <Tab label="Health Profile" sx={{ fontWeight: 'bold' }} />
             <Tab label="Medical History" sx={{ fontWeight: 'bold' }} />
+            <Tab label="Access Log" sx={{ fontWeight: 'bold' }} />
           </Tabs>
         </Box>
 

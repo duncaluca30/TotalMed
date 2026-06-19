@@ -184,6 +184,71 @@ async function deleteBirth({ id, patientId }) {
     return result.count > 0;
 }
 
+// ── Appointment reminders ────────────────────────────────────────────────────
+
+function decryptAppointment(appt) {
+    if (!appt) return appt;
+    for (const field of ['specialty', 'location', 'reason']) {
+        if (appt[field]) {
+            try { appt[field] = decrypt(appt[field]); }
+            catch (e) { console.error(`Failed to decrypt ${field} for appointment`, appt.id); }
+        }
+    }
+    return appt;
+}
+
+/** Decrypt a list of appointments in place. */
+function decryptAppointments(appointments) {
+    appointments.forEach(decryptAppointment);
+    return appointments;
+}
+
+/** Fetch and decrypt a patient's appointment reminders (soonest first). */
+async function getDecryptedAppointments(patientId) {
+    const appointments = await prisma.appointment.findMany({
+        where: { patientId },
+        orderBy: { dateTime: 'asc' }
+    });
+    return decryptAppointments(appointments);
+}
+
+/** Create an encrypted appointment reminder, returning it decrypted. */
+async function createAppointment({ patientId, doctorId, dateTime, specialty, location, reason }) {
+    const created = await prisma.appointment.create({
+        data: {
+            patientId,
+            doctorId: doctorId || null,
+            dateTime: new Date(dateTime),
+            specialty: specialty ? encrypt(specialty) : null,
+            location: location ? encrypt(location) : null,
+            reason: reason ? encrypt(reason) : null
+        }
+    });
+    return decryptAppointment(created);
+}
+
+/** Update an appointment scoped to its owning patient. Returns decrypted record or null. */
+async function updateAppointment({ id, patientId, dateTime, specialty, location, reason }) {
+    const result = await prisma.appointment.updateMany({
+        where: { id, patientId },
+        data: {
+            dateTime: new Date(dateTime),
+            specialty: specialty ? encrypt(specialty) : null,
+            location: location ? encrypt(location) : null,
+            reason: reason ? encrypt(reason) : null
+        }
+    });
+    if (result.count === 0) return null;
+    const updated = await prisma.appointment.findUnique({ where: { id } });
+    return decryptAppointment(updated);
+}
+
+/** Delete an appointment scoped to its owning patient. Returns true if deleted. */
+async function deleteAppointment({ id, patientId }) {
+    const result = await prisma.appointment.deleteMany({ where: { id, patientId } });
+    return result.count > 0;
+}
+
 module.exports = {
     decryptAllergies,
     getDecryptedAllergies,
@@ -199,5 +264,10 @@ module.exports = {
     getBirths,
     createBirth,
     updateBirth,
-    deleteBirth
+    deleteBirth,
+    decryptAppointments,
+    getDecryptedAppointments,
+    createAppointment,
+    updateAppointment,
+    deleteAppointment
 };

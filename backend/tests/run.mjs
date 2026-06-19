@@ -8,6 +8,7 @@ import * as validation from './groups/validation.mjs';
 import * as scenario from './groups/scenario.mjs';
 import * as socket from './groups/socket.mjs';
 import * as records from './groups/records.mjs';
+import * as features from './groups/features.mjs';
 import * as middleware from './groups/middleware.mjs';
 import * as ratelimit from './groups/ratelimit.mjs';
 
@@ -19,6 +20,7 @@ const groups = [
   ['Concurrent access & revoke', scenario],
   ['Real-time consent over Socket.IO', socket],
   ['Doctor record-write path', records],
+  ['Health profile, reminders, account & access log', features],
   ['HTTP middleware security', middleware],
   ['Rate limiters', ratelimit], // must stay LAST (exhausts the shared login limiter)
 ];

@@ -3,9 +3,12 @@ import { Box, Typography, Button, TextField } from '@mui/material';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import FingerprintIcon from '@mui/icons-material/Fingerprint';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
+import KeyOutlinedIcon from '@mui/icons-material/KeyOutlined';
 import { startRegistration } from '@simplewebauthn/browser';
-import { fetchWithAuth } from '../../services/api';
+import { fetchWithAuth, setCsrfToken } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
+import PasswordChecklist from '../Auth/PasswordChecklist';
+import { isPasswordValid } from '../../utils/passwordRules';
 
 const StatusPill = ({ children }) => (
   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, background: 'rgba(0, 184, 148, 0.12)', color: '#0f6e56', px: 1.25, py: 0.5, borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, flexShrink: 0 }}>
@@ -41,6 +44,10 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
   const [twoFactorSecret, setTwoFactorSecret] = useState('');
   const [setupPin, setSetupPin] = useState('');
   const [registering, setRegistering] = useState(false);
+
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
+  const [savingPw, setSavingPw] = useState(false);
 
   const hasPasskeys = passkeys.length > 0;
   const twoFactorActive = isTwoFactorEnabled;
@@ -99,6 +106,27 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
     }
   };
 
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (pw.next !== pw.confirm) return showToast('New passwords do not match.', 'error');
+    setSavingPw(true);
+    try {
+      const data = await fetchWithAuth('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword: pw.current, newPassword: pw.next }),
+      });
+      // The server rotated our session token — refresh the in-memory CSRF token.
+      if (data?.csrfToken) setCsrfToken(data.csrfToken);
+      setPw({ current: '', next: '', confirm: '' });
+      setPwOpen(false);
+      showToast('Password changed. Other devices have been signed out.', 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to change password.', 'error');
+    } finally {
+      setSavingPw(false);
+    }
+  };
+
   return (
     <div className="card card--security" style={{ marginTop: '20px' }}>
       {/* ---- Two-Factor Authentication ---- */}
@@ -121,7 +149,7 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
               <Typography sx={{ mt: 1, fontSize: '0.85em', color: '#636e72' }}>Manual Key: <strong>{twoFactorSecret}</strong></Typography>
 
               <Box component="form" onSubmit={handleVerify2FASetup} sx={{ display: 'flex', gap: 1, mt: 3, justifyContent: 'center' }}>
-                <TextField size="small" label="Enter 6-digit code" value={setupPin} onChange={(e) => setSetupPin(e.target.value.replace(/\D/g, ''))} inputProps={{ maxLength: 6 }} required />
+                <TextField size="small" label="Enter 6-digit code" value={setupPin} onChange={(e) => setSetupPin(e.target.value.replace(/\D/g, ''))} slotProps={{ htmlInput: { maxLength: 6 } }} required />
                 <Button type="submit" variant="contained" sx={{ backgroundColor: '#5b4fe6' }}>Verify</Button>
               </Box>
             </Box>
@@ -161,6 +189,39 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
             {registering ? 'Registering…' : 'Register Current Device'}
           </Button>
         </>
+      )}
+
+      <hr className="section-divider" />
+
+      {/* ---- Change password ---- */}
+      <SectionHeader
+        icon={<KeyOutlinedIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />}
+        title="Password"
+      />
+      {!pwOpen ? (
+        <>
+          <p className="text-muted">Change your account password. This signs you out on all other devices.</p>
+          <Button variant="outlined" onClick={() => setPwOpen(true)} sx={{ mt: 1, textTransform: 'none' }}>Change password</Button>
+        </>
+      ) : (
+        <Box component="form" onSubmit={handleChangePassword} sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+          <TextField size="small" type="password" label="Current password" value={pw.current}
+            onChange={(e) => setPw({ ...pw, current: e.target.value })} required fullWidth />
+          <TextField size="small" type="password" label="New password" value={pw.next}
+            onChange={(e) => setPw({ ...pw, next: e.target.value })} required fullWidth />
+          <PasswordChecklist password={pw.next} />
+          <TextField size="small" type="password" label="Confirm new password" value={pw.confirm}
+            onChange={(e) => setPw({ ...pw, confirm: e.target.value })} required fullWidth />
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button type="submit" variant="contained" disabled={savingPw || !isPasswordValid(pw.next) || pw.next !== pw.confirm}
+              sx={{ backgroundColor: '#5b4fe6', textTransform: 'none' }}>
+              {savingPw ? 'Saving…' : 'Update password'}
+            </Button>
+            <Button onClick={() => { setPwOpen(false); setPw({ current: '', next: '', confirm: '' }); }} variant="text" sx={{ textTransform: 'none', color: '#636e72' }}>
+              Cancel
+            </Button>
+          </Box>
+        </Box>
       )}
     </div>
   );

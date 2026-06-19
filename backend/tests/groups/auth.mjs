@@ -10,8 +10,14 @@ export async function run({ app, t }) {
   t.ok(await bcrypt.compare(creds.password, dbUser.password), 'stored password is a valid bcrypt hash');
   await t.throws(() => auth.registerUser(creds), 'duplicate email is rejected');
 
-  t.section('Login');
+  t.section('Email verification gate');
+  t.ok(dbUser.isEmailVerified === false, 'new accounts start unverified');
   const req = { headers: { 'x-forwarded-for': '1.2.3.4', 'user-agent': 'test' }, socket: { remoteAddress: '1.2.3.4' } };
+  await t.throws(() => auth.authenticateUser(creds.email, creds.password, req), 'login is blocked until the email is verified');
+  // Simulate clicking the confirmation link.
+  await prisma.user.update({ where: { id: user.id }, data: { isEmailVerified: true } });
+
+  t.section('Login');
   const login = await auth.authenticateUser(creds.email, creds.password, req);
   t.ok(!!login.user && login.availableMethods.includes('EMAIL'), 'correct credentials authenticate; EMAIL method offered');
   await t.throws(() => auth.authenticateUser(creds.email, 'WrongPass1!', req), 'wrong password is rejected');

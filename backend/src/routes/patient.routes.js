@@ -4,9 +4,9 @@ const router = express.Router();
 const prisma = require('../config/prisma');
 const authenticateToken = require('../middleware/authenticate');
 const validate = require('../middleware/validate');
-const { getDecryptedRecords, generateAccessCode } = require('../services/vault.service');
+const { getDecryptedRecords, generateAccessCode, getPatientAccessLog } = require('../services/vault.service');
 const { revokeVaultAccess } = require('../services/vaultRevocations');
-const { allergySchema, medicationSchema, birthSchema, patientProfileSchema } = require('../schemas/health.schema');
+const { allergySchema, medicationSchema, birthSchema, patientProfileSchema, appointmentSchema } = require('../schemas/health.schema');
 const health = require('../services/health.service');
 const { decrypt } = require('../../utils/cipher');
 
@@ -53,6 +53,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         patientData.allergies = await health.getDecryptedAllergies(patientData.id);
         patientData.medications = await health.getDecryptedMedications(patientData.id);
         patientData.births = await health.getBirths(patientData.id);
+        patientData.appointments = await health.getDecryptedAppointments(patientData.id);
 
         if (patientData.accessCode) {
             patientData.accessCode.code = decrypt(patientData.accessCode.code);
@@ -107,6 +108,21 @@ router.post('/revoke-access', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to revoke access." });
+    }
+});
+
+// GET /api/patient/access-log — who accessed this patient's data, and when
+router.get('/access-log', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const logs = await getPatientAccessLog(patientId);
+        res.json({ logs });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to load access log." });
     }
 });
 
@@ -276,6 +292,93 @@ router.delete('/births/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to remove birth." });
+    }
+});
+
+// ── Appointment reminders (patient self-service) ─────────────────────────────
+
+// POST /api/patient/appointments
+router.post('/appointments', authenticateToken, validate(appointmentSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const { dateTime, specialty, location, reason } = req.body;
+        const appointment = await health.createAppointment({ patientId, dateTime, specialty, location, reason });
+        res.status(201).json(appointment);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to add appointment." });
+    }
+});
+
+// PUT /api/patient/appointments/:id
+router.put('/appointments/:id', authenticateToken, validate(appointmentSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const { dateTime, specialty, location, reason } = req.body;
+        const appointment = await health.updateAppointment({ id: req.params.id, patientId, dateTime, specialty, location, reason });
+        if (!appointment) return res.status(404).json({ error: "Appointment not found." });
+        res.json(appointment);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update appointment." });
+    }
+});
+
+// DELETE /api/patient/appointments/:id
+router.delete('/appointments/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const deleted = await health.deleteAppointment({ id: req.params.id, patientId });
+        if (!deleted) return res.status(404).json({ error: "Appointment not found." });
+        res.json({ message: "Appointment removed." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to remove appointment." });
+    }
+});
+
+// ── Account deletion (right to be forgotten) ─────────────────────────────────
+
+// DELETE /api/patient/account — permanently erase the patient and all their data
+router.delete('/account', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const userId = req.user.id;
+        const patient = await prisma.patient.findUnique({ where: { userId }, select: { id: true } });
+        if (!patient) return res.status(404).json({ error: "Patient profile not found." });
+        const patientId = patient.id;
+
+        // Delete child rows first (no cascade configured), then the patient, then
+        // the user's own auth artifacts and the user record itself — all atomically.
+        await prisma.$transaction([
+            prisma.appointment.deleteMany({ where: { patientId } }),
+            prisma.medicalRecord.deleteMany({ where: { patientId } }),
+            prisma.allergy.deleteMany({ where: { patientId } }),
+            prisma.medication.deleteMany({ where: { patientId } }),
+            prisma.birth.deleteMany({ where: { patientId } }),
+            prisma.accessCode.deleteMany({ where: { patientId } }),
+            prisma.patient.delete({ where: { id: patientId } }),
+            prisma.passkey.deleteMany({ where: { userId } }),
+            prisma.auditLog.deleteMany({ where: { userId } }),
+            prisma.user.delete({ where: { id: userId } })
+        ]);
+
+        // Clear the now-orphaned session cookies.
+        res.clearCookie('token', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' });
+        res.clearCookie('csrf-token', { httpOnly: false, secure: process.env.NODE_ENV === 'production', sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' });
+        res.json({ message: "Your account and all associated data have been permanently deleted." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to delete account." });
     }
 });
 

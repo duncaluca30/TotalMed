@@ -1,16 +1,62 @@
-import React from 'react';
-import { useOutletContext } from 'react-router-dom';
-import { Box, Typography } from '@mui/material';
+import React, { useState } from 'react';
+import { useOutletContext, useNavigate } from 'react-router-dom';
+import { Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
 import CakeOutlinedIcon from '@mui/icons-material/CakeOutlined';
 import VerifiedUserOutlinedIcon from '@mui/icons-material/VerifiedUserOutlined';
 import VpnKeyOutlinedIcon from '@mui/icons-material/VpnKeyOutlined';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
+import { useAuth } from '../../context/AuthContext';
 import SecurityCard from '../Layout/SecurityCard';
+import AppointmentReminders from '../Health/AppointmentReminders';
 
 const PatientDashboard = () => {
   const { patientData, setPatientData } = useOutletContext();
   const showToast = useToast();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  const appointments = patientData.appointments || [];
+  const setAppointments = (next) => setPatientData({ ...patientData, appointments: next });
+
+  const addAppointment = async (payload) => {
+    try {
+      const created = await fetchWithAuth('/api/patient/appointments', { method: 'POST', body: JSON.stringify(payload) });
+      setAppointments([...appointments, created].sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime)));
+      showToast('Appointment added.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to add appointment.', 'error'); throw e; }
+  };
+  const updateAppointment = async (id, payload) => {
+    try {
+      const updated = await fetchWithAuth(`/api/patient/appointments/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      setAppointments(appointments.map((a) => (a.id === id ? updated : a)).sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime)));
+      showToast('Appointment updated.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to update appointment.', 'error'); throw e; }
+  };
+  const deleteAppointment = async (id) => {
+    try {
+      await fetchWithAuth(`/api/patient/appointments/${id}`, { method: 'DELETE' });
+      setAppointments(appointments.filter((a) => a.id !== id));
+      showToast('Appointment removed.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to remove appointment.', 'error'); }
+  };
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await fetchWithAuth('/api/patient/account', { method: 'DELETE' });
+      showToast('Your account has been deleted.', 'success');
+      logout();
+      navigate('/login');
+    } catch (e) {
+      showToast(e.message || 'Failed to delete account.', 'error');
+      setDeleting(false);
+    }
+  };
 
   const handleGenerateCode = async () => {
     try {
@@ -85,6 +131,41 @@ const PatientDashboard = () => {
           </Box>
         )}
       </div>
+
+      {/* Appointment reminders */}
+      <div className="card" style={{ marginTop: '20px' }}>
+        <AppointmentReminders
+          appointments={appointments}
+          onAdd={addAppointment}
+          onUpdate={updateAppointment}
+          onDelete={deleteAppointment}
+        />
+      </div>
+
+      {/* Danger zone */}
+      <div className="card" style={{ marginTop: '20px', border: '1px solid #ffd6d6' }}>
+        <Typography sx={{ fontWeight: 600, color: '#c0392b', mb: 0.5 }}>Delete account</Typography>
+        <Typography sx={{ color: 'var(--light-text)', fontSize: '0.9rem', mb: 1.5 }}>
+          Permanently erase your account and all medical data. This cannot be undone.
+        </Typography>
+        <Button variant="outlined" color="error" onClick={() => setDeleteOpen(true)}>Delete my account</Button>
+      </div>
+
+      <Dialog open={deleteOpen} onClose={() => !deleting && setDeleteOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ color: '#c0392b', fontWeight: 700 }}>Delete account permanently?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2, fontSize: '0.92rem' }}>
+            This will erase your profile, medical records, allergies, medications, gynecological history and appointments. This action is irreversible. Type <strong>DELETE</strong> to confirm.
+          </Typography>
+          <TextField fullWidth size="small" value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder="DELETE" autoFocus />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteOpen(false)} disabled={deleting} sx={{ textTransform: 'none', color: '#636e72' }}>Cancel</Button>
+          <Button onClick={handleDeleteAccount} variant="contained" color="error" disabled={deleting || deleteConfirm !== 'DELETE'} sx={{ textTransform: 'none' }}>
+            {deleting ? 'Deleting…' : 'Delete forever'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -139,11 +139,44 @@ async function createAuditLog({ userId, action, details, ipAddress }) {
     });
 }
 
+/**
+ * Build the patient-facing access log: every audited action whose details
+ * reference this patient (vault views, records/allergies/medications added),
+ * with the acting doctor resolved to a readable name.
+ */
+async function getPatientAccessLog(patientId, limit = 100) {
+    const logs = await prisma.auditLog.findMany({
+        where: { details: { contains: patientId } },
+        orderBy: { createdAt: 'desc' },
+        take: limit
+    });
+
+    const userIds = [...new Set(logs.map(l => l.userId))];
+    const doctors = await prisma.doctor.findMany({
+        where: { userId: { in: userIds } },
+        select: { userId: true, firstName: true, lastName: true, specialty: true }
+    });
+    const byUser = new Map(doctors.map(d => [d.userId, d]));
+
+    return logs.map(l => {
+        const d = byUser.get(l.userId);
+        return {
+            id: l.id,
+            action: l.action,
+            actor: d ? `Dr. ${d.firstName} ${d.lastName}` : 'Unknown user',
+            specialty: d ? d.specialty : null,
+            ipAddress: l.ipAddress,
+            createdAt: l.createdAt
+        };
+    });
+}
+
 module.exports = {
     lookupAccessCode,
     generateAccessCode,
     getDecryptedRecords,
     decryptRecords,
     createEncryptedRecord,
-    createAuditLog
+    createAuditLog,
+    getPatientAccessLog
 };

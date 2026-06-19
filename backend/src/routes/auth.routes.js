@@ -160,11 +160,12 @@ router.post('/webauthn/verify-authentication', async (req, res) => {
 // POST /api/auth/forgot-password
 router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), async (req, res) => {
     try {
-        // Build a base URL that points at the frontend. In production the backend
-        // serves the SPA from the same origin, so the request origin/host works;
-        // FRONTEND_URL overrides it when the two are deployed separately.
-        const baseUrl = process.env.FRONTEND_URL
-            || req.headers.origin
+        // Build the reset link from wherever the user actually opened the app
+        // (the request Origin) — that origin already serves the SPA, so the link
+        // always points to a page that exists. FRONTEND_URL is only a fallback for
+        // when there's no Origin header (e.g. a non-browser client).
+        const baseUrl = req.headers.origin
+            || process.env.FRONTEND_URL
             || `${req.protocol}://${req.get('host')}`;
         await requestPasswordReset(req.body.email, baseUrl);
         // Always succeed — never reveal whether the email is registered.

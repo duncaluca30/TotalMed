@@ -131,6 +131,59 @@ async function deleteMedication({ id, patientId }) {
     return result.count > 0;
 }
 
+// ── Gynecological / obstetric profile ───────────────────────────────────────
+
+/**
+ * Patch the patient-level gynecological fields (sex, menopause, menarche).
+ * Only the keys present in `fields` are touched, so partial updates are safe.
+ * Returns the updated subset.
+ */
+async function updatePatientProfile(patientId, fields) {
+    const data = {};
+    if (fields.sex !== undefined) data.sex = fields.sex;
+    if (fields.atMenopause !== undefined) data.atMenopause = fields.atMenopause;
+    if (fields.menarcheDate !== undefined) {
+        data.menarcheDate = fields.menarcheDate ? new Date(fields.menarcheDate) : null;
+    }
+
+    return prisma.patient.update({
+        where: { id: patientId },
+        data,
+        select: { id: true, sex: true, atMenopause: true, menarcheDate: true }
+    });
+}
+
+/** Fetch all births for a patient (most recent first). */
+async function getBirths(patientId) {
+    return prisma.birth.findMany({
+        where: { patientId },
+        orderBy: [{ year: 'desc' }, { createdAt: 'desc' }]
+    });
+}
+
+/** Create a birth entry. */
+async function createBirth({ patientId, modality, year }) {
+    return prisma.birth.create({
+        data: { patientId, modality, year: year ?? null }
+    });
+}
+
+/** Update a birth scoped to its owning patient. Returns the record or null. */
+async function updateBirth({ id, patientId, modality, year }) {
+    const result = await prisma.birth.updateMany({
+        where: { id, patientId },
+        data: { modality, year: year ?? null }
+    });
+    if (result.count === 0) return null;
+    return prisma.birth.findUnique({ where: { id } });
+}
+
+/** Delete a birth scoped to its owning patient. Returns true if deleted. */
+async function deleteBirth({ id, patientId }) {
+    const result = await prisma.birth.deleteMany({ where: { id, patientId } });
+    return result.count > 0;
+}
+
 module.exports = {
     decryptAllergies,
     getDecryptedAllergies,
@@ -141,5 +194,10 @@ module.exports = {
     getDecryptedMedications,
     createMedication,
     updateMedication,
-    deleteMedication
+    deleteMedication,
+    updatePatientProfile,
+    getBirths,
+    createBirth,
+    updateBirth,
+    deleteBirth
 };

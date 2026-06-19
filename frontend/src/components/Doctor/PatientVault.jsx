@@ -8,11 +8,18 @@ import autoTable from 'jspdf-autotable';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 import HealthLists from '../Health/HealthLists';
+import GynecologySection from '../Health/GynecologySection';
 
 const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) => {
   const [newRecord, setNewRecord] = useState({ diagnosis: '', treatment: '', notes: '' });
   const [allergies, setAllergies] = useState(patient.allergies || []);
   const [medications, setMedications] = useState(patient.medications || []);
+  const [births, setBirths] = useState(patient.births || []);
+  const [profile, setProfile] = useState({
+    sex: patient.sex || null,
+    menarcheDate: patient.menarcheDate || null,
+    atMenopause: patient.atMenopause || false,
+  });
   const showToast = useToast();
 
   // Doctor-side allergy/medication mutations carry the active vault session so
@@ -62,6 +69,35 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
     } catch (e) { showToast(e.message || 'Failed to remove medication.', 'error'); }
   };
 
+  const saveProfile = async (fields) => {
+    try {
+      const updated = await fetchWithAuth('/api/doctor/patient-profile', { method: 'PUT', body: vaultBody(fields) });
+      setProfile({ sex: updated.sex, menarcheDate: updated.menarcheDate, atMenopause: updated.atMenopause });
+      showToast('Profile updated.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to update profile.', 'error'); throw e; }
+  };
+  const addBirth = async (payload) => {
+    try {
+      const created = await fetchWithAuth('/api/doctor/births', { method: 'POST', body: vaultBody(payload) });
+      setBirths((prev) => [created, ...prev]);
+      showToast('Birth added.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to add birth.', 'error'); throw e; }
+  };
+  const updateBirth = async (id, payload) => {
+    try {
+      const updated = await fetchWithAuth(`/api/doctor/births/${id}`, { method: 'PUT', body: vaultBody(payload) });
+      setBirths((prev) => prev.map((b) => (b.id === id ? updated : b)));
+      showToast('Birth updated.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to update birth.', 'error'); throw e; }
+  };
+  const deleteBirth = async (id) => {
+    try {
+      await fetchWithAuth(`/api/doctor/births/${id}`, { method: 'DELETE', body: vaultBody({}) });
+      setBirths((prev) => prev.filter((b) => b.id !== id));
+      showToast('Birth removed.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to remove birth.', 'error'); }
+  };
+
   const handleDownloadPDF = () => {
     const records = patient.medicalRecords || [];
     if (records.length === 0 && allergies.length === 0 && medications.length === 0) {
@@ -78,7 +114,25 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
     doc.text(`Patient File: ${patient.firstName} ${patient.lastName}`, 14, 48);
     doc.text(`Attending Physician: Dr. ${doctorData.firstName} ${doctorData.lastName} (${doctorData.specialty})`, 14, 54);
 
-    let cursorY = 62;
+    const sexLabel = { MALE: 'Male', FEMALE: 'Female', OTHER: 'Other' }[profile.sex] || 'Not specified';
+    doc.text(`Sex: ${sexLabel}`, 14, 60);
+    let cursorY = 66;
+    if (profile.sex === 'FEMALE') {
+      const menarche = profile.menarcheDate ? new Date(profile.menarcheDate).toLocaleDateString() : '—';
+      doc.text(`Menarche: ${menarche}   |   Menopause: ${profile.atMenopause ? 'Yes' : 'No'}   |   Births: ${births.length}`, 14, cursorY);
+      cursorY += 6;
+      if (births.length > 0) {
+        autoTable(doc, {
+          startY: cursorY,
+          head: [["Birth modality", "Year"]],
+          body: births.map(b => [b.modality === 'CESAREAN' ? 'Cesarean' : 'Natural', b.year || "—"]),
+          theme: 'grid',
+          headStyles: { fillColor: [214, 51, 108], textColor: [255, 255, 255] },
+          styles: { fontSize: 9, cellPadding: 3 },
+        });
+        cursorY = doc.lastAutoTable.finalY + 6;
+      }
+    }
     if (allergies.length > 0) {
       autoTable(doc, {
         startY: cursorY,
@@ -204,6 +258,18 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
             onUpdateMedication={updateMedication}
             onDeleteMedication={deleteMedication}
           />
+          <Box sx={{ borderTop: '1px solid rgba(231, 76, 60, 0.15)', mt: 3, pt: 3 }}>
+            <GynecologySection
+              sex={profile.sex}
+              menarcheDate={profile.menarcheDate}
+              atMenopause={profile.atMenopause}
+              births={births}
+              onSaveProfile={saveProfile}
+              onAddBirth={addBirth}
+              onUpdateBirth={updateBirth}
+              onDeleteBirth={deleteBirth}
+            />
+          </Box>
         </Box>
 
         {/* Shared records */}

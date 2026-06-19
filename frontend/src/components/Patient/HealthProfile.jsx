@@ -4,6 +4,7 @@ import { Box } from '@mui/material';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 import HealthLists from '../Health/HealthLists';
+import GynecologySection from '../Health/GynecologySection';
 
 const HealthProfile = () => {
   const { patientData, setPatientData } = useOutletContext();
@@ -11,9 +12,41 @@ const HealthProfile = () => {
 
   const allergies = patientData.allergies || [];
   const medications = patientData.medications || [];
+  const births = patientData.births || [];
 
   const setAllergies = (next) => setPatientData({ ...patientData, allergies: next });
   const setMedications = (next) => setPatientData({ ...patientData, medications: next });
+  const setBirths = (next) => setPatientData({ ...patientData, births: next });
+
+  // ── Sex & gynecological profile ──
+  const saveProfile = async (fields) => {
+    try {
+      const updated = await fetchWithAuth('/api/patient/profile', { method: 'PUT', body: JSON.stringify(fields) });
+      setPatientData({ ...patientData, sex: updated.sex, atMenopause: updated.atMenopause, menarcheDate: updated.menarcheDate });
+      showToast('Profile updated.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to update profile.', 'error'); throw e; }
+  };
+  const addBirth = async (payload) => {
+    try {
+      const created = await fetchWithAuth('/api/patient/births', { method: 'POST', body: JSON.stringify(payload) });
+      setBirths([created, ...births]);
+      showToast('Birth added.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to add birth.', 'error'); throw e; }
+  };
+  const updateBirth = async (id, payload) => {
+    try {
+      const updated = await fetchWithAuth(`/api/patient/births/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      setBirths(births.map((b) => (b.id === id ? updated : b)));
+      showToast('Birth updated.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to update birth.', 'error'); throw e; }
+  };
+  const deleteBirth = async (id) => {
+    try {
+      await fetchWithAuth(`/api/patient/births/${id}`, { method: 'DELETE' });
+      setBirths(births.filter((b) => b.id !== id));
+      showToast('Birth removed.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to remove birth.', 'error'); }
+  };
 
   // ── Allergies ──
   const addAllergy = async (payload) => {
@@ -64,11 +97,24 @@ const HealthProfile = () => {
   return (
     <Box>
       <Box className="page-heading">
-        <h3 style={{ margin: 0 }}>Allergies &amp; current medications</h3>
+        <h3 style={{ margin: 0 }}>Health profile</h3>
       </Box>
       <p className="text-muted" style={{ marginTop: 0, marginBottom: 20 }}>
         Keep this up to date — it is always shared with any doctor you grant vault access to, so they can treat you safely.
       </p>
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <GynecologySection
+          sex={patientData.sex}
+          menarcheDate={patientData.menarcheDate}
+          atMenopause={patientData.atMenopause}
+          births={births}
+          onSaveProfile={saveProfile}
+          onAddBirth={addBirth}
+          onUpdateBirth={updateBirth}
+          onDeleteBirth={deleteBirth}
+        />
+      </div>
+
       <div className="card">
         <HealthLists
           allergies={allergies}

@@ -107,7 +107,7 @@ const PatientLayout = () => {
           <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
             <Tabs value={currentTab} textColor="primary" indicatorColor="primary">
               <Tab label="Dashboard & Vault Key" sx={{ fontWeight: 'bold' }} />
-              <Tab label="Allergies & Meds" sx={{ fontWeight: 'bold' }} />
+              <Tab label="Health Profile" sx={{ fontWeight: 'bold' }} />
               <Tab label="Medical History" sx={{ fontWeight: 'bold' }} />
             </Tabs>
           </Box>
@@ -167,7 +167,7 @@ const PatientLayout = () => {
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
           <Tabs value={currentTab} onChange={handleTabChange} textColor="primary" indicatorColor="primary">
             <Tab label="Dashboard & Vault Key" sx={{ fontWeight: 'bold' }} />
-            <Tab label="Allergies & Meds" sx={{ fontWeight: 'bold' }} />
+            <Tab label="Health Profile" sx={{ fontWeight: 'bold' }} />
             <Tab label="Medical History" sx={{ fontWeight: 'bold' }} />
           </Tabs>
         </Box>

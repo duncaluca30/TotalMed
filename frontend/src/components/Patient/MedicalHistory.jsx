@@ -14,6 +14,7 @@ const MedicalHistory = () => {
     const recordsToPrint = patientData.medicalRecords || [];
     const allergies = patientData.allergies || [];
     const medications = patientData.medications || [];
+    const births = patientData.births || [];
     if (recordsToPrint.length === 0 && allergies.length === 0 && medications.length === 0) {
       return showToast("No data to download.", "error");
     }
@@ -28,7 +29,25 @@ const MedicalHistory = () => {
     
     doc.text(`Patient File: ${patientData.firstName} ${patientData.lastName}`, 14, 48);
 
-    let startY = 55;
+    const sexLabel = { MALE: 'Male', FEMALE: 'Female', OTHER: 'Other' }[patientData.sex] || 'Not specified';
+    doc.text(`Sex: ${sexLabel}`, 14, 54);
+    let startY = 60;
+    if (patientData.sex === 'FEMALE') {
+      const menarche = patientData.menarcheDate ? new Date(patientData.menarcheDate).toLocaleDateString() : '—';
+      doc.text(`Menarche: ${menarche}   |   Menopause: ${patientData.atMenopause ? 'Yes' : 'No'}   |   Births: ${births.length}`, 14, startY);
+      startY += 6;
+      if (births.length > 0) {
+        autoTable(doc, {
+          startY,
+          head: [["Birth modality", "Year"]],
+          body: births.map(b => [b.modality === 'CESAREAN' ? 'Cesarean' : 'Natural', b.year || "—"]),
+          theme: 'grid',
+          headStyles: { fillColor: [214, 51, 108], textColor: [255, 255, 255] },
+          styles: { fontSize: 9, cellPadding: 3 },
+        });
+        startY = doc.lastAutoTable.finalY + 6;
+      }
+    }
     if (allergies.length > 0) {
       autoTable(doc, {
         startY,

@@ -24,6 +24,17 @@ enum AllergySeverity {
   SEVERE
 }
 
+enum Sex {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum BirthModality {
+  NATURAL
+  CESAREAN
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -52,7 +63,13 @@ model Patient {
   lastName    String
   dateOfBirth DateTime
   phone       String?
+  sex         Sex?
   accessCode    AccessCode?
+
+  // Gynecological / obstetric history — only relevant when sex == FEMALE.
+  // Individual births are tracked in the Birth model below.
+  menarcheDate DateTime?
+  atMenopause  Boolean  @default(false)
 
   userId      String   @unique
   user        User     @relation(fields: [userId], references: [id])
@@ -61,6 +78,7 @@ model Patient {
   medicalRecords MedicalRecord[]
   allergies      Allergy[]
   medications    Medication[]
+  births         Birth[]
 }
 
 model Doctor {
@@ -130,6 +148,20 @@ model Medication {
 
   patientId String
   patient   Patient  @relation(fields: [patientId], references: [id])
+}
+
+// A single birth in a patient's obstetric history. Modality and year are
+// structured (non-identifying) values, so — like AllergySeverity — they are
+// stored as typed columns rather than encrypted text. The number of births is
+// simply the count of these rows.
+model Birth {
+  id        String        @id @default(uuid())
+  modality  BirthModality
+  year      Int?
+  createdAt DateTime      @default(now())
+
+  patientId String
+  patient   Patient       @relation(fields: [patientId], references: [id])
 }
 
 model AccessCode {

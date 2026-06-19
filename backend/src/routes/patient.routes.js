@@ -6,7 +6,7 @@ const authenticateToken = require('../middleware/authenticate');
 const validate = require('../middleware/validate');
 const { getDecryptedRecords, generateAccessCode } = require('../services/vault.service');
 const { revokeVaultAccess } = require('../services/vaultRevocations');
-const { allergySchema, medicationSchema } = require('../schemas/health.schema');
+const { allergySchema, medicationSchema, birthSchema, patientProfileSchema } = require('../schemas/health.schema');
 const health = require('../services/health.service');
 const { decrypt } = require('../../utils/cipher');
 
@@ -52,6 +52,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         // always returned in full (decrypted), not paginated.
         patientData.allergies = await health.getDecryptedAllergies(patientData.id);
         patientData.medications = await health.getDecryptedMedications(patientData.id);
+        patientData.births = await health.getBirths(patientData.id);
 
         if (patientData.accessCode) {
             patientData.accessCode.code = decrypt(patientData.accessCode.code);
@@ -208,6 +209,73 @@ router.delete('/medications/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to remove medication." });
+    }
+});
+
+// ── Gynecological profile (patient self-service) ─────────────────────────────
+
+// PUT /api/patient/profile — patch sex / menopause / menarche
+router.put('/profile', authenticateToken, validate(patientProfileSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const { sex, atMenopause, menarcheDate } = req.body;
+        const updated = await health.updatePatientProfile(patientId, { sex, atMenopause, menarcheDate });
+        res.json(updated);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update profile." });
+    }
+});
+
+// POST /api/patient/births
+router.post('/births', authenticateToken, validate(birthSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const { modality, year } = req.body;
+        const birth = await health.createBirth({ patientId, modality, year });
+        res.status(201).json(birth);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to add birth." });
+    }
+});
+
+// PUT /api/patient/births/:id
+router.put('/births/:id', authenticateToken, validate(birthSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const { modality, year } = req.body;
+        const birth = await health.updateBirth({ id: req.params.id, patientId, modality, year });
+        if (!birth) return res.status(404).json({ error: "Birth not found." });
+        res.json(birth);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update birth." });
+    }
+});
+
+// DELETE /api/patient/births/:id
+router.delete('/births/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const deleted = await health.deleteBirth({ id: req.params.id, patientId });
+        if (!deleted) return res.status(404).json({ error: "Birth not found." });
+        res.json({ message: "Birth removed." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to remove birth." });
     }
 });
 

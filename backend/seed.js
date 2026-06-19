@@ -3,6 +3,7 @@ const { Pool } = require('pg');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
+const { encrypt } = require('./utils/cipher');
 
 // Initialize the Prisma 7 Adapter just like we did in server.js
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -34,7 +35,9 @@ async function main() {
     });
     console.log(`✅ Created Doctor: ${doctor.doctorProfile.firstName} ${doctor.doctorProfile.lastName}`);
 
-    // 2. Create a Fake Patient
+    // 2. Create a Fake Patient — a female patient with a full health profile
+    //    (sex, menarche, births) plus encrypted allergies & medications so the
+    //    whole "Health Profile" section can be demoed end to end.
     const patient = await prisma.user.create({
         data: {
             email: "maria.ionescu@email.com",
@@ -44,14 +47,36 @@ async function main() {
                 create: {
                     firstName: "Maria",
                     lastName: "Ionescu",
-                    dateOfBirth: new Date("1990-05-15"), 
-                    phone: "0722123456"
+                    dateOfBirth: new Date("1990-05-15"),
+                    phone: "0722123456",
+                    sex: "FEMALE",
+                    menarcheDate: new Date("2003-09-01"), // ~age 13
+                    atMenopause: false,
+                    births: {
+                        create: [
+                            { modality: "NATURAL", year: 2015 },
+                            { modality: "CESAREAN", year: 2019 }
+                        ]
+                    },
+                    // Text fields are stored encrypted at rest, exactly like the app does.
+                    allergies: {
+                        create: [
+                            { substance: encrypt("Penicillin"), reaction: encrypt("Rash and facial swelling"), severity: "SEVERE" },
+                            { substance: encrypt("Pollen"), reaction: encrypt("Sneezing, itchy eyes"), severity: "MILD" }
+                        ]
+                    },
+                    medications: {
+                        create: [
+                            { name: encrypt("Levothyroxine"), dosage: encrypt("50 mcg"), frequency: encrypt("Once daily, in the morning") },
+                            { name: encrypt("Vitamin D"), dosage: encrypt("2000 IU"), frequency: encrypt("Once daily") }
+                        ]
+                    }
                 }
             }
         },
         include: { patientProfile: true }
     });
-    console.log(`✅ Created Patient: ${patient.patientProfile.firstName} ${patient.patientProfile.lastName}`);
+    console.log(`✅ Created Patient: ${patient.patientProfile.firstName} ${patient.patientProfile.lastName} (FEMALE, 2 births, 2 allergies, 2 medications)`);
 
     // 3. Create a Scheduled Appointment between them
     const tomorrow = new Date();

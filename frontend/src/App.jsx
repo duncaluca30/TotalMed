@@ -8,6 +8,7 @@ import RegisterForm from './components/Auth/RegisterForm';
 import PatientLayout from './components/Patient/PatientLayout';
 import PatientDashboard from './components/Patient/PatientDashboard';
 import MedicalHistory from './components/Patient/MedicalHistory';
+import HealthProfile from './components/Patient/HealthProfile';
 import DoctorLayout from './components/Doctor/DoctorLayout';
 import DoctorDashboard from './components/Doctor/DoctorDashboard';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
@@ -31,6 +32,7 @@ function App() {
             }
           >
             <Route index element={<PatientDashboard />} />
+            <Route path="health" element={<HealthProfile />} />
             <Route path="history" element={<MedicalHistory />} />
           </Route>
           

@@ -95,7 +95,9 @@ const PatientLayout = () => {
     }
   };
 
-  const currentTab = location.pathname.includes('/history') ? 1 : 0;
+  const currentTab = location.pathname.includes('/history') ? 2
+    : location.pathname.includes('/health') ? 1
+    : 0;
 
   if (!patientData) {
     return (
@@ -105,6 +107,7 @@ const PatientLayout = () => {
           <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
             <Tabs value={currentTab} textColor="primary" indicatorColor="primary">
               <Tab label="Dashboard & Vault Key" sx={{ fontWeight: 'bold' }} />
+              <Tab label="Allergies & Meds" sx={{ fontWeight: 'bold' }} />
               <Tab label="Medical History" sx={{ fontWeight: 'bold' }} />
             </Tabs>
           </Box>
@@ -123,7 +126,8 @@ const PatientLayout = () => {
 
   const handleTabChange = (event, newValue) => {
     if (newValue === 0) navigate('/patient');
-    if (newValue === 1) navigate('/patient/history');
+    if (newValue === 1) navigate('/patient/health');
+    if (newValue === 2) navigate('/patient/history');
   };
 
   return (
@@ -163,6 +167,7 @@ const PatientLayout = () => {
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
           <Tabs value={currentTab} onChange={handleTabChange} textColor="primary" indicatorColor="primary">
             <Tab label="Dashboard & Vault Key" sx={{ fontWeight: 'bold' }} />
+            <Tab label="Allergies & Meds" sx={{ fontWeight: 'bold' }} />
             <Tab label="Medical History" sx={{ fontWeight: 'bold' }} />
           </Tabs>
         </Box>

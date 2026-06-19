@@ -57,7 +57,7 @@ export function loadApp() {
 
 export async function reset(prisma) {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "AuditLog","AccessCode","MedicalRecord","Appointment","Passkey","Patient","Doctor","User" RESTART IDENTITY CASCADE'
+    'TRUNCATE TABLE "AuditLog","AccessCode","MedicalRecord","Allergy","Medication","Appointment","Passkey","Patient","Doctor","User" RESTART IDENTITY CASCADE'
   );
 }
 

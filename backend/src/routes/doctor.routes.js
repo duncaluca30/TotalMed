@@ -8,9 +8,32 @@ const { vaultLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 const { recordSchema } = require('../schemas/doctor.schema');
 const { vaultAccessSchema } = require('../schemas/vault.schema');
+const { doctorAllergySchema, doctorMedicationSchema } = require('../schemas/health.schema');
 
 const { lookupAccessCode, decryptRecords, createEncryptedRecord, createAuditLog } = require('../services/vault.service');
+const health = require('../services/health.service');
 const { isVaultTokenRevoked } = require('../services/vaultRevocations');
+
+/**
+ * Validate an active vault session for the requesting doctor against a target
+ * patient. Returns { ok: true } on success, or { ok: false, status, error }
+ * describing why access is denied. Mirrors the checks in POST /records.
+ */
+function verifyVaultSession(vaultToken, doctorId, patientId) {
+    let session;
+    try {
+        session = jwt.verify(vaultToken, process.env.JWT_SECRET);
+    } catch (err) {
+        return { ok: false, status: 403, error: "Vault session expired. Please re-enter a new access code." };
+    }
+    if (session.patientId !== patientId || session.doctorId !== doctorId) {
+        return { ok: false, status: 403, error: "Vault session mismatch. Access denied." };
+    }
+    if (isVaultTokenRevoked(session.patientId, session.iat)) {
+        return { ok: false, status: 403, error: "Access was revoked by the patient." };
+    }
+    return { ok: true, session };
+}
 
 // GET /api/doctor/dashboard
 router.get('/dashboard', authenticateToken, async (req, res) => {
@@ -122,6 +145,12 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                 const paginatedRecords = approvedRecords.slice(skip, skip + limit);
                 decryptRecords(paginatedRecords);
                 patientData.medicalRecords = paginatedRecords;
+
+                // Allergies and current medications are safety-critical, so they
+                // are always shared with the treating doctor — regardless of which
+                // historical records the patient chose to disclose.
+                patientData.allergies = await health.getDecryptedAllergies(validCode.patientId);
+                patientData.medications = await health.getDecryptedMedications(validCode.patientId);
 
                 const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
                 await createAuditLog({
@@ -241,6 +270,130 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to add record." });
+    }
+});
+
+// ── Allergies (doctor, during an active vault session) ───────────────────────
+
+// POST /api/doctor/allergies
+router.post('/allergies', authenticateToken, validate(doctorAllergySchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        const { patientId, vaultToken, substance, reaction, severity } = req.body;
+        const check = verifyVaultSession(vaultToken, doctor.id, patientId);
+        if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+        const allergy = await health.createAllergy({ patientId, substance, reaction, severity });
+
+        const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        await createAuditLog({ userId: req.user.id, action: 'ALLERGY_ADDED', details: { patientId, allergyId: allergy.id }, ipAddress: rawIp });
+
+        res.status(201).json(allergy);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to add allergy." });
+    }
+});
+
+// PUT /api/doctor/allergies/:id
+router.put('/allergies/:id', authenticateToken, validate(doctorAllergySchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        const { patientId, vaultToken, substance, reaction, severity } = req.body;
+        const check = verifyVaultSession(vaultToken, doctor.id, patientId);
+        if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+        const allergy = await health.updateAllergy({ id: req.params.id, patientId, substance, reaction, severity });
+        if (!allergy) return res.status(404).json({ error: "Allergy not found." });
+        res.json(allergy);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update allergy." });
+    }
+});
+
+// DELETE /api/doctor/allergies/:id
+router.delete('/allergies/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        const { patientId, vaultToken } = req.body;
+        const check = verifyVaultSession(vaultToken, doctor.id, patientId);
+        if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+        const deleted = await health.deleteAllergy({ id: req.params.id, patientId });
+        if (!deleted) return res.status(404).json({ error: "Allergy not found." });
+        res.json({ message: "Allergy removed." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to remove allergy." });
+    }
+});
+
+// ── Medications (doctor, during an active vault session) ──────────────────────
+
+// POST /api/doctor/medications
+router.post('/medications', authenticateToken, validate(doctorMedicationSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        const { patientId, vaultToken, name, dosage, frequency } = req.body;
+        const check = verifyVaultSession(vaultToken, doctor.id, patientId);
+        if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+        const medication = await health.createMedication({ patientId, name, dosage, frequency });
+
+        const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        await createAuditLog({ userId: req.user.id, action: 'MEDICATION_ADDED', details: { patientId, medicationId: medication.id }, ipAddress: rawIp });
+
+        res.status(201).json(medication);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to add medication." });
+    }
+});
+
+// PUT /api/doctor/medications/:id
+router.put('/medications/:id', authenticateToken, validate(doctorMedicationSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        const { patientId, vaultToken, name, dosage, frequency } = req.body;
+        const check = verifyVaultSession(vaultToken, doctor.id, patientId);
+        if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+        const medication = await health.updateMedication({ id: req.params.id, patientId, name, dosage, frequency });
+        if (!medication) return res.status(404).json({ error: "Medication not found." });
+        res.json(medication);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update medication." });
+    }
+});
+
+// DELETE /api/doctor/medications/:id
+router.delete('/medications/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        const { patientId, vaultToken } = req.body;
+        const check = verifyVaultSession(vaultToken, doctor.id, patientId);
+        if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+        const deleted = await health.deleteMedication({ id: req.params.id, patientId });
+        if (!deleted) return res.status(404).json({ error: "Medication not found." });
+        res.json({ message: "Medication removed." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to remove medication." });
     }
 });
 

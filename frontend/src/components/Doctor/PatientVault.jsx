@@ -2,19 +2,70 @@ import React, { useState } from 'react';
 import { Box, Typography, Button, TextField } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import HealthAndSafetyOutlinedIcon from '@mui/icons-material/HealthAndSafetyOutlined';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
+import HealthLists from '../Health/HealthLists';
 
 const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) => {
   const [newRecord, setNewRecord] = useState({ diagnosis: '', treatment: '', notes: '' });
+  const [allergies, setAllergies] = useState(patient.allergies || []);
+  const [medications, setMedications] = useState(patient.medications || []);
   const showToast = useToast();
 
+  // Doctor-side allergy/medication mutations carry the active vault session so
+  // the server can verify the doctor still has access to this patient.
+  const vaultBody = (payload) => JSON.stringify({ ...payload, patientId: patient.id, vaultToken });
+
+  const addAllergy = async (payload) => {
+    try {
+      const created = await fetchWithAuth('/api/doctor/allergies', { method: 'POST', body: vaultBody(payload) });
+      setAllergies((prev) => [created, ...prev]);
+      showToast('Allergy added.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to add allergy.', 'error'); throw e; }
+  };
+  const updateAllergy = async (id, payload) => {
+    try {
+      const updated = await fetchWithAuth(`/api/doctor/allergies/${id}`, { method: 'PUT', body: vaultBody(payload) });
+      setAllergies((prev) => prev.map((a) => (a.id === id ? updated : a)));
+      showToast('Allergy updated.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to update allergy.', 'error'); throw e; }
+  };
+  const deleteAllergy = async (id) => {
+    try {
+      await fetchWithAuth(`/api/doctor/allergies/${id}`, { method: 'DELETE', body: vaultBody({}) });
+      setAllergies((prev) => prev.filter((a) => a.id !== id));
+      showToast('Allergy removed.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to remove allergy.', 'error'); }
+  };
+  const addMedication = async (payload) => {
+    try {
+      const created = await fetchWithAuth('/api/doctor/medications', { method: 'POST', body: vaultBody(payload) });
+      setMedications((prev) => [created, ...prev]);
+      showToast('Medication added.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to add medication.', 'error'); throw e; }
+  };
+  const updateMedication = async (id, payload) => {
+    try {
+      const updated = await fetchWithAuth(`/api/doctor/medications/${id}`, { method: 'PUT', body: vaultBody(payload) });
+      setMedications((prev) => prev.map((m) => (m.id === id ? updated : m)));
+      showToast('Medication updated.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to update medication.', 'error'); throw e; }
+  };
+  const deleteMedication = async (id) => {
+    try {
+      await fetchWithAuth(`/api/doctor/medications/${id}`, { method: 'DELETE', body: vaultBody({}) });
+      setMedications((prev) => prev.filter((m) => m.id !== id));
+      showToast('Medication removed.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to remove medication.', 'error'); }
+  };
+
   const handleDownloadPDF = () => {
-    const records = patient.medicalRecords;
-    if (!records || records.length === 0) {
-      return showToast("No records to download.", "error");
+    const records = patient.medicalRecords || [];
+    if (records.length === 0 && allergies.length === 0 && medications.length === 0) {
+      return showToast("No data to download.", "error");
     }
     const doc = new jsPDF();
     doc.setFontSize(22);
@@ -26,8 +77,32 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
     doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 38);
     doc.text(`Patient File: ${patient.firstName} ${patient.lastName}`, 14, 48);
     doc.text(`Attending Physician: Dr. ${doctorData.firstName} ${doctorData.lastName} (${doctorData.specialty})`, 14, 54);
+
+    let cursorY = 62;
+    if (allergies.length > 0) {
+      autoTable(doc, {
+        startY: cursorY,
+        head: [["Allergy", "Reaction", "Severity"]],
+        body: allergies.map(a => [a.substance, a.reaction || "—", a.severity]),
+        theme: 'grid',
+        headStyles: { fillColor: [192, 57, 43], textColor: [255, 255, 255] },
+        styles: { fontSize: 9, cellPadding: 3 },
+      });
+      cursorY = doc.lastAutoTable.finalY + 6;
+    }
+    if (medications.length > 0) {
+      autoTable(doc, {
+        startY: cursorY,
+        head: [["Medication", "Dosage", "Frequency"]],
+        body: medications.map(m => [m.name, m.dosage || "—", m.frequency || "—"]),
+        theme: 'grid',
+        headStyles: { fillColor: [91, 79, 230], textColor: [255, 255, 255] },
+        styles: { fontSize: 9, cellPadding: 3 },
+      });
+      cursorY = doc.lastAutoTable.finalY + 6;
+    }
     autoTable(doc, {
-      startY: 62,
+      startY: cursorY,
       head: [["Date", "Diagnosis", "Treatment Plan", "Attending Dr.", "Clinical Notes"]],
       body: records.map(record => [
         new Date(record.createdAt).toLocaleDateString(),
@@ -110,6 +185,27 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
       </Box>
 
       <Box sx={{ p: 3 }}>
+        {/* Allergies & current medications — always shared for patient safety */}
+        <Box sx={{
+          backgroundColor: 'rgba(231, 76, 60, 0.05)', border: '1px solid rgba(231, 76, 60, 0.2)',
+          borderRadius: '10px', p: 2.5, mb: 3,
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <HealthAndSafetyOutlinedIcon sx={{ fontSize: 22, color: '#c0392b' }} />
+            <Typography sx={{ fontWeight: 700, color: '#c0392b' }}>Allergies &amp; Current Medications</Typography>
+          </Box>
+          <HealthLists
+            allergies={allergies}
+            medications={medications}
+            onAddAllergy={addAllergy}
+            onUpdateAllergy={updateAllergy}
+            onDeleteAllergy={deleteAllergy}
+            onAddMedication={addMedication}
+            onUpdateMedication={updateMedication}
+            onDeleteMedication={deleteMedication}
+          />
+        </Box>
+
         {/* Shared records */}
         <Typography variant="h6" sx={{ color: 'var(--dark-text)', mb: 2 }}>
           Patient History

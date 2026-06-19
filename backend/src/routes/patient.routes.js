@@ -3,9 +3,23 @@ const router = express.Router();
 
 const prisma = require('../config/prisma');
 const authenticateToken = require('../middleware/authenticate');
+const validate = require('../middleware/validate');
 const { getDecryptedRecords, generateAccessCode } = require('../services/vault.service');
 const { revokeVaultAccess } = require('../services/vaultRevocations');
+const { allergySchema, medicationSchema } = require('../schemas/health.schema');
+const health = require('../services/health.service');
 const { decrypt } = require('../../utils/cipher');
+
+// Resolve the authenticated patient's profile id (or null). Used by the
+// self-service allergy/medication endpoints so a patient can only ever touch
+// their own data.
+async function getPatientId(userId) {
+    const patient = await prisma.patient.findUnique({
+        where: { userId },
+        select: { id: true }
+    });
+    return patient ? patient.id : null;
+}
 
 // GET /api/patient/dashboard
 router.get('/dashboard', authenticateToken, async (req, res) => {
@@ -33,6 +47,11 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         // Fetch decrypted, paginated records via service
         const { records, total } = await getDecryptedRecords(patientData.id, page, limit);
         patientData.medicalRecords = records;
+
+        // Allergies and current medications are small, patient-level lists —
+        // always returned in full (decrypted), not paginated.
+        patientData.allergies = await health.getDecryptedAllergies(patientData.id);
+        patientData.medications = await health.getDecryptedMedications(patientData.id);
 
         if (patientData.accessCode) {
             patientData.accessCode.code = decrypt(patientData.accessCode.code);
@@ -87,6 +106,108 @@ router.post('/revoke-access', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to revoke access." });
+    }
+});
+
+// ── Allergies (patient self-service) ─────────────────────────────────────────
+
+// POST /api/patient/allergies
+router.post('/allergies', authenticateToken, validate(allergySchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const { substance, reaction, severity } = req.body;
+        const allergy = await health.createAllergy({ patientId, substance, reaction, severity });
+        res.status(201).json(allergy);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to add allergy." });
+    }
+});
+
+// PUT /api/patient/allergies/:id
+router.put('/allergies/:id', authenticateToken, validate(allergySchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const { substance, reaction, severity } = req.body;
+        const allergy = await health.updateAllergy({ id: req.params.id, patientId, substance, reaction, severity });
+        if (!allergy) return res.status(404).json({ error: "Allergy not found." });
+        res.json(allergy);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update allergy." });
+    }
+});
+
+// DELETE /api/patient/allergies/:id
+router.delete('/allergies/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const deleted = await health.deleteAllergy({ id: req.params.id, patientId });
+        if (!deleted) return res.status(404).json({ error: "Allergy not found." });
+        res.json({ message: "Allergy removed." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to remove allergy." });
+    }
+});
+
+// ── Medications (patient self-service) ────────────────────────────────────────
+
+// POST /api/patient/medications
+router.post('/medications', authenticateToken, validate(medicationSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const { name, dosage, frequency } = req.body;
+        const medication = await health.createMedication({ patientId, name, dosage, frequency });
+        res.status(201).json(medication);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to add medication." });
+    }
+});
+
+// PUT /api/patient/medications/:id
+router.put('/medications/:id', authenticateToken, validate(medicationSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const { name, dosage, frequency } = req.body;
+        const medication = await health.updateMedication({ id: req.params.id, patientId, name, dosage, frequency });
+        if (!medication) return res.status(404).json({ error: "Medication not found." });
+        res.json(medication);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update medication." });
+    }
+});
+
+// DELETE /api/patient/medications/:id
+router.delete('/medications/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const deleted = await health.deleteMedication({ id: req.params.id, patientId });
+        if (!deleted) return res.status(404).json({ error: "Medication not found." });
+        res.json({ message: "Medication removed." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to remove medication." });
     }
 });
 

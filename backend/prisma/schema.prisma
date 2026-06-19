@@ -18,6 +18,12 @@ enum AppointmentStatus {
   CANCELLED
 }
 
+enum AllergySeverity {
+  MILD
+  MODERATE
+  SEVERE
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -53,6 +59,8 @@ model Patient {
 
   appointments   Appointment[]
   medicalRecords MedicalRecord[]
+  allergies      Allergy[]
+  medications    Medication[]
 }
 
 model Doctor {
@@ -94,6 +102,34 @@ model MedicalRecord {
   
   doctorId    String
   doctor      Doctor   @relation(fields: [doctorId], references: [id])
+}
+
+// Patient-level allergy. Sensitive text fields (substance, reaction) are stored
+// encrypted at rest, like MedicalRecord. Severity is a plaintext enum so it stays
+// queryable and is not patient-identifying on its own.
+model Allergy {
+  id        String          @id @default(uuid())
+  substance String
+  reaction  String?
+  severity  AllergySeverity @default(MODERATE)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  patientId String
+  patient   Patient         @relation(fields: [patientId], references: [id])
+}
+
+// Patient-level current medication. Text fields are stored encrypted at rest.
+model Medication {
+  id        String   @id @default(uuid())
+  name      String
+  dosage    String?
+  frequency String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id])
 }
 
 model AccessCode {

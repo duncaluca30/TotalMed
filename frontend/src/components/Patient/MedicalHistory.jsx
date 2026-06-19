@@ -11,9 +11,11 @@ const MedicalHistory = () => {
   const showToast = useToast();
 
   const handleDownloadPDF = () => {
-    const recordsToPrint = patientData.medicalRecords;
-    if (!recordsToPrint || recordsToPrint.length === 0) {
-      return showToast("No records to download.", "error");
+    const recordsToPrint = patientData.medicalRecords || [];
+    const allergies = patientData.allergies || [];
+    const medications = patientData.medications || [];
+    if (recordsToPrint.length === 0 && allergies.length === 0 && medications.length === 0) {
+      return showToast("No data to download.", "error");
     }
     const doc = new jsPDF();
     doc.setFontSize(22);
@@ -25,16 +27,38 @@ const MedicalHistory = () => {
     doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 38);
     
     doc.text(`Patient File: ${patientData.firstName} ${patientData.lastName}`, 14, 48);
-    
-    const startY = 55;
+
+    let startY = 55;
+    if (allergies.length > 0) {
+      autoTable(doc, {
+        startY,
+        head: [["Allergy", "Reaction", "Severity"]],
+        body: allergies.map(a => [a.substance, a.reaction || "—", a.severity]),
+        theme: 'grid',
+        headStyles: { fillColor: [192, 57, 43], textColor: [255, 255, 255] },
+        styles: { fontSize: 9, cellPadding: 3 },
+      });
+      startY = doc.lastAutoTable.finalY + 6;
+    }
+    if (medications.length > 0) {
+      autoTable(doc, {
+        startY,
+        head: [["Medication", "Dosage", "Frequency"]],
+        body: medications.map(m => [m.name, m.dosage || "—", m.frequency || "—"]),
+        theme: 'grid',
+        headStyles: { fillColor: [91, 79, 230], textColor: [255, 255, 255] },
+        styles: { fontSize: 9, cellPadding: 3 },
+      });
+      startY = doc.lastAutoTable.finalY + 6;
+    }
     const tableColumn = ["Date", "Diagnosis", "Treatment Plan", "Attending Dr.", "Clinical Notes"];
     const tableRows = [];
     recordsToPrint.forEach(record => {
       tableRows.push([
-        new Date(record.createdAt).toLocaleDateString(), 
-        record.diagnosis, 
-        record.treatment || "N/A", 
-        `Dr. ${record.doctor?.lastName || 'Unknown'}`, 
+        new Date(record.createdAt).toLocaleDateString(),
+        record.diagnosis,
+        record.treatment || "N/A",
+        `Dr. ${record.doctor?.lastName || 'Unknown'}`,
         record.notes || "None"
       ]);
     });

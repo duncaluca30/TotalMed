@@ -8,7 +8,10 @@ const { generateRegistrationOptions, verifyRegistrationResponse,
 
 const prisma = require('../config/prisma');
 const { encrypt, decrypt } = require('../../utils/cipher');
-const { sendOTPEmail, sendSecurityAlertEmail } = require('../../utils/mailer');
+const { sendOTPEmail, sendSecurityAlertEmail, sendPasswordResetEmail } = require('../../utils/mailer');
+
+// Tokens are emailed in the clear (in the link) but stored only as a SHA-256 hash.
+const hashResetToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
 /**
  * Register a new patient user.
@@ -426,6 +429,64 @@ async function verifyWebAuthnAuthentication(userId, response, origin) {
 }
 
 /**
+ * Begin a password reset. Always resolves without revealing whether the email
+ * exists (to avoid account enumeration). If it does, a one-time token is stored
+ * (hashed) and a reset link is emailed.
+ */
+async function requestPasswordReset(email, baseUrl) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return; // Silent — don't disclose that the email is unregistered.
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 30 * 60000); // 30 minutes
+
+    await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordResetToken: hashResetToken(rawToken), passwordResetExpiresAt: expiresAt }
+    });
+
+    const resetUrl = `${baseUrl.replace(/\/$/, '')}/reset-password?token=${rawToken}`;
+    await sendPasswordResetEmail(user.email, resetUrl);
+}
+
+/**
+ * Complete a password reset using the emailed token. Throws on an invalid or
+ * expired token. Clears the token so it can't be reused.
+ */
+async function resetPassword(token, newPassword) {
+    if (!token) {
+        const error = new Error("Invalid or expired reset link.");
+        error.status = 400;
+        throw error;
+    }
+
+    const user = await prisma.user.findFirst({
+        where: {
+            passwordResetToken: hashResetToken(token),
+            passwordResetExpiresAt: { gt: new Date() }
+        }
+    });
+
+    if (!user) {
+        const error = new Error("Invalid or expired reset link. Please request a new one.");
+        error.status = 400;
+        throw error;
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+        where: { id: user.id },
+        data: {
+            password: hashedPassword,
+            passwordResetToken: null,
+            passwordResetExpiresAt: null
+        }
+    });
+}
+
+/**
  * Sign a JWT for a user.
  */
 function signUserToken(user) {
@@ -455,6 +516,8 @@ module.exports = {
     verifyWebAuthnRegistration,
     generateWebAuthnAuthentication,
     verifyWebAuthnAuthentication,
+    requestPasswordReset,
+    resetPassword,
     signUserToken,
     setAuthCookie
 };

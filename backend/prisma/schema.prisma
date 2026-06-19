@@ -49,6 +49,11 @@ model User {
   emailOtpExpiresAt  DateTime?
   webAuthnChallenge  String?
 
+  // Password reset: we store only the SHA-256 hash of the emailed token, so a DB
+  // leak can't be used to reset accounts.
+  passwordResetToken     String?
+  passwordResetExpiresAt DateTime?
+
   lastLoginIp       String?
   lastLoginDevice   String?
 

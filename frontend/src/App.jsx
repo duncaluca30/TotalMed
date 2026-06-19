@@ -5,6 +5,8 @@ import { ToastProvider } from './hooks/useToast';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
+import ForgotPasswordForm from './components/Auth/ForgotPasswordForm';
+import ResetPasswordForm from './components/Auth/ResetPasswordForm';
 import PatientLayout from './components/Patient/PatientLayout';
 import PatientDashboard from './components/Patient/PatientDashboard';
 import MedicalHistory from './components/Patient/MedicalHistory';
@@ -22,6 +24,8 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginForm />} />
           <Route path="/register" element={<RegisterForm />} />
+          <Route path="/forgot-password" element={<ForgotPasswordForm />} />
+          <Route path="/reset-password" element={<ResetPasswordForm />} />
           
           <Route 
             path="/patient" 

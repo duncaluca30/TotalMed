@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, TextField, Box, List, ListItem, ListItemText, Checkbox, Button } from '@mui/material';
+import { filterRecords } from '../../utils/recordSearch';
 
 const AuthRequestDialog = ({ authRequest, patientData, onClose, socket }) => {
   const [popupSearch, setPopupSearch] = useState('');
@@ -23,14 +24,13 @@ const AuthRequestDialog = ({ authRequest, patientData, onClose, socket }) => {
         <Typography sx={{ mb: 2, color: '#2d3436' }}>
           Please select the specific medical records you wish to share with this physician.
         </Typography>
-        <TextField 
-          fullWidth size="small" label="Filter Diagnostics..." variant="outlined" 
-          value={popupSearch} onChange={(e) => setPopupSearch(e.target.value)} sx={{ mb: 2 }} 
+        <TextField
+          fullWidth size="small" label="Search by diagnosis, treatment, notes, doctor or date…" variant="outlined"
+          value={popupSearch} onChange={(e) => setPopupSearch(e.target.value)} sx={{ mb: 2 }}
         />
         <Box sx={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #dfe6e9', borderRadius: '4px' }}>
           <List>
-            {(patientData?.medicalRecords || [])
-            .filter(record => record.diagnosis.toLowerCase().includes(popupSearch.toLowerCase()))
+            {filterRecords(patientData?.medicalRecords || [], popupSearch)
             .map((record) => {
                 const isChecked = selectedRecordIds.includes(record.id);
                 return (

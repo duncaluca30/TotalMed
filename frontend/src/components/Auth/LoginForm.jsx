@@ -221,7 +221,10 @@ const LoginForm = () => {
         )}
 
         {!requires2FA && (
-          <div style={{ marginTop: '20px', textAlign: 'center' }}>
+          <div style={{ marginTop: '16px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <Button component={Link} to="/forgot-password" variant="text" sx={{ textTransform: 'none', color: '#5b4fe6' }}>
+              Forgot your password?
+            </Button>
             <Button component={Link} to="/register" variant="text" sx={{ textTransform: 'none', color: '#636e72' }}>
               New patient? Sign up here
             </Button>

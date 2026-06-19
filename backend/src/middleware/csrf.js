@@ -35,6 +35,8 @@ const EXEMPT_ROUTES = [
     '/api/auth/login',
     '/api/auth/register',
     '/api/auth/logout',
+    '/api/auth/forgot-password',
+    '/api/auth/reset-password',
     '/api/auth/2fa/send-email',
     '/api/auth/2fa/validate',
     '/api/auth/webauthn/generate-authentication',

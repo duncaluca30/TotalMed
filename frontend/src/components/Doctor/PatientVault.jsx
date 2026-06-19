@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
-import { Box, Typography, Button, TextField } from '@mui/material';
+import { Box, Typography, Button, TextField, InputAdornment } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import HealthAndSafetyOutlinedIcon from '@mui/icons-material/HealthAndSafetyOutlined';
+import SearchIcon from '@mui/icons-material/Search';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 import HealthLists from '../Health/HealthLists';
 import GynecologySection from '../Health/GynecologySection';
+import { filterRecords } from '../../utils/recordSearch';
 
 const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) => {
   const [newRecord, setNewRecord] = useState({ diagnosis: '', treatment: '', notes: '' });
+  const [recordSearch, setRecordSearch] = useState('');
   const [allergies, setAllergies] = useState(patient.allergies || []);
   const [medications, setMedications] = useState(patient.medications || []);
   const [births, setBirths] = useState(patient.births || []);
@@ -202,6 +205,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
   };
 
   const records = patient.medicalRecords || [];
+  const visibleRecords = filterRecords(records, recordSearch);
 
   return (
     <div className="card card--vault" style={{ marginTop: '30px', padding: 0, overflow: 'hidden' }}>
@@ -280,8 +284,18 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
           </Typography>
         </Typography>
 
+        {records.length > 0 && (
+          <TextField
+            fullWidth size="small" placeholder="Search by diagnosis, treatment, notes, doctor or date…"
+            value={recordSearch} onChange={(e) => setRecordSearch(e.target.value)}
+            sx={{ mb: 2 }}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+          />
+        )}
+
         {records.length > 0 ? (
-          records.map(record => (
+          visibleRecords.length > 0 ? (
+          visibleRecords.map(record => (
             <div key={record.id} className="card card--record" style={{ marginBottom: '12px', boxShadow: 'none' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: '6px' }}>
                 <h4 style={{ margin: 0 }}>{record.diagnosis}</h4>
@@ -292,6 +306,11 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
               {record.notes && <div className="record-notes">"{record.notes}"</div>}
             </div>
           ))
+          ) : (
+            <Typography sx={{ color: 'var(--light-text)', fontStyle: 'italic', py: 2 }}>
+              No shared records match "{recordSearch}".
+            </Typography>
+          )
         ) : (
           <Box sx={{
             textAlign: 'center', py: 4, px: 2,

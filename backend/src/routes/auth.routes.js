@@ -4,7 +4,7 @@ const router = express.Router();
 const authenticateToken = require('../middleware/authenticate');
 const { authLimiter, twoFactorLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
-const { registerSchema, loginSchema } = require('../schemas/auth.schema');
+const { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } = require('../schemas/auth.schema');
 const { generateCsrfToken, setCsrfCookie } = require('../middleware/csrf');
 
 const {
@@ -18,6 +18,8 @@ const {
     verifyWebAuthnRegistration,
     generateWebAuthnAuthentication,
     verifyWebAuthnAuthentication,
+    requestPasswordReset,
+    resetPassword,
     signUserToken,
     setAuthCookie
 } = require('../services/auth.service');
@@ -152,6 +154,36 @@ router.post('/webauthn/verify-authentication', async (req, res) => {
     } catch (error) {
         console.error("🚨 AUTH VERIFY ERROR:", error);
         res.status(error.status || 500).json({ error: error.message || "Failed to verify biometrics." });
+    }
+});
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), async (req, res) => {
+    try {
+        // Build a base URL that points at the frontend. In production the backend
+        // serves the SPA from the same origin, so the request origin/host works;
+        // FRONTEND_URL overrides it when the two are deployed separately.
+        const baseUrl = process.env.FRONTEND_URL
+            || req.headers.origin
+            || `${req.protocol}://${req.get('host')}`;
+        await requestPasswordReset(req.body.email, baseUrl);
+        // Always succeed — never reveal whether the email is registered.
+        res.json({ message: "If an account exists for that email, a reset link has been sent." });
+    } catch (error) {
+        console.error("🚨 FORGOT PASSWORD ERROR:", error);
+        // Still respond generically so failures don't leak account existence.
+        res.json({ message: "If an account exists for that email, a reset link has been sent." });
+    }
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', authLimiter, validate(resetPasswordSchema), async (req, res) => {
+    try {
+        await resetPassword(req.body.token, req.body.password);
+        res.json({ message: "Password updated. You can now sign in with your new password." });
+    } catch (error) {
+        console.error("🚨 RESET PASSWORD ERROR:", error);
+        res.status(error.status || 500).json({ error: error.message || "Failed to reset password." });
     }
 });
 

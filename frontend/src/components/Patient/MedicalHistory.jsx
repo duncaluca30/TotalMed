@@ -1,14 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Box, Button } from '@mui/material';
+import { Box, Button, TextField, InputAdornment } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import SearchIcon from '@mui/icons-material/Search';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useToast } from '../../hooks/useToast';
+import { filterRecords } from '../../utils/recordSearch';
 
 const MedicalHistory = () => {
   const { patientData, pagination, fetchMoreRecords, loadingMore } = useOutletContext();
   const showToast = useToast();
+  const [search, setSearch] = useState('');
+
+  const visibleRecords = filterRecords(patientData.medicalRecords, search);
 
   const handleDownloadPDF = () => {
     const recordsToPrint = patientData.medicalRecords || [];
@@ -96,9 +101,19 @@ const MedicalHistory = () => {
         <h3 style={{ margin: 0 }}>Your medical history</h3>
         <Button variant="contained" startIcon={<PictureAsPdfIcon />} onClick={handleDownloadPDF}>Download PDF</Button>
       </Box>
-      
+
+      {patientData.medicalRecords && patientData.medicalRecords.length > 0 && (
+        <TextField
+          fullWidth size="small" placeholder="Search by diagnosis, treatment, notes, doctor or date…"
+          value={search} onChange={(e) => setSearch(e.target.value)}
+          sx={{ mb: 2 }}
+          InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+        />
+      )}
+
       {patientData.medicalRecords && patientData.medicalRecords.length > 0 ? (
-        patientData.medicalRecords.map((record) => (
+        visibleRecords.length > 0 ? (
+        visibleRecords.map((record) => (
           <div key={record.id} className="card card--record" style={{ marginBottom: '15px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
               <h4 style={{ margin: 0 }}>{record.diagnosis}</h4>
@@ -109,6 +124,9 @@ const MedicalHistory = () => {
             {record.notes && <div className="record-notes">"{record.notes}"</div>}
           </div>
         ))
+        ) : (
+          <p className="text-muted" style={{ fontStyle: 'italic' }}>No records match "{search}".</p>
+        )
       ) : (
         <p className="text-muted" style={{ fontStyle: 'italic' }}>Your medical vault is currently empty.</p>
       )}

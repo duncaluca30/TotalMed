@@ -79,4 +79,45 @@ const sendSecurityAlertEmail = async (targetEmail, location, deviceString) => {
     }
 };
 
-module.exports = { sendOTPEmail, sendSecurityAlertEmail };
+const sendPasswordResetEmail = async (targetEmail, resetUrl) => {
+    try {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'api-key': process.env.BREVO_API_KEY,
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                sender: { name: "TotalMed Security", email: "duncaluca@gmail.com" },
+                to: [{ email: targetEmail }],
+                subject: '🔑 Reset your TotalMed password',
+                htmlContent: `
+                    <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #dfe6e9; padding: 20px; border-radius: 8px;">
+                        <h2 style="color: #5b4fe6; text-align: center;">TotalMed Password Reset</h2>
+                        <p>We received a request to reset the password for your TotalMed account. Click the button below to choose a new password:</p>
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${resetUrl}" style="display: inline-block; background-color: #5b4fe6; color: #ffffff; text-decoration: none; font-weight: bold; padding: 12px 28px; border-radius: 8px;">
+                                Reset Password
+                            </a>
+                        </div>
+                        <p style="color: #636e72; font-size: 0.85em;">This link expires in 30 minutes. If you didn't request a reset, you can safely ignore this email — your password will stay the same.</p>
+                        <p style="color: #b2bec3; font-size: 0.75em; word-break: break-all;">If the button doesn't work, paste this link into your browser:<br/>${resetUrl}</p>
+                    </div>
+                `
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(JSON.stringify(errorData));
+        }
+
+        console.log(`✅ Password reset email sent via Brevo API to ${targetEmail}`);
+    } catch (error) {
+        console.error("🚨 BREVO RESET ERROR:", error);
+        throw error;
+    }
+};
+
+module.exports = { sendOTPEmail, sendSecurityAlertEmail, sendPasswordResetEmail };

@@ -117,15 +117,19 @@ const DoctorDashboard = () => {
         />
       )}
 
-      <SecurityCard
-        isTwoFactorEnabled={doctorData?.user?.isTwoFactorEnabled}
-        passkeys={doctorData?.user?.passkeys || []}
-        onTwoFactorEnabled={() => setDoctorData({ ...doctorData, user: { ...doctorData.user, isTwoFactorEnabled: true } })}
-        onPasskeyAdded={() => setDoctorData({
-          ...doctorData,
-          user: { ...doctorData.user, passkeys: [...(doctorData.user?.passkeys || []), { id: `local-${Date.now()}`, deviceType: 'platform' }] },
-        })}
-      />
+      {/* Hide the doctor's own 2FA/biometric settings while a patient vault is open,
+          so account-security controls aren't mixed in with the patient's file. */}
+      {!unlockedPatient && (
+        <SecurityCard
+          isTwoFactorEnabled={doctorData?.user?.isTwoFactorEnabled}
+          passkeys={doctorData?.user?.passkeys || []}
+          onTwoFactorEnabled={() => setDoctorData({ ...doctorData, user: { ...doctorData.user, isTwoFactorEnabled: true } })}
+          onPasskeyAdded={() => setDoctorData({
+            ...doctorData,
+            user: { ...doctorData.user, passkeys: [...(doctorData.user?.passkeys || []), { id: `local-${Date.now()}`, deviceType: 'platform' }] },
+          })}
+        />
+      )}
     </>
   );
 };

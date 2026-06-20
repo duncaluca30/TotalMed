@@ -20,6 +20,7 @@ async function buildFhirBundle(patientId) {
     const medications = await health.getDecryptedMedications(patientId);
     const appointments = await health.getDecryptedAppointments(patientId);
     const births = await health.getBirths(patientId);
+    const vitals = await health.getVitalSigns(patientId);
 
     const entries = [];
 
@@ -100,6 +101,20 @@ async function buildFhirBundle(patientId) {
                 subject: { reference: `Patient/${patient.id}` },
                 code: { text: 'Birth' },
                 valueString: `${b.modality}${b.year ? ` (${b.year})` : ''}`
+            }
+        });
+    }
+
+    for (const v of vitals) {
+        entries.push({
+            resource: {
+                resourceType: 'Observation',
+                id: v.id,
+                status: 'final',
+                subject: { reference: `Patient/${patient.id}` },
+                code: { text: v.type },
+                effectiveDateTime: v.measuredAt,
+                valueString: `${v.value2 != null ? `${v.value}/${v.value2}` : v.value} ${v.unit}`
             }
         });
     }

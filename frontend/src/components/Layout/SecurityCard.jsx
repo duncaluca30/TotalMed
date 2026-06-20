@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Box, Typography, Button, TextField } from '@mui/material';
+import { Box, Typography, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import FingerprintIcon from '@mui/icons-material/Fingerprint';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import KeyOutlinedIcon from '@mui/icons-material/KeyOutlined';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import DevicesOutlinedIcon from '@mui/icons-material/DevicesOutlined';
 import { startRegistration } from '@simplewebauthn/browser';
 import { fetchWithAuth, setCsrfToken } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
@@ -48,6 +50,42 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
   const [pwOpen, setPwOpen] = useState(false);
   const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
   const [savingPw, setSavingPw] = useState(false);
+
+  const [backupCodes, setBackupCodes] = useState(null);
+  const [generatingCodes, setGeneratingCodes] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleGenerateBackupCodes = async () => {
+    setGeneratingCodes(true);
+    try {
+      const data = await fetchWithAuth('/api/auth/2fa/backup-codes', { method: 'POST' });
+      setBackupCodes(data.codes || []);
+    } catch (err) {
+      showToast(err.message || 'Failed to generate backup codes.', 'error');
+    } finally { setGeneratingCodes(false); }
+  };
+
+  const handleDownloadCodes = () => {
+    const blob = new Blob([
+      `TotalMed backup codes\nGenerated: ${new Date().toLocaleString()}\n\n${backupCodes.join('\n')}\n\nEach code works once. Keep them somewhere safe.`,
+    ], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'totalmed-backup-codes.txt';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSignOutEverywhere = async () => {
+    setSigningOut(true);
+    try {
+      const data = await fetchWithAuth('/api/auth/logout-all', { method: 'POST' });
+      if (data?.csrfToken) setCsrfToken(data.csrfToken);
+      showToast('Signed out of all other devices.', 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to sign out other devices.', 'error');
+    } finally { setSigningOut(false); }
+  };
 
   const hasPasskeys = passkeys.length > 0;
   const twoFactorActive = isTwoFactorEnabled;
@@ -223,6 +261,51 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
           </Box>
         </Box>
       )}
+
+      <hr className="section-divider" />
+
+      {/* ---- Backup codes ---- */}
+      <SectionHeader
+        icon={<RestartAltIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />}
+        title="Backup codes"
+      />
+      <p className="text-muted">Single-use codes to sign in if you lose access to your other methods.</p>
+      <Button variant="outlined" onClick={handleGenerateBackupCodes} disabled={generatingCodes} sx={{ mt: 1, textTransform: 'none' }}>
+        {generatingCodes ? 'Generating…' : 'Generate backup codes'}
+      </Button>
+
+      <hr className="section-divider" />
+
+      {/* ---- Active sessions ---- */}
+      <SectionHeader
+        icon={<DevicesOutlinedIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />}
+        title="Active sessions"
+      />
+      <p className="text-muted">Sign out everywhere else if you used a shared or lost device. This device stays signed in.</p>
+      <Button variant="outlined" color="error" onClick={handleSignOutEverywhere} disabled={signingOut} sx={{ mt: 1, textTransform: 'none' }}>
+        {signingOut ? 'Signing out…' : 'Sign out of all other devices'}
+      </Button>
+
+      {/* Backup codes shown once after generation */}
+      <Dialog open={!!backupCodes} onClose={() => setBackupCodes(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Your backup codes</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: '0.9rem', color: '#636e72', mb: 2 }}>
+            Save these now — they won't be shown again. Each code works once.
+          </Typography>
+          <Box sx={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1,
+            fontFamily: 'monospace', fontSize: '1rem',
+            backgroundColor: '#f8f9fa', borderRadius: '8px', p: 2,
+          }}>
+            {(backupCodes || []).map((c) => <span key={c}>{c}</span>)}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleDownloadCodes} sx={{ textTransform: 'none' }}>Download .txt</Button>
+          <Button onClick={() => setBackupCodes(null)} variant="contained" sx={{ textTransform: 'none', backgroundColor: '#5b4fe6' }}>Done</Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };

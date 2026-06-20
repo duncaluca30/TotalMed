@@ -186,8 +186,46 @@ async function authenticateUser(email, password, req) {
     const availableMethods = ['EMAIL'];
     if (user.isTwoFactorEnabled) availableMethods.push('APP');
     if (user.passkeys && user.passkeys.length > 0) availableMethods.push('BIOMETRICS');
+    if (user.twoFactorBackupCodes && user.twoFactorBackupCodes.length > 0) availableMethods.push('BACKUP');
 
     return { user, availableMethods };
+}
+
+/**
+ * Generate a fresh set of 10 single-use backup codes. The plaintext is returned
+ * once (to show the user); only SHA-256 hashes are stored. Replaces any existing
+ * codes.
+ */
+async function generateBackupCodes(userId) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+        const error = new Error("User not found.");
+        error.status = 404;
+        throw error;
+    }
+
+    // 10 codes, each 10 hex chars. Displayed grouped as XXXXX-XXXXX for
+    // readability, but hashed/compared in canonical no-dash form so the dash is
+    // optional on input.
+    const raws = Array.from({ length: 10 }, () => crypto.randomBytes(5).toString('hex'));
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: { twoFactorBackupCodes: raws.map(hashToken) }
+    });
+
+    return raws.map((raw) => `${raw.slice(0, 5)}-${raw.slice(5)}`);
+}
+
+/**
+ * Invalidate every existing session for a user by advancing sessionValidAfter.
+ * The caller re-issues a token for the current device so it stays logged in.
+ */
+async function logoutAll(userId) {
+    await prisma.user.update({
+        where: { id: userId },
+        data: { sessionValidAfter: new Date() }
+    });
 }
 
 /**
@@ -257,6 +295,20 @@ async function validate2FA(userId, token, method) {
             throw error;
         }
         isValid = await bcrypt.compare(token, user.emailOtpCode);
+    } else if (method === 'BACKUP') {
+        // Canonicalise to lowercase no-dash, so the dash and case are optional.
+        const canonical = (token || '').toString().trim().toLowerCase().replace(/[\s-]/g, '');
+        const stored = user.twoFactorBackupCodes || [];
+        const candidateHash = hashToken(canonical);
+        const matchHash = stored.includes(candidateHash) ? candidateHash : null;
+        if (matchHash) {
+            isValid = true;
+            // Consume the used code so it can never be replayed.
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { twoFactorBackupCodes: stored.filter((h) => h !== matchHash) }
+            });
+        }
     }
 
     if (!isValid) {
@@ -633,6 +685,8 @@ module.exports = {
     requestPasswordReset,
     resetPassword,
     changePassword,
+    generateBackupCodes,
+    logoutAll,
     signUserToken,
     setAuthCookie
 };

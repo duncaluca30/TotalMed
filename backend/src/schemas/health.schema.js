@@ -34,6 +34,14 @@ const appointmentFields = {
   reason: z.string().max(500, 'Note too long (max 500 chars)').optional().nullable()
 };
 
+const vitalFields = {
+  type: z.enum(['BLOOD_PRESSURE', 'WEIGHT', 'GLUCOSE', 'HEART_RATE', 'TEMPERATURE']),
+  value: z.coerce.number().finite('Value must be a number'),
+  value2: z.coerce.number().finite().optional().nullable(),
+  unit: z.string().min(1, 'Unit is required').max(20, 'Unit too long'),
+  measuredAt: z.string().min(1, 'Measurement date is required')
+};
+
 // Doctor-side requests carry the active vault session + the target patient.
 const vaultFields = {
   patientId: z.string().uuid('Invalid patient ID format'),
@@ -45,12 +53,14 @@ const medicationSchema = z.object(medicationFields);
 const birthSchema = z.object(birthFields);
 const patientProfileSchema = z.object(patientProfileFields);
 const appointmentSchema = z.object(appointmentFields);
+const vitalSchema = z.object(vitalFields);
 
 const doctorAllergySchema = z.object({ ...allergyFields, ...vaultFields });
 const doctorMedicationSchema = z.object({ ...medicationFields, ...vaultFields });
 const doctorBirthSchema = z.object({ ...birthFields, ...vaultFields });
 const doctorPatientProfileSchema = z.object({ ...patientProfileFields, ...vaultFields });
 const doctorAppointmentSchema = z.object({ ...appointmentFields, ...vaultFields });
+const doctorVitalSchema = z.object({ ...vitalFields, ...vaultFields });
 
 module.exports = {
   allergySchema,
@@ -58,9 +68,11 @@ module.exports = {
   birthSchema,
   patientProfileSchema,
   appointmentSchema,
+  vitalSchema,
   doctorAllergySchema,
   doctorMedicationSchema,
   doctorBirthSchema,
   doctorPatientProfileSchema,
-  doctorAppointmentSchema
+  doctorAppointmentSchema,
+  doctorVitalSchema
 };

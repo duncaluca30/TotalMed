@@ -263,7 +263,42 @@ async function deleteAppointment({ id, patientId }) {
     return result.count > 0;
 }
 
+// ── Vital signs ──────────────────────────────────────────────────────────────
+// Numeric measurements — stored as plain typed columns (non-identifying and
+// needed for charting), so no encryption, unlike the free-text health fields.
+
+/** Fetch a patient's vital signs, oldest first (chart-friendly ordering). */
+function getVitalSigns(patientId) {
+    return prisma.vitalSign.findMany({
+        where: { patientId },
+        orderBy: { measuredAt: 'asc' }
+    });
+}
+
+/** Create a vital-sign measurement. */
+function createVitalSign({ patientId, type, value, value2, unit, measuredAt }) {
+    return prisma.vitalSign.create({
+        data: {
+            patientId,
+            type,
+            value,
+            value2: value2 ?? null,
+            unit,
+            measuredAt: new Date(measuredAt)
+        }
+    });
+}
+
+/** Delete a vital sign scoped to its owning patient. Returns true if deleted. */
+async function deleteVitalSign({ id, patientId }) {
+    const result = await prisma.vitalSign.deleteMany({ where: { id, patientId } });
+    return result.count > 0;
+}
+
 module.exports = {
+    getVitalSigns,
+    createVitalSign,
+    deleteVitalSign,
     decryptAllergies,
     getDecryptedAllergies,
     createAllergy,

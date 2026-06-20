@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Typography, Button, TextField, InputAdornment } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import MinimizeIcon from '@mui/icons-material/Minimize';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import HealthAndSafetyOutlinedIcon from '@mui/icons-material/HealthAndSafetyOutlined';
 import SearchIcon from '@mui/icons-material/Search';
@@ -11,10 +12,12 @@ import { useToast } from '../../hooks/useToast';
 import HealthLists from '../Health/HealthLists';
 import GynecologySection from '../Health/GynecologySection';
 import AppointmentReminders from '../Health/AppointmentReminders';
+import VitalSigns from '../Health/VitalSigns';
 import RecordAttachments from '../Health/RecordAttachments';
+import RecordAmendments from '../Health/RecordAmendments';
 import { filterRecords } from '../../utils/recordSearch';
 
-const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) => {
+const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, onMinimize }) => {
   const [newRecord, setNewRecord] = useState({ diagnosis: '', treatment: '', notes: '' });
   const [recordSearch, setRecordSearch] = useState('');
   const [records, setRecords] = useState(patient.medicalRecords || []);
@@ -22,6 +25,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
   const [medications, setMedications] = useState(patient.medications || []);
   const [births, setBirths] = useState(patient.births || []);
   const [appointments, setAppointments] = useState(patient.appointments || []);
+  const [vitalSigns, setVitalSigns] = useState(patient.vitalSigns || []);
   const [profile, setProfile] = useState({
     sex: patient.sex || null,
     menarcheDate: patient.menarcheDate || null,
@@ -129,6 +133,14 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
     } catch (e) { showToast(e.message || 'Failed to remove appointment.', 'error'); }
   };
 
+  const addVital = async (payload) => {
+    try {
+      const created = await fetchWithAuth('/api/doctor/vitals', { method: 'POST', body: vaultBody(payload) });
+      setVitalSigns((prev) => [...prev, created]);
+      showToast('Reading added.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to add reading.', 'error'); throw e; }
+  };
+
   const setRecordAttachments = (recordId, updater) => {
     setRecords((prev) => prev.map((r) =>
       r.id === recordId ? { ...r, attachments: updater(r.attachments || []) } : r
@@ -150,6 +162,13 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
     try {
       await downloadFile(`/api/doctor/attachments/${att.id}/download?vaultToken=${encodeURIComponent(vaultToken)}`, att.fileName);
     } catch (e) { showToast(e.message || 'Download failed.', 'error'); }
+  };
+  const addAmendment = async (record, text) => {
+    try {
+      const created = await fetchWithAuth(`/api/doctor/records/${record.id}/amendments`, { method: 'POST', body: vaultBody({ text }) });
+      setRecords((prev) => prev.map((r) => (r.id === record.id ? { ...r, amendments: [...(r.amendments || []), created] } : r)));
+      showToast('Amendment added.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to add amendment.', 'error'); throw e; }
   };
 
   const handleDownloadPDF = () => {
@@ -287,6 +306,11 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
           >
             Download PDF
           </Button>
+          {onMinimize && (
+            <Button onClick={onMinimize} variant="outlined" size="small" startIcon={<MinimizeIcon />} sx={{ borderColor: '#636e72', color: '#636e72' }}>
+              Minimize
+            </Button>
+          )}
           <Button onClick={handleLockAndExit} variant="outlined" color="error" size="small">Lock Vault & Exit</Button>
         </Box>
       </Box>
@@ -331,6 +355,9 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
               onDelete={deleteAppointment}
             />
           </Box>
+          <Box sx={{ borderTop: '1px solid rgba(231, 76, 60, 0.15)', mt: 3, pt: 3 }}>
+            <VitalSigns vitals={vitalSigns} onAdd={addVital} />
+          </Box>
         </Box>
 
         {/* Shared records */}
@@ -365,6 +392,10 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
                 attachments={record.attachments}
                 onUpload={(file) => uploadAttachment(record, file)}
                 onDownload={downloadAttachment}
+              />
+              <RecordAmendments
+                amendments={record.amendments}
+                onAdd={(text) => addAmendment(record, text)}
               />
             </div>
           ))

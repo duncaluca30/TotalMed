@@ -182,6 +182,7 @@ const LoginForm = () => {
                 {available2FAMethods.includes('APP') && <Tab label="App" value="APP" />}
                 {available2FAMethods.includes('EMAIL') && <Tab label="Email" value="EMAIL" />}
                 {available2FAMethods.includes('BIOMETRICS') && <Tab label="Biometrics" value="BIOMETRICS" />}
+                {available2FAMethods.includes('BACKUP') && <Tab label="Backup code" value="BACKUP" />}
               </Tabs>
             )}
 
@@ -201,18 +202,33 @@ const LoginForm = () => {
                 <Typography sx={{ textAlign: 'center', color: '#2d3436', mb: 1, fontWeight: 'bold' }}>
                   {selected2FAMethod === 'APP'
                     ? "Enter the 6-digit code from your authenticator app"
-                    : "Enter the 6-digit code sent to your email"}
+                    : selected2FAMethod === 'BACKUP'
+                      ? "Enter one of your saved backup codes"
+                      : "Enter the 6-digit code sent to your email"}
                 </Typography>
 
-                <TextField 
-                  label="6-Digit Code" 
-                  value={twoFactorToken}
-                  onChange={(e) => setTwoFactorToken(e.target.value.replace(/\D/g, ''))}
-                  slotProps={{ htmlInput: { maxLength: 6, style: { letterSpacing: '8px', textAlign: 'center', fontSize: '1.5em', fontWeight: 'bold' } } }}
-                  required 
-                  fullWidth 
-                  autoFocus
-                />
+                {selected2FAMethod === 'BACKUP' ? (
+                  <TextField
+                    label="Backup code"
+                    value={twoFactorToken}
+                    onChange={(e) => setTwoFactorToken(e.target.value)}
+                    placeholder="xxxxx-xxxxx"
+                    slotProps={{ htmlInput: { maxLength: 11, style: { textAlign: 'center', fontSize: '1.2em', letterSpacing: '2px' } } }}
+                    required
+                    fullWidth
+                    autoFocus
+                  />
+                ) : (
+                  <TextField
+                    label="6-Digit Code"
+                    value={twoFactorToken}
+                    onChange={(e) => setTwoFactorToken(e.target.value.replace(/\D/g, ''))}
+                    slotProps={{ htmlInput: { maxLength: 6, style: { letterSpacing: '8px', textAlign: 'center', fontSize: '1.5em', fontWeight: 'bold' } } }}
+                    required
+                    fullWidth
+                    autoFocus
+                  />
+                )}
 
                 <Button type="submit" variant="contained" size="large" sx={{ mt: 1, backgroundColor: '#00b894', py: 1.5, fontSize: '1.1rem', textTransform: 'none' }}>
                   Verify & Access Vault

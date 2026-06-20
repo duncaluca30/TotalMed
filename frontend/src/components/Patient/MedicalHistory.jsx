@@ -10,6 +10,7 @@ import { useToast } from '../../hooks/useToast';
 import { filterRecords } from '../../utils/recordSearch';
 import { uploadFile, downloadFile, fetchWithAuth } from '../../services/api';
 import RecordAttachments from '../Health/RecordAttachments';
+import RecordAmendments from '../Health/RecordAmendments';
 
 const MedicalHistory = () => {
   const { patientData, setPatientData, pagination, fetchMoreRecords, loadingMore } = useOutletContext();
@@ -171,6 +172,7 @@ const MedicalHistory = () => {
               onDownload={downloadAttachment}
               onDelete={(att) => deleteAttachment(record, att)}
             />
+            <RecordAmendments amendments={record.amendments} />
           </div>
         ))
         ) : (

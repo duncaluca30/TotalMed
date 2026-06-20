@@ -16,6 +16,19 @@ const AdminDashboard = () => {
   const [logs, setLogs] = useState(null);
   const [pagination, setPagination] = useState(null);
   const [emergencies, setEmergencies] = useState(null);
+  const [integrity, setIntegrity] = useState(null);
+  const [verifying, setVerifying] = useState(false);
+
+  const verifyIntegrity = async () => {
+    setVerifying(true);
+    try {
+      const result = await fetchWithAuth('/api/admin/audit-logs/verify');
+      setIntegrity(result);
+      showToast(result.ok ? 'Audit chain is intact.' : 'Audit chain is BROKEN.', result.ok ? 'success' : 'error');
+    } catch (e) {
+      showToast(e.message || 'Verification failed.', 'error');
+    } finally { setVerifying(false); }
+  };
 
   const loadLogs = async (page = 1) => {
     try {
@@ -86,7 +99,23 @@ const AdminDashboard = () => {
         </Paper>
       )}
 
-      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5, color: 'var(--dark-text)' }}>Audit trail</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--dark-text)' }}>Audit trail</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          {integrity && (
+            <Chip
+              size="small"
+              label={integrity.ok ? `Chain intact (${integrity.checked})` : `Broken at ${integrity.brokenAtId?.slice(0, 8)}…`}
+              sx={integrity.ok
+                ? { backgroundColor: 'rgba(0,184,148,0.16)', color: '#0f6e56', fontWeight: 600 }
+                : { backgroundColor: 'rgba(231,76,60,0.16)', color: '#c0392b', fontWeight: 600 }}
+            />
+          )}
+          <Button variant="outlined" size="small" onClick={verifyIntegrity} disabled={verifying}>
+            {verifying ? 'Verifying…' : 'Verify integrity'}
+          </Button>
+        </Box>
+      </Box>
       {!logs ? (
         <Skeleton variant="rectangular" height={200} sx={{ borderRadius: 2 }} />
       ) : logs.length === 0 ? (

@@ -3,6 +3,7 @@ const router = express.Router();
 
 const prisma = require('../config/prisma');
 const authenticateToken = require('../middleware/authenticate');
+const { verifyAuditChain } = require('../services/vault.service');
 
 // Every route here requires ADMIN clearance.
 function requireAdmin(req, res, next) {
@@ -65,6 +66,17 @@ router.get('/audit-logs', authenticateToken, requireAdmin, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to load audit logs." });
+    }
+});
+
+// GET /api/admin/audit-logs/verify — recompute the tamper-evident hash chain.
+router.get('/audit-logs/verify', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const result = await verifyAuditChain();
+        res.json(result);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to verify audit chain." });
     }
 });
 

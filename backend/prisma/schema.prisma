@@ -45,6 +45,10 @@ model User {
   twoFactorSecret String?
   isTwoFactorEnabled Boolean @default(false)
 
+  // Single-use 2FA recovery codes, stored as SHA-256 hashes. A used code is
+  // removed from the array so it can never be replayed.
+  twoFactorBackupCodes String[] @default([])
+
   emailOtpCode       String?
   emailOtpExpiresAt  DateTime?
   webAuthnChallenge  String?
@@ -96,6 +100,27 @@ model Patient {
   medications      Medication[]
   births           Birth[]
   emergencyAccesses EmergencyAccess[]
+  vitalSigns       VitalSign[]
+}
+
+// A single time-stamped vital-sign measurement. Values are numeric and
+// structured (non-identifying on their own), so — like Birth.year and
+// AllergySeverity — they are stored as plain typed columns rather than encrypted
+// text, which also keeps them directly chartable. For BLOOD_PRESSURE, `value` is
+// systolic and `value2` is diastolic.
+model VitalSign {
+  id         String   @id @default(uuid())
+  type       String   // BLOOD_PRESSURE | WEIGHT | GLUCOSE | HEART_RATE | TEMPERATURE
+  value      Float
+  value2     Float?
+  unit       String
+  measuredAt DateTime
+  createdAt  DateTime @default(now())
+
+  patientId  String
+  patient    Patient  @relation(fields: [patientId], references: [id])
+
+  @@index([patientId, type])
 }
 
 model Doctor {
@@ -111,6 +136,7 @@ model Doctor {
   appointments     Appointment[]
   medicalRecords   MedicalRecord[]
   emergencyAccesses EmergencyAccess[]
+  amendments       Amendment[]
 }
 
 // A reminder on the patient's calendar (e.g. "Cardiology check-up · 12.06.2027 ·
@@ -150,6 +176,22 @@ model MedicalRecord {
   doctor      Doctor   @relation(fields: [doctorId], references: [id])
 
   attachments Attachment[]
+  amendments  Amendment[]
+}
+
+// An append-only correction/addendum to a medical record. Records themselves are
+// never edited (integrity); a doctor adds a dated amendment instead, preserving
+// the original text alongside the correction. Text is encrypted at rest.
+model Amendment {
+  id        String        @id @default(uuid())
+  text      String        // encrypted
+  createdAt DateTime      @default(now())
+
+  recordId  String
+  record    MedicalRecord @relation(fields: [recordId], references: [id])
+
+  doctorId  String
+  doctor    Doctor        @relation(fields: [doctorId], references: [id])
 }
 
 // A file (lab result, imaging, discharge letter…) attached to a medical record.
@@ -241,6 +283,12 @@ model AuditLog {
   details   String?
   ipAddress String?
   createdAt DateTime @default(now())
+
+  // Tamper-evidence: each entry stores the hash of the previous entry plus a
+  // hash of its own fields, forming an append-only chain. Editing or deleting a
+  // row breaks the chain, which the admin "verify integrity" check detects.
+  prevHash  String?
+  entryHash String?
 }
 
 // Records every break-the-glass access so the patient can be notified post-hoc

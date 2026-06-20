@@ -7,7 +7,9 @@ import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutl
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 import PatientVault from './PatientVault';
+import MinimizedVault from './MinimizedVault';
 import VaultWaitingScreen from './VaultWaitingScreen';
+import ConsultationHistory from './ConsultationHistory';
 import SecurityCard from '../Layout/SecurityCard';
 
 const DoctorDashboard = () => {
@@ -17,6 +19,7 @@ const DoctorDashboard = () => {
   const [vaultToken, setVaultToken] = useState(null);
   const [pagination, setPagination] = useState(null);
   const [isWaiting, setIsWaiting] = useState(false);
+  const [minimized, setMinimized] = useState(false);
   const abortRef = useRef(null);
 
   const [cnpSearch, setCnpSearch] = useState('');
@@ -62,6 +65,16 @@ const DoctorDashboard = () => {
     setVaultToken(null);
     setPagination(null);
     setVaultCode('');
+    setMinimized(false);
+  };
+
+  // Lock from the minimized card: notify the patient that viewing ended (same as
+  // "Lock Vault & Exit" inside the vault), then clear the session.
+  const handleLockVault = async () => {
+    try {
+      await fetchWithAuth('/api/doctor/lock-vault', { method: 'POST', body: JSON.stringify({ vaultToken }) });
+    } catch { /* non-critical */ }
+    resetVault();
   };
 
   const handleCnpSearch = async (e) => {
@@ -214,6 +227,13 @@ const DoctorDashboard = () => {
             </DialogActions>
           </Dialog>
         </div>
+      ) : minimized ? (
+        <MinimizedVault
+          patient={unlockedPatient}
+          vaultToken={vaultToken}
+          onResume={() => setMinimized(false)}
+          onLock={handleLockVault}
+        />
       ) : (
         <PatientVault
           doctorData={doctorData}
@@ -221,12 +241,16 @@ const DoctorDashboard = () => {
           vaultToken={vaultToken}
           pagination={pagination}
           onClose={resetVault}
+          onMinimize={() => setMinimized(true)}
         />
       )}
 
-      {/* Hide the doctor's own 2FA/biometric settings while a patient vault is open,
-          so account-security controls aren't mixed in with the patient's file. */}
-      {!unlockedPatient && (
+      {/* Hide the doctor's own 2FA/biometric settings while a patient vault is
+          actively open. When the vault is minimized the doctor is back on their
+          dashboard, so the security controls return alongside the resume card. */}
+      {(!unlockedPatient || minimized) && <ConsultationHistory />}
+
+      {(!unlockedPatient || minimized) && (
         <SecurityCard
           isTwoFactorEnabled={doctorData?.user?.isTwoFactorEnabled}
           passkeys={doctorData?.user?.passkeys || []}

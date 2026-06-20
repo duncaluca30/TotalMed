@@ -61,7 +61,7 @@ const PatientDashboard = () => {
   const handleGenerateCode = async () => {
     try {
       const data = await fetchWithAuth('/api/patient/generate-code', { method: 'POST' });
-      setPatientData({ ...patientData, accessCode: { code: data.code, expiresAt: data.expiresAt } });
+      setPatientData({ ...patientData, accessCode: { code: data.code, expiresAt: data.expiresAt, qrDataUrl: data.qrDataUrl } });
       showToast("Code generated successfully!", "success");
     } catch (error) {
       showToast(error.message || "Failed to generate code.", "error");
@@ -125,8 +125,17 @@ const PatientDashboard = () => {
           <Box sx={{ textAlign: 'center' }}>
             <Typography sx={{ fontSize: '0.78rem', color: '#6b5ca8', mb: 0.5 }}>Your secure code</Typography>
             <Typography sx={{ fontSize: '2.4rem', fontWeight: 700, letterSpacing: '8px', color: '#7c3aed', lineHeight: 1 }}>{prettyCode}</Typography>
+            {patientData.accessCode.qrDataUrl && (
+              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                <img
+                  src={patientData.accessCode.qrDataUrl}
+                  alt="Access code QR"
+                  style={{ width: 150, height: 150, background: '#fff', padding: 8, borderRadius: 8, border: '1px solid #e0d9f5' }}
+                />
+              </Box>
+            )}
             <Typography sx={{ fontSize: '0.8rem', color: '#c0392b', mt: 1 }}>
-              Show this to your doctor. Keep this window open.
+              Show the code or QR to your doctor. Keep this window open.
             </Typography>
           </Box>
         )}

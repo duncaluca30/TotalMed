@@ -6,11 +6,12 @@ const authenticateToken = require('../middleware/authenticate');
 const validate = require('../middleware/validate');
 const { getDecryptedRecords, generateAccessCode, getPatientAccessLog } = require('../services/vault.service');
 const { revokeVaultAccess } = require('../services/vaultRevocations');
-const { allergySchema, medicationSchema, birthSchema, patientProfileSchema, appointmentSchema } = require('../schemas/health.schema');
+const { allergySchema, medicationSchema, birthSchema, patientProfileSchema, appointmentSchema, vitalSchema } = require('../schemas/health.schema');
 const health = require('../services/health.service');
 const attachments = require('../services/attachment.service');
 const { buildFhirBundle } = require('../services/export.service');
 const { createAuditLog } = require('../services/vault.service');
+const qrcode = require('qrcode');
 const { singleFile } = require('../middleware/upload');
 const { decrypt } = require('../../utils/cipher');
 
@@ -58,9 +59,11 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         patientData.medications = await health.getDecryptedMedications(patientData.id);
         patientData.births = await health.getBirths(patientData.id);
         patientData.appointments = await health.getDecryptedAppointments(patientData.id);
+        patientData.vitalSigns = await health.getVitalSigns(patientData.id);
 
         if (patientData.accessCode) {
             patientData.accessCode.code = decrypt(patientData.accessCode.code);
+            patientData.accessCode.qrDataUrl = await qrcode.toDataURL(patientData.accessCode.code);
         }
 
         res.json({
@@ -358,6 +361,40 @@ router.delete('/appointments/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// ── Vital signs (patient self-service) ───────────────────────────────────────
+
+// POST /api/patient/vitals
+router.post('/vitals', authenticateToken, validate(vitalSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const { type, value, value2, unit, measuredAt } = req.body;
+        const vital = await health.createVitalSign({ patientId, type, value, value2, unit, measuredAt });
+        res.status(201).json(vital);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to add vital sign." });
+    }
+});
+
+// DELETE /api/patient/vitals/:id
+router.delete('/vitals/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const deleted = await health.deleteVitalSign({ id: req.params.id, patientId });
+        if (!deleted) return res.status(404).json({ error: "Vital sign not found." });
+        res.json({ message: "Vital sign removed." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to remove vital sign." });
+    }
+});
+
 // ── Data portability (GDPR) ──────────────────────────────────────────────────
 
 // GET /api/patient/export — download the full history as a FHIR-style JSON Bundle.
@@ -470,7 +507,9 @@ router.delete('/account', authenticateToken, async (req, res) => {
 
         await prisma.$transaction([
             prisma.notification.deleteMany({ where: { userId } }),
+            prisma.amendment.deleteMany({ where: { recordId: { in: recordIds } } }),
             prisma.attachment.deleteMany({ where: { recordId: { in: recordIds } } }),
+            prisma.vitalSign.deleteMany({ where: { patientId } }),
             prisma.appointment.deleteMany({ where: { patientId } }),
             prisma.medicalRecord.deleteMany({ where: { patientId } }),
             prisma.allergy.deleteMany({ where: { patientId } }),

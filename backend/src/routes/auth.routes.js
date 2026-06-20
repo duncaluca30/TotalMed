@@ -23,6 +23,8 @@ const {
     requestPasswordReset,
     resetPassword,
     changePassword,
+    generateBackupCodes,
+    logoutAll,
     signUserToken,
     setAuthCookie
 } = require('../services/auth.service');
@@ -140,6 +142,29 @@ router.post('/2fa/verify-setup', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error("🚨 2FA VERIFY ERROR:", error);
         res.status(error.status || 500).json({ error: error.message || "Failed to verify 2FA." });
+    }
+});
+
+// POST /api/auth/2fa/backup-codes (authenticated) — (re)generate recovery codes
+router.post('/2fa/backup-codes', authenticateToken, async (req, res) => {
+    try {
+        const codes = await generateBackupCodes(req.user.id);
+        res.json({ codes });
+    } catch (error) {
+        console.error("🚨 BACKUP CODES ERROR:", error);
+        res.status(error.status || 500).json({ error: error.message || "Failed to generate backup codes." });
+    }
+});
+
+// POST /api/auth/logout-all (authenticated) — sign out every other device, keep this one
+router.post('/logout-all', authenticateToken, async (req, res) => {
+    try {
+        await logoutAll(req.user.id);
+        // Re-issue a token for the current device so it survives the sessionValidAfter bump.
+        completeLogin(res, { id: req.user.id, role: req.user.role }, "Signed out of all other devices.");
+    } catch (error) {
+        console.error("🚨 LOGOUT-ALL ERROR:", error);
+        res.status(error.status || 500).json({ error: error.message || "Failed to sign out other devices." });
     }
 });
 

@@ -5,6 +5,7 @@ import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 import HealthLists from '../Health/HealthLists';
 import GynecologySection from '../Health/GynecologySection';
+import VitalSigns from '../Health/VitalSigns';
 
 const HealthProfile = () => {
   const { patientData, setPatientData } = useOutletContext();
@@ -13,10 +14,27 @@ const HealthProfile = () => {
   const allergies = patientData.allergies || [];
   const medications = patientData.medications || [];
   const births = patientData.births || [];
+  const vitalSigns = patientData.vitalSigns || [];
 
   const setAllergies = (next) => setPatientData({ ...patientData, allergies: next });
   const setMedications = (next) => setPatientData({ ...patientData, medications: next });
   const setBirths = (next) => setPatientData({ ...patientData, births: next });
+  const setVitals = (next) => setPatientData({ ...patientData, vitalSigns: next });
+
+  const addVital = async (payload) => {
+    try {
+      const created = await fetchWithAuth('/api/patient/vitals', { method: 'POST', body: JSON.stringify(payload) });
+      setVitals([...vitalSigns, created]);
+      showToast('Reading added.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to add reading.', 'error'); throw e; }
+  };
+  const deleteVital = async (id) => {
+    try {
+      await fetchWithAuth(`/api/patient/vitals/${id}`, { method: 'DELETE' });
+      setVitals(vitalSigns.filter((v) => v.id !== id));
+      showToast('Reading removed.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to remove reading.', 'error'); }
+  };
 
   // ── Sex & gynecological profile ──
   const saveProfile = async (fields) => {
@@ -127,6 +145,10 @@ const HealthProfile = () => {
           onUpdateMedication={updateMedication}
           onDeleteMedication={deleteMedication}
         />
+      </div>
+
+      <div className="card" style={{ marginTop: '20px' }}>
+        <VitalSigns vitals={vitalSigns} onAdd={addVital} onDelete={deleteVital} />
       </div>
     </Box>
   );

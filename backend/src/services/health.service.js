@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const { encrypt, decrypt } = require('../../utils/cipher');
+const { checkMedication } = require('../../utils/interactions');
 
 // ── Allergies ──────────────────────────────────────────────────────────────
 
@@ -97,8 +98,18 @@ async function getDecryptedMedications(patientId) {
     return decryptMedications(medications);
 }
 
-/** Create an encrypted medication, returning it decrypted. */
+/**
+ * Create an encrypted medication, returning it decrypted. Also runs a
+ * non-blocking safety check against the patient's allergies and current
+ * medications and attaches any `warnings` to the returned object.
+ */
 async function createMedication({ patientId, name, dosage, frequency }) {
+    // Gather the patient's existing data BEFORE inserting, so the new drug isn't
+    // compared against itself. Sequential (not Promise.all) to stay friendly to
+    // single-connection drivers.
+    const allergies = await getDecryptedAllergies(patientId);
+    const medications = await getDecryptedMedications(patientId);
+
     const created = await prisma.medication.create({
         data: {
             patientId,
@@ -107,7 +118,10 @@ async function createMedication({ patientId, name, dosage, frequency }) {
             frequency: frequency ? encrypt(frequency) : null
         }
     });
-    return decryptMedication(created);
+
+    const result = decryptMedication(created);
+    result.warnings = checkMedication(name, allergies, medications);
+    return result;
 }
 
 /** Update a medication scoped to its owning patient. Returns decrypted record or null. */

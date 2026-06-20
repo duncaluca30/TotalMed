@@ -9,6 +9,7 @@ const ACTIONS = {
   RECORD_ADDED: { label: 'Added record', color: '#0f6e56', bg: 'rgba(0, 184, 148, 0.14)' },
   ALLERGY_ADDED: { label: 'Added allergy', color: '#c0392b', bg: 'rgba(231, 76, 60, 0.14)' },
   MEDICATION_ADDED: { label: 'Added medication', color: '#b7791f', bg: 'rgba(237, 137, 54, 0.16)' },
+  ATTACHMENT_ADDED: { label: 'Added attachment', color: '#0984e3', bg: 'rgba(9, 132, 227, 0.14)' },
 };
 
 const AccessLog = () => {

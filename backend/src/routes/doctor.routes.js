@@ -6,13 +6,17 @@ const prisma = require('../config/prisma');
 const authenticateToken = require('../middleware/authenticate');
 const { vaultLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
-const { recordSchema } = require('../schemas/doctor.schema');
+const { recordSchema, patientSearchSchema, emergencyAccessSchema } = require('../schemas/doctor.schema');
 const { vaultAccessSchema } = require('../schemas/vault.schema');
 const { doctorAllergySchema, doctorMedicationSchema, doctorBirthSchema, doctorPatientProfileSchema, doctorAppointmentSchema } = require('../schemas/health.schema');
 
-const { lookupAccessCode, decryptRecords, createEncryptedRecord, createAuditLog } = require('../services/vault.service');
+const { lookupAccessCode, decryptRecords, createEncryptedRecord, createAuditLog, getDecryptedRecords } = require('../services/vault.service');
 const health = require('../services/health.service');
+const attachments = require('../services/attachment.service');
+const notifications = require('../services/notification.service');
+const { singleFile } = require('../middleware/upload');
 const { isVaultTokenRevoked } = require('../services/vaultRevocations');
+const { sendEmergencyAccessEmail } = require('../../utils/mailer');
 
 /**
  * Validate an active vault session for the requesting doctor against a target
@@ -144,6 +148,7 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                 const totalRecords = approvedRecords.length;
                 const paginatedRecords = approvedRecords.slice(skip, skip + limit);
                 decryptRecords(paginatedRecords);
+                await attachments.attachMetaToRecords(paginatedRecords);
                 patientData.medicalRecords = paginatedRecords;
 
                 // Allergies and current medications are safety-critical, so they
@@ -162,18 +167,27 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                     ipAddress: rawIp
                 });
 
-                // Issue a short-lived vault session token so the doctor can add records
-                // even though the access code is now consumed
+                // The patient chooses how long the session lasts in the consent
+                // dialog. Validate against an allow-list so a tampered socket
+                // payload can't request an arbitrarily long token; default 15m.
+                const ALLOWED_DURATIONS = [15, 60, 480, 1440];
+                const durationMinutes = ALLOWED_DURATIONS.includes(authData.durationMinutes)
+                    ? authData.durationMinutes
+                    : 15;
+
+                // Issue a vault session token so the doctor can add records even
+                // though the access code is now consumed.
                 const vaultToken = jwt.sign(
                     { patientId: validCode.patientId, doctorId: doctor.id },
                     process.env.JWT_SECRET,
-                    { expiresIn: '15m' }
+                    { expiresIn: `${durationMinutes}m` }
                 );
 
                 // Let the patient know their doctor is now actively viewing the records
-                // they just shared.
+                // they just shared, and for how long.
                 req.io.to(patientUser.userId).emit('vault-viewing-started', {
-                    doctorName: `Dr. ${doctor.lastName}`
+                    doctorName: `Dr. ${doctor.lastName}`,
+                    durationMinutes
                 });
 
                 res.json({
@@ -262,6 +276,15 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
                     doctor: { lastName: doctor.lastName }
                 };
                 io.to(patientForSocket.userId).emit('vault-updated', { newRecord: decryptedRecord });
+
+                // Durable in-app notification + real-time push.
+                const note = await notifications.create(
+                    patientForSocket.userId,
+                    'RECORD_ADDED',
+                    'New medical record added',
+                    `Dr. ${doctor.lastName} added "${diagnosis}" to your file.`
+                );
+                if (note) io.to(patientForSocket.userId).emit('notification', note);
             }
         } catch (socketError) {
             console.error("WEBSOCKET ERROR:", socketError);
@@ -272,6 +295,68 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to add record." });
+    }
+});
+
+// ── Attachments (doctor, during an active vault session) ─────────────────────
+
+// POST /api/doctor/attachments — upload a file against a record of the patient
+// whose vault is currently open (multipart: file + recordId + patientId + vaultToken).
+router.post('/attachments', authenticateToken, singleFile('file'), async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        const { patientId, vaultToken, recordId } = req.body;
+        const check = verifyVaultSession(vaultToken, doctor.id, patientId);
+        if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+        if (!req.file) return res.status(400).json({ error: "No file uploaded." });
+        if (!recordId) return res.status(400).json({ error: "recordId is required." });
+        if (!(await attachments.recordBelongsToPatient(recordId, patientId))) {
+            return res.status(404).json({ error: "Record not found for this patient." });
+        }
+
+        const meta = await attachments.createAttachment({
+            recordId,
+            originalName: req.file.originalname,
+            mimeType: req.file.mimetype,
+            buffer: req.file.buffer
+        });
+
+        const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        await createAuditLog({ userId: req.user.id, action: 'ATTACHMENT_ADDED', details: { patientId, attachmentId: meta.id, recordId }, ipAddress: rawIp });
+
+        res.status(201).json(meta);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to upload attachment." });
+    }
+});
+
+// GET /api/doctor/attachments/:id/download?vaultToken=... — stream a file from
+// the open vault. The owning patient is resolved from the attachment and the
+// vault session is verified against them.
+router.get('/attachments/:id/download', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        const owningPatientId = await attachments.getOwningPatientId(req.params.id);
+        if (!owningPatientId) return res.status(404).json({ error: "Attachment not found." });
+
+        const check = verifyVaultSession(req.query.vaultToken, doctor.id, owningPatientId);
+        if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+        const file = await attachments.getDataForPatient(req.params.id, owningPatientId);
+        if (!file) return res.status(404).json({ error: "Attachment not found." });
+
+        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.fileName)}"`);
+        res.send(file.buffer);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to download attachment." });
     }
 });
 
@@ -530,6 +615,107 @@ router.delete('/appointments/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to remove appointment." });
+    }
+});
+
+// GET /api/doctor/patient-search?cnp=...
+// Returns only the patient's name and ID so the doctor can confirm they have
+// the right person before triggering emergency access.
+router.get('/patient-search', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+
+        const { cnp } = req.query;
+        const parsed = patientSearchSchema.safeParse({ cnp });
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid CNP." });
+        }
+        const patient = await prisma.patient.findUnique({
+            where: { cnp },
+            select: { id: true, firstName: true, lastName: true, dateOfBirth: true }
+        });
+
+        if (!patient) return res.status(404).json({ error: "No patient found with that CNP." });
+
+        res.json({ patient });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Patient search failed." });
+    }
+});
+
+// POST /api/doctor/emergency-access
+// Break-the-glass: bypasses patient consent. Requires a mandatory reason.
+// Audit log is written BEFORE data is returned; patient is notified by email.
+router.post('/emergency-access', authenticateToken, vaultLimiter, validate(emergencyAccessSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+
+        const { patientId, reason } = req.body;
+        const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+        if (!doctor) return res.status(404).json({ error: "Doctor profile not found." });
+
+        const patientWithUser = await prisma.patient.findUnique({
+            where: { id: patientId },
+            include: { user: { select: { email: true } } }
+        });
+        if (!patientWithUser) return res.status(404).json({ error: "Patient not found." });
+
+        // Audit-first: log the access before returning any data
+        const emergencyLog = await prisma.emergencyAccess.create({
+            data: { doctorId: doctor.id, patientId, reason }
+        });
+        await createAuditLog({
+            userId: req.user.id,
+            action: 'EMERGENCY_ACCESS',
+            details: { patientId, emergencyLogId: emergencyLog.id, reason },
+            ipAddress: rawIp
+        });
+
+        // Fetch all records — no consent filter applies in an emergency
+        const { records } = await getDecryptedRecords(patientId, 1, 1000);
+        const allergies = await health.getDecryptedAllergies(patientId);
+        const medications = await health.getDecryptedMedications(patientId);
+        const births = await health.getBirths(patientId);
+
+        // Issue a standard vault token so the doctor can add records if needed
+        const vaultToken = jwt.sign(
+            { patientId, doctorId: doctor.id },
+            process.env.JWT_SECRET,
+            { expiresIn: '15m' }
+        );
+
+        // Notify patient asynchronously — do not block the emergency response
+        const timestamp = new Date().toLocaleString('ro-RO', { timeZone: 'Europe/Bucharest' });
+        sendEmergencyAccessEmail(
+            patientWithUser.user.email,
+            `Dr. ${doctor.firstName} ${doctor.lastName}`,
+            doctor.specialty,
+            reason,
+            timestamp
+        ).then(() => prisma.emergencyAccess.update({
+            where: { id: emergencyLog.id },
+            data: { notifiedAt: new Date() }
+        })).catch(() => {});
+
+        // Durable in-app notification (in addition to the email).
+        const note = await notifications.create(
+            patientWithUser.userId,
+            'EMERGENCY_ACCESS',
+            'Emergency access to your records',
+            `Dr. ${doctor.firstName} ${doctor.lastName} (${doctor.specialty}) accessed your records under an emergency override. Reason: ${reason}`
+        );
+        if (note) req.io.to(patientWithUser.userId).emit('notification', note);
+
+        res.json({
+            patient: { ...patientWithUser, medicalRecords: records, allergies, medications, births },
+            vaultToken
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Emergency access failed." });
     }
 });
 

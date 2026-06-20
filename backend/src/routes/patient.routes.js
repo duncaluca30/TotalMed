@@ -8,6 +8,10 @@ const { getDecryptedRecords, generateAccessCode, getPatientAccessLog } = require
 const { revokeVaultAccess } = require('../services/vaultRevocations');
 const { allergySchema, medicationSchema, birthSchema, patientProfileSchema, appointmentSchema } = require('../schemas/health.schema');
 const health = require('../services/health.service');
+const attachments = require('../services/attachment.service');
+const { buildFhirBundle } = require('../services/export.service');
+const { createAuditLog } = require('../services/vault.service');
+const { singleFile } = require('../middleware/upload');
 const { decrypt } = require('../../utils/cipher');
 
 // Resolve the authenticated patient's profile id (or null). Used by the
@@ -137,6 +141,10 @@ router.post('/allergies', authenticateToken, validate(allergySchema), async (req
 
         const { substance, reaction, severity } = req.body;
         const allergy = await health.createAllergy({ patientId, substance, reaction, severity });
+
+        const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        await createAuditLog({ userId: req.user.id, action: 'ALLERGY_ADDED', details: { patientId, allergyId: allergy.id }, ipAddress: rawIp });
+
         res.status(201).json(allergy);
     } catch (error) {
         console.error(error);
@@ -188,6 +196,10 @@ router.post('/medications', authenticateToken, validate(medicationSchema), async
 
         const { name, dosage, frequency } = req.body;
         const medication = await health.createMedication({ patientId, name, dosage, frequency });
+
+        const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        await createAuditLog({ userId: req.user.id, action: 'MEDICATION_ADDED', details: { patientId, medicationId: medication.id }, ipAddress: rawIp });
+
         res.status(201).json(medication);
     } catch (error) {
         console.error(error);
@@ -346,6 +358,97 @@ router.delete('/appointments/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// ── Data portability (GDPR) ──────────────────────────────────────────────────
+
+// GET /api/patient/export — download the full history as a FHIR-style JSON Bundle.
+router.get('/export', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const bundle = await buildFhirBundle(patientId);
+        if (!bundle) return res.status(404).json({ error: "Patient profile not found." });
+
+        res.setHeader('Content-Type', 'application/fhir+json');
+        res.setHeader('Content-Disposition', 'attachment; filename="totalmed-export.json"');
+        res.send(JSON.stringify(bundle, null, 2));
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to export data." });
+    }
+});
+
+// ── Attachments (patient self-service) ───────────────────────────────────────
+
+// POST /api/patient/attachments — upload a file against one of the patient's
+// own records (multipart/form-data: file + recordId).
+router.post('/attachments', authenticateToken, singleFile('file'), async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        if (!req.file) return res.status(400).json({ error: "No file uploaded." });
+        const { recordId } = req.body;
+        if (!recordId) return res.status(400).json({ error: "recordId is required." });
+
+        if (!(await attachments.recordBelongsToPatient(recordId, patientId))) {
+            return res.status(404).json({ error: "Record not found." });
+        }
+
+        const meta = await attachments.createAttachment({
+            recordId,
+            originalName: req.file.originalname,
+            mimeType: req.file.mimetype,
+            buffer: req.file.buffer
+        });
+
+        const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        await createAuditLog({ userId: req.user.id, action: 'ATTACHMENT_ADDED', details: { patientId, attachmentId: meta.id, recordId }, ipAddress: rawIp });
+
+        res.status(201).json(meta);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to upload attachment." });
+    }
+});
+
+// GET /api/patient/attachments/:id/download — stream the decrypted file.
+router.get('/attachments/:id/download', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const file = await attachments.getDataForPatient(req.params.id, patientId);
+        if (!file) return res.status(404).json({ error: "Attachment not found." });
+
+        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.fileName)}"`);
+        res.send(file.buffer);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to download attachment." });
+    }
+});
+
+// DELETE /api/patient/attachments/:id
+router.delete('/attachments/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const deleted = await attachments.deleteForPatient(req.params.id, patientId);
+        if (!deleted) return res.status(404).json({ error: "Attachment not found." });
+        res.json({ message: "Attachment removed." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to remove attachment." });
+    }
+});
+
 // ── Account deletion (right to be forgotten) ─────────────────────────────────
 
 // DELETE /api/patient/account — permanently erase the patient and all their data
@@ -359,7 +462,15 @@ router.delete('/account', authenticateToken, async (req, res) => {
 
         // Delete child rows first (no cascade configured), then the patient, then
         // the user's own auth artifacts and the user record itself — all atomically.
+        // Attachments reference medical records (FK), so they must be cleared
+        // before the records they hang off.
+        const recordIds = (await prisma.medicalRecord.findMany({
+            where: { patientId }, select: { id: true }
+        })).map(r => r.id);
+
         await prisma.$transaction([
+            prisma.notification.deleteMany({ where: { userId } }),
+            prisma.attachment.deleteMany({ where: { recordId: { in: recordIds } } }),
             prisma.appointment.deleteMany({ where: { patientId } }),
             prisma.medicalRecord.deleteMany({ where: { patientId } }),
             prisma.allergy.deleteMany({ where: { patientId } }),

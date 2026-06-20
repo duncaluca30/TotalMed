@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Box, Typography, Button, TextField } from '@mui/material';
+import { Box, Typography, Button, TextField, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
@@ -17,6 +18,11 @@ const DoctorDashboard = () => {
   const [pagination, setPagination] = useState(null);
   const [isWaiting, setIsWaiting] = useState(false);
   const abortRef = useRef(null);
+
+  const [cnpSearch, setCnpSearch] = useState('');
+  const [foundPatient, setFoundPatient] = useState(null);
+  const [emergencyReason, setEmergencyReason] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const showToast = useToast();
 
@@ -56,6 +62,36 @@ const DoctorDashboard = () => {
     setVaultToken(null);
     setPagination(null);
     setVaultCode('');
+  };
+
+  const handleCnpSearch = async (e) => {
+    e.preventDefault();
+    setFoundPatient(null);
+    try {
+      const data = await fetchWithAuth(`/api/doctor/patient-search?cnp=${encodeURIComponent(cnpSearch)}`);
+      setFoundPatient(data.patient);
+    } catch (error) {
+      showToast(error.message || "Patient not found.", "error");
+    }
+  };
+
+  const handleEmergencyAccess = async () => {
+    setConfirmOpen(false);
+    try {
+      const data = await fetchWithAuth('/api/doctor/emergency-access', {
+        method: 'POST',
+        body: JSON.stringify({ patientId: foundPatient.id, reason: emergencyReason }),
+      });
+      setUnlockedPatient(data.patient);
+      setVaultToken(data.vaultToken);
+      setPagination(null);
+      setCnpSearch('');
+      setFoundPatient(null);
+      setEmergencyReason('');
+      showToast("Emergency access granted. Patient has been notified.", "warning");
+    } catch (error) {
+      showToast(error.message || "Emergency access failed.", "error");
+    }
   };
 
   return (
@@ -106,6 +142,77 @@ const DoctorDashboard = () => {
               Request Access
             </Button>
           </Box>
+
+          <Divider sx={{ my: 4 }}>
+            <Typography variant="caption" sx={{ color: 'var(--light-text)', px: 1 }}>Emergency Access</Typography>
+          </Divider>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, justifyContent: 'center' }}>
+            <WarningAmberIcon sx={{ color: '#e17055' }} />
+            <Typography variant="body2" sx={{ color: '#e17055', fontWeight: 600 }}>
+              Break-the-glass — patient consent bypassed
+            </Typography>
+          </Box>
+          <Typography variant="body2" sx={{ color: 'var(--light-text)', mb: 2, maxWidth: 380, mx: 'auto' }}>
+            Use only when the patient is unable to provide consent. All access is permanently logged and the patient is notified by email.
+          </Typography>
+
+          <Box component="form" onSubmit={handleCnpSearch} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <TextField
+              label="Patient CNP"
+              variant="outlined"
+              value={cnpSearch}
+              onChange={(e) => { setCnpSearch(e.target.value); setFoundPatient(null); }}
+              slotProps={{ htmlInput: { maxLength: 13, inputMode: 'numeric' } }}
+              required
+            />
+            <Button type="submit" variant="outlined" color="warning">
+              Search Patient
+            </Button>
+          </Box>
+
+          {foundPatient && (
+            <Box sx={{ mt: 2, p: 2, borderRadius: 2, backgroundColor: '#fff3f3', border: '1px solid #fab1a0', maxWidth: 380, mx: 'auto' }}>
+              <Typography sx={{ fontWeight: 600, color: '#2d3436' }}>
+                {foundPatient.firstName} {foundPatient.lastName}
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'var(--light-text)', mb: 2 }}>
+                DOB: {new Date(foundPatient.dateOfBirth).toLocaleDateString('ro-RO')}
+              </Typography>
+              <TextField
+                label="Reason for emergency access"
+                multiline
+                rows={2}
+                fullWidth
+                value={emergencyReason}
+                onChange={(e) => setEmergencyReason(e.target.value)}
+                sx={{ mb: 2 }}
+              />
+              <Button
+                variant="contained"
+                color="error"
+                fullWidth
+                disabled={emergencyReason.trim().length < 10}
+                onClick={() => setConfirmOpen(true)}
+              >
+                Override &amp; Access Vault
+              </Button>
+            </Box>
+          )}
+
+          <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+            <DialogTitle sx={{ color: '#d63031' }}>Confirm Emergency Access</DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                You are about to access <strong>{foundPatient?.firstName} {foundPatient?.lastName}</strong>'s medical records without their consent.
+                This action is permanently logged and the patient will be notified immediately by email.
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
+              <Button onClick={handleEmergencyAccess} color="error" variant="contained">Confirm Override</Button>
+            </DialogActions>
+          </Dialog>
         </div>
       ) : (
         <PatientVault

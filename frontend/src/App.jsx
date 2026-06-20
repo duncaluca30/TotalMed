@@ -15,6 +15,8 @@ import HealthProfile from './components/Patient/HealthProfile';
 import AccessLog from './components/Patient/AccessLog';
 import DoctorLayout from './components/Doctor/DoctorLayout';
 import DoctorDashboard from './components/Doctor/DoctorDashboard';
+import AdminLayout from './components/Admin/AdminLayout';
+import AdminDashboard from './components/Admin/AdminDashboard';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import './App.css';
 
@@ -44,8 +46,8 @@ function App() {
             <Route path="access-log" element={<AccessLog />} />
           </Route>
           
-          <Route 
-            path="/doctor" 
+          <Route
+            path="/doctor"
             element={
               <ProtectedRoute allowedRoles={['DOCTOR']}>
                 <DoctorLayout />
@@ -54,7 +56,18 @@ function App() {
           >
             <Route index element={<DoctorDashboard />} />
           </Route>
-          
+
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+          </Route>
+
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

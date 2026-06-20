@@ -1,6 +1,7 @@
 require('dotenv').config();
 const createServer = require('./src/app');
 const startCleanupJob = require('./src/jobs/cleanup');
+const startReminderJob = require('./src/jobs/reminders');
 
 // Safety net: a stray rejection (e.g. from an async event listener that runs
 // outside any try/catch) must never take the whole server down and disconnect
@@ -13,6 +14,7 @@ const { server } = createServer();
 
 // Background jobs
 startCleanupJob();
+startReminderJob();
 
 // Start server
 const PORT = process.env.PORT || 5000;

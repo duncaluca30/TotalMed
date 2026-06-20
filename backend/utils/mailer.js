@@ -161,4 +161,75 @@ const sendVerificationEmail = async (targetEmail, verifyUrl) => {
     }
 };
 
-module.exports = { sendOTPEmail, sendSecurityAlertEmail, sendPasswordResetEmail, sendVerificationEmail };
+const sendEmergencyAccessEmail = async (targetEmail, doctorName, specialty, reason, timestamp) => {
+    try {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'api-key': process.env.BREVO_API_KEY,
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                sender: { name: "TotalMed Security", email: "duncaluca@gmail.com" },
+                to: [{ email: targetEmail }],
+                subject: '🚨 Emergency Access to Your Medical Records',
+                htmlContent: `
+                    <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #dfe6e9; padding: 20px; border-radius: 8px;">
+                        <h2 style="color: #d63031; text-align: center;">Emergency Access Notice</h2>
+                        <p>A physician accessed your medical records without your prior consent under an emergency override.</p>
+                        <div style="background-color: #fff3f3; padding: 15px; border-radius: 6px; border-left: 4px solid #d63031; margin: 20px 0;">
+                            <p style="margin: 5px 0;"><strong>Doctor:</strong> ${doctorName}</p>
+                            <p style="margin: 5px 0;"><strong>Specialty:</strong> ${specialty}</p>
+                            <p style="margin: 5px 0;"><strong>Time:</strong> ${timestamp}</p>
+                            <p style="margin: 5px 0;"><strong>Stated reason:</strong> ${reason}</p>
+                        </div>
+                        <p>This access has been permanently logged. If you believe this was unauthorised, please contact your healthcare provider or TotalMed support immediately.</p>
+                    </div>
+                `
+            })
+        });
+
+        if (!response.ok) throw new Error("Failed to send emergency access email");
+        console.log(`🚨 Emergency access notification sent to ${targetEmail}`);
+    } catch (error) {
+        console.error("🚨 BREVO EMERGENCY EMAIL ERROR:", error);
+    }
+};
+
+const sendAppointmentReminderEmail = async (targetEmail, whenStr, specialty, location) => {
+    try {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'api-key': process.env.BREVO_API_KEY,
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                sender: { name: "TotalMed Reminders", email: "duncaluca@gmail.com" },
+                to: [{ email: targetEmail }],
+                subject: '📅 Reminder: upcoming medical appointment',
+                htmlContent: `
+                    <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #dfe6e9; padding: 20px; border-radius: 8px;">
+                        <h2 style="color: #0984e3; text-align: center;">Appointment Reminder</h2>
+                        <p>This is a friendly reminder about your upcoming appointment:</p>
+                        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; border-left: 4px solid #0984e3; margin: 20px 0;">
+                            <p style="margin: 5px 0;"><strong>When:</strong> ${whenStr}</p>
+                            ${specialty ? `<p style="margin: 5px 0;"><strong>What:</strong> ${specialty}</p>` : ''}
+                            ${location ? `<p style="margin: 5px 0;"><strong>Where:</strong> ${location}</p>` : ''}
+                        </div>
+                        <p style="color: #636e72; font-size: 0.85em;">You're receiving this because the appointment is scheduled within the next 24 hours.</p>
+                    </div>
+                `
+            })
+        });
+
+        if (!response.ok) throw new Error("Failed to send appointment reminder");
+        console.log(`📅 Appointment reminder sent to ${targetEmail}`);
+    } catch (error) {
+        console.error("🚨 BREVO REMINDER ERROR:", error);
+    }
+};
+
+module.exports = { sendOTPEmail, sendSecurityAlertEmail, sendPasswordResetEmail, sendVerificationEmail, sendEmergencyAccessEmail, sendAppointmentReminderEmail };

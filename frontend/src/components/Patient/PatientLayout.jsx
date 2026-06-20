@@ -12,6 +12,8 @@ const PatientLayout = () => {
   const [pagination, setPagination] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [viewingDoctor, setViewingDoctor] = useState(null);
+  const [viewingUntil, setViewingUntil] = useState(null); // epoch ms when the grant expires
+  const [now, setNow] = useState(Date.now());
   
   const { logout, authRequest, setAuthRequest, socket } = useAuth();
   const showToast = useToast();
@@ -56,16 +58,19 @@ const PatientLayout = () => {
         accessCode: null
       } : prev);
       setViewingDoctor(null); // adding a record ends the viewing session
+      setViewingUntil(null);
       navigate('/patient/history');
     };
     const handleViewingStarted = (data) => {
       setViewingDoctor(data?.doctorName || 'Your doctor');
+      const minutes = data?.durationMinutes || 15;
+      setViewingUntil(Date.now() + minutes * 60 * 1000);
       // The access code was consumed on the server the moment access was granted.
       // Clear it locally so we don't keep showing a dead code, and so the
       // "Generate Access Code" button reappears for the next share.
       setPatientData(prev => prev ? { ...prev, accessCode: null } : prev);
     };
-    const handleViewingEnded = () => setViewingDoctor(null);
+    const handleViewingEnded = () => { setViewingDoctor(null); setViewingUntil(null); };
 
     socket.on('vault-updated', handleVaultUpdated);
     socket.on('vault-viewing-started', handleViewingStarted);
@@ -77,18 +82,23 @@ const PatientLayout = () => {
     };
   }, [socket, navigate]);
 
-  // Fallback: never let the "doctor is viewing" banner get stuck — the vault
-  // session token expires after 15 minutes anyway.
+  // Tick once a second while a doctor is viewing, so the countdown updates and
+  // the banner clears itself the moment the grant expires.
   useEffect(() => {
-    if (!viewingDoctor) return;
-    const t = setTimeout(() => setViewingDoctor(null), 15 * 60 * 1000);
-    return () => clearTimeout(t);
-  }, [viewingDoctor]);
+    if (!viewingUntil) return;
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= viewingUntil) { setViewingDoctor(null); setViewingUntil(null); }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [viewingUntil]);
 
   const handleRevokeAccess = async () => {
     try {
       await fetchWithAuth('/api/patient/revoke-access', { method: 'POST' });
       setViewingDoctor(null);
+      setViewingUntil(null);
       showToast('Access revoked. The doctor can no longer add records.', 'success');
     } catch (error) {
       showToast(error.message || 'Failed to revoke access.', 'error');
@@ -153,6 +163,14 @@ const PatientLayout = () => {
           }} />
           <Typography sx={{ color: '#5b4fe6', fontWeight: 600 }}>
             {viewingDoctor} is currently viewing the records you shared.
+            {viewingUntil && (() => {
+              const secs = Math.max(0, Math.round((viewingUntil - now) / 1000));
+              const h = Math.floor(secs / 3600);
+              const m = Math.floor((secs % 3600) / 60);
+              const s = secs % 60;
+              const pretty = h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+              return ` Access expires in ${pretty}.`;
+            })()}
           </Typography>
           <Button
             onClick={handleRevokeAccess}

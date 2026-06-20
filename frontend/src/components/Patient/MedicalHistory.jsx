@@ -2,16 +2,56 @@ import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Box, Button, TextField, InputAdornment } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import DataObjectIcon from '@mui/icons-material/DataObject';
 import SearchIcon from '@mui/icons-material/Search';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useToast } from '../../hooks/useToast';
 import { filterRecords } from '../../utils/recordSearch';
+import { uploadFile, downloadFile, fetchWithAuth } from '../../services/api';
+import RecordAttachments from '../Health/RecordAttachments';
 
 const MedicalHistory = () => {
-  const { patientData, pagination, fetchMoreRecords, loadingMore } = useOutletContext();
+  const { patientData, setPatientData, pagination, fetchMoreRecords, loadingMore } = useOutletContext();
   const showToast = useToast();
   const [search, setSearch] = useState('');
+
+  // Replace the attachments array on one record inside patientData.
+  const setRecordAttachments = (recordId, updater) => {
+    setPatientData((prev) => ({
+      ...prev,
+      medicalRecords: prev.medicalRecords.map((r) =>
+        r.id === recordId ? { ...r, attachments: updater(r.attachments || []) } : r
+      ),
+    }));
+  };
+
+  const uploadAttachment = async (record, file) => {
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('recordId', record.id);
+      const meta = await uploadFile('/api/patient/attachments', fd);
+      setRecordAttachments(record.id, (list) => [...list, meta]);
+      showToast('File attached.', 'success');
+    } catch (e) { showToast(e.message || 'Upload failed.', 'error'); }
+  };
+  const downloadAttachment = async (att) => {
+    try { await downloadFile(`/api/patient/attachments/${att.id}/download`, att.fileName); }
+    catch (e) { showToast(e.message || 'Download failed.', 'error'); }
+  };
+  const deleteAttachment = async (record, att) => {
+    try {
+      await fetchWithAuth(`/api/patient/attachments/${att.id}`, { method: 'DELETE' });
+      setRecordAttachments(record.id, (list) => list.filter((a) => a.id !== att.id));
+      showToast('Attachment removed.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to remove attachment.', 'error'); }
+  };
+
+  const handleExportJson = async () => {
+    try { await downloadFile('/api/patient/export', 'totalmed-export.json'); }
+    catch (e) { showToast(e.message || 'Export failed.', 'error'); }
+  };
 
   const visibleRecords = filterRecords(patientData.medicalRecords, search);
 
@@ -99,7 +139,10 @@ const MedicalHistory = () => {
     <Box>
       <Box className="page-heading">
         <h3 style={{ margin: 0 }}>Your medical history</h3>
-        <Button variant="contained" startIcon={<PictureAsPdfIcon />} onClick={handleDownloadPDF}>Download PDF</Button>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Button variant="outlined" startIcon={<DataObjectIcon />} onClick={handleExportJson}>Export (JSON)</Button>
+          <Button variant="contained" startIcon={<PictureAsPdfIcon />} onClick={handleDownloadPDF}>Download PDF</Button>
+        </Box>
       </Box>
 
       {patientData.medicalRecords && patientData.medicalRecords.length > 0 && (
@@ -122,6 +165,12 @@ const MedicalHistory = () => {
             <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Attending Physician:</strong> Dr. {record.doctor?.lastName || 'Unknown'}</p>
             {record.treatment && <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Treatment Plan:</strong> {record.treatment}</p>}
             {record.notes && <div className="record-notes">"{record.notes}"</div>}
+            <RecordAttachments
+              attachments={record.attachments}
+              onUpload={(file) => uploadAttachment(record, file)}
+              onDownload={downloadAttachment}
+              onDelete={(att) => deleteAttachment(record, att)}
+            />
           </div>
         ))
         ) : (

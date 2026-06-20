@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const prisma = require('../config/prisma');
 const { encrypt, decrypt } = require('../../utils/cipher');
+const { attachMetaToRecords } = require('./attachment.service');
 
 /**
  * Look up an access code by decrypting all active codes and matching.
@@ -89,6 +90,8 @@ async function getDecryptedRecords(patientId, page = 1, limit = 10) {
         }
     });
 
+    await attachMetaToRecords(records);
+
     return { records, total };
 }
 
@@ -158,12 +161,23 @@ async function getPatientAccessLog(patientId, limit = 100) {
     });
     const byUser = new Map(doctors.map(d => [d.userId, d]));
 
+    // Resolve the patient's own user id so their self-service actions read as
+    // "You" rather than "Unknown user".
+    const patient = await prisma.patient.findUnique({
+        where: { id: patientId },
+        select: { userId: true }
+    });
+    const selfUserId = patient?.userId;
+
     return logs.map(l => {
         const d = byUser.get(l.userId);
+        const actor = d
+            ? `Dr. ${d.firstName} ${d.lastName}`
+            : (l.userId === selfUserId ? 'You' : 'Unknown user');
         return {
             id: l.id,
             action: l.action,
-            actor: d ? `Dr. ${d.firstName} ${d.lastName}` : 'Unknown user',
+            actor,
             specialty: d ? d.specialty : null,
             ipAddress: l.ipAddress,
             createdAt: l.createdAt

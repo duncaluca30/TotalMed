@@ -11,7 +11,7 @@ import { isPasswordValid } from '../../utils/passwordRules';
 
 const RegisterForm = () => {
   const [formData, setFormData] = useState({
-    email: '', password: '', confirmPassword: '', firstName: '', lastName: '', dateOfBirth: '', phone: ''
+    email: '', password: '', confirmPassword: '', firstName: '', lastName: '', dateOfBirth: '', phone: '', cnp: ''
   });
   const [registered, setRegistered] = useState(false);
 
@@ -111,6 +111,14 @@ const RegisterForm = () => {
                 slotProps={{ textField: { fullWidth: true, required: true } }}
               />
               <TextField label="Phone Number" name="phone" type="tel" onChange={handleChange} required fullWidth />
+              <TextField
+                label="CNP (Cod Numeric Personal)"
+                name="cnp"
+                onChange={handleChange}
+                fullWidth
+                slotProps={{ htmlInput: { maxLength: 13, inputMode: 'numeric', pattern: '\\d{13}' } }}
+                helperText="Optional — required for emergency access by physicians"
+              />
               <TextField label="Email Address" name="email" type="email" onChange={handleChange} required fullWidth />
               <TextField label="Password" name="password" type="password" value={formData.password} onChange={handleChange} required fullWidth />
               <PasswordChecklist password={formData.password} />

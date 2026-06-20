@@ -1,16 +1,27 @@
 import React, { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, TextField, Box, List, ListItem, ListItemText, Checkbox, Button } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, TextField, Box, List, ListItem, ListItemText, Checkbox, Button, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import { filterRecords } from '../../utils/recordSearch';
+
+// How long the doctor's vault session stays open after approval. Must match the
+// allow-list the server validates in POST /access-vault.
+const DURATION_OPTIONS = [
+  { value: 15, label: '15 minutes' },
+  { value: 60, label: '1 hour' },
+  { value: 480, label: '8 hours' },
+  { value: 1440, label: '24 hours' },
+];
 
 const AuthRequestDialog = ({ authRequest, patientData, onClose, socket }) => {
   const [popupSearch, setPopupSearch] = useState('');
   const [selectedRecordIds, setSelectedRecordIds] = useState([]);
+  const [durationMinutes, setDurationMinutes] = useState(15);
 
   const handleAuthDecision = (approved) => {
-    socket.emit('auth-response', { 
-      code: authRequest.code, 
-      approved: approved, 
-      sharedRecordIds: selectedRecordIds 
+    socket.emit('auth-response', {
+      code: authRequest.code,
+      approved: approved,
+      sharedRecordIds: selectedRecordIds,
+      durationMinutes,
     });
     onClose();
   };
@@ -54,6 +65,23 @@ const AuthRequestDialog = ({ authRequest, patientData, onClose, socket }) => {
             )}
           </List>
         </Box>
+
+        <FormControl fullWidth size="small" sx={{ mt: 2 }}>
+          <InputLabel id="vault-duration-label">Access duration</InputLabel>
+          <Select
+            labelId="vault-duration-label"
+            label="Access duration"
+            value={durationMinutes}
+            onChange={(e) => setDurationMinutes(e.target.value)}
+          >
+            {DURATION_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+            ))}
+          </Select>
+          <Typography sx={{ fontSize: '0.78rem', color: '#636e72', mt: 0.5 }}>
+            The doctor can view and add records until this time runs out. You can revoke access at any moment.
+          </Typography>
+        </FormControl>
       </DialogContent>
       <DialogActions sx={{ p: 3, justifyContent: 'space-between', borderTop: '1px solid #dfe6e9' }}>
         <Button onClick={() => handleAuthDecision(false)} variant="outlined" color="error">Deny All Access</Button>

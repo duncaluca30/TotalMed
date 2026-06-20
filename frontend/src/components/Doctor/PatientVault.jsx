@@ -6,16 +6,18 @@ import HealthAndSafetyOutlinedIcon from '@mui/icons-material/HealthAndSafetyOutl
 import SearchIcon from '@mui/icons-material/Search';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { fetchWithAuth } from '../../services/api';
+import { fetchWithAuth, uploadFile, downloadFile } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 import HealthLists from '../Health/HealthLists';
 import GynecologySection from '../Health/GynecologySection';
 import AppointmentReminders from '../Health/AppointmentReminders';
+import RecordAttachments from '../Health/RecordAttachments';
 import { filterRecords } from '../../utils/recordSearch';
 
 const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) => {
   const [newRecord, setNewRecord] = useState({ diagnosis: '', treatment: '', notes: '' });
   const [recordSearch, setRecordSearch] = useState('');
+  const [records, setRecords] = useState(patient.medicalRecords || []);
   const [allergies, setAllergies] = useState(patient.allergies || []);
   const [medications, setMedications] = useState(patient.medications || []);
   const [births, setBirths] = useState(patient.births || []);
@@ -57,6 +59,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
       const created = await fetchWithAuth('/api/doctor/medications', { method: 'POST', body: vaultBody(payload) });
       setMedications((prev) => [created, ...prev]);
       showToast('Medication added.', 'success');
+      return created;
     } catch (e) { showToast(e.message || 'Failed to add medication.', 'error'); throw e; }
   };
   const updateMedication = async (id, payload) => {
@@ -126,8 +129,30 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
     } catch (e) { showToast(e.message || 'Failed to remove appointment.', 'error'); }
   };
 
+  const setRecordAttachments = (recordId, updater) => {
+    setRecords((prev) => prev.map((r) =>
+      r.id === recordId ? { ...r, attachments: updater(r.attachments || []) } : r
+    ));
+  };
+  const uploadAttachment = async (record, file) => {
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('recordId', record.id);
+      fd.append('patientId', patient.id);
+      fd.append('vaultToken', vaultToken);
+      const meta = await uploadFile('/api/doctor/attachments', fd);
+      setRecordAttachments(record.id, (list) => [...list, meta]);
+      showToast('File attached.', 'success');
+    } catch (e) { showToast(e.message || 'Upload failed.', 'error'); }
+  };
+  const downloadAttachment = async (att) => {
+    try {
+      await downloadFile(`/api/doctor/attachments/${att.id}/download?vaultToken=${encodeURIComponent(vaultToken)}`, att.fileName);
+    } catch (e) { showToast(e.message || 'Download failed.', 'error'); }
+  };
+
   const handleDownloadPDF = () => {
-    const records = patient.medicalRecords || [];
     if (records.length === 0 && allergies.length === 0 && medications.length === 0) {
       return showToast("No data to download.", "error");
     }
@@ -229,7 +254,6 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
     }
   };
 
-  const records = patient.medicalRecords || [];
   const visibleRecords = filterRecords(records, recordSearch);
 
   return (
@@ -337,6 +361,11 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose }) 
               <p style={{ margin: '4px 0', fontSize: '0.9em' }}><strong>Attending:</strong> Dr. {record.doctor?.lastName || 'Unknown'}</p>
               {record.treatment && <p style={{ margin: '4px 0', fontSize: '0.9em' }}><strong>Treatment:</strong> {record.treatment}</p>}
               {record.notes && <div className="record-notes">"{record.notes}"</div>}
+              <RecordAttachments
+                attachments={record.attachments}
+                onUpload={(file) => uploadAttachment(record, file)}
+                onDownload={downloadAttachment}
+              />
             </div>
           ))
           ) : (

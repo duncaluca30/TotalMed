@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Typography, TextField, Button, IconButton, MenuItem, Chip } from '@mui/material';
+import { Box, Typography, TextField, Button, IconButton, MenuItem, Chip, Alert } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
@@ -36,6 +36,7 @@ const HealthLists = ({
   const [medDraft, setMedDraft] = useState(emptyMedication);
   const [editingMedId, setEditingMedId] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [medWarnings, setMedWarnings] = useState([]);
 
   const resetAllergy = () => { setAllergyDraft(emptyAllergy); setEditingAllergyId(null); };
   const resetMed = () => { setMedDraft(emptyMedication); setEditingMedId(null); };
@@ -62,7 +63,8 @@ const HealthLists = ({
       if (editingMedId) {
         await onUpdateMedication(editingMedId, medDraft);
       } else {
-        await onAddMedication(medDraft);
+        const created = await onAddMedication(medDraft);
+        setMedWarnings(created?.warnings || []);
       }
       resetMed();
     } finally { setBusy(false); }
@@ -171,6 +173,13 @@ const HealthLists = ({
           </Box>
         ) : (
           <Typography className="text-muted" sx={{ fontStyle: 'italic', fontSize: '0.9rem' }}>No current medications recorded.</Typography>
+        )}
+
+        {medWarnings.length > 0 && (
+          <Alert severity="warning" onClose={() => setMedWarnings([])} sx={{ mt: 2 }}>
+            <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Safety check — medication still saved</Typography>
+            {medWarnings.map((w, i) => <Typography key={i} sx={{ fontSize: '0.85rem' }}>• {w}</Typography>)}
+          </Alert>
         )}
 
         {editable && (

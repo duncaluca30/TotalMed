@@ -2,6 +2,7 @@ import React from 'react';
 import { AppBar, Toolbar, Typography, Button } from '@mui/material';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import { useAuth } from '../../context/AuthContext';
+import NotificationBell from './NotificationBell';
 
 const AppHeader = ({ title }) => {
   const { logout } = useAuth();
@@ -13,6 +14,7 @@ const AppHeader = ({ title }) => {
         <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold', letterSpacing: '1px' }}>
           {title}
         </Typography>
+        <NotificationBell />
         <Button color="inherit" onClick={logout} sx={{ fontWeight: 'bold' }}>Secure Logout</Button>
       </Toolbar>
     </AppBar>

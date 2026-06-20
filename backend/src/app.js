@@ -14,6 +14,8 @@ const setupSocketHandlers = require('./socket/handler');
 const authRoutes = require('./routes/auth.routes');
 const patientRoutes = require('./routes/patient.routes');
 const doctorRoutes = require('./routes/doctor.routes');
+const adminRoutes = require('./routes/admin.routes');
+const notificationRoutes = require('./routes/notification.routes');
 const prisma = require('./config/prisma');
 const { csrfProtection } = require('./middleware/csrf');
 
@@ -73,6 +75,8 @@ function createServer() {
     app.use('/api/auth', authRoutes);
     app.use('/api/patient', patientRoutes);
     app.use('/api/doctor', doctorRoutes);
+    app.use('/api/admin', adminRoutes);
+    app.use('/api/notifications', notificationRoutes);
 
     // --- SERVE FRONTEND IN PRODUCTION ---
     if (process.env.NODE_ENV === 'production') {

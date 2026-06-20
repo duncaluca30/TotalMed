@@ -50,4 +50,30 @@ function decrypt(text) {
     }
 }
 
-module.exports = { encrypt, decrypt };
+// ── Binary variants (for file attachments) ───────────────────────────────────
+// Text encrypt/decrypt above go through hex+utf8, which is fine for short fields
+// but wasteful for files. These work directly on Buffers and store the result as
+// a single binary blob laid out as: iv(16) | authTag(16) | ciphertext.
+
+function encryptBuffer(buffer) {
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(algorithm, Buffer.from(secretKey), iv);
+
+    const ciphertext = Buffer.concat([cipher.update(buffer), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+
+    return Buffer.concat([iv, authTag, ciphertext]);
+}
+
+function decryptBuffer(blob) {
+    const iv = blob.subarray(0, 16);
+    const authTag = blob.subarray(16, 32);
+    const ciphertext = blob.subarray(32);
+
+    const decipher = crypto.createDecipheriv(algorithm, Buffer.from(secretKey), iv);
+    decipher.setAuthTag(authTag);
+
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+}
+
+module.exports = { encrypt, decrypt, encryptBuffer, decryptBuffer };

@@ -15,7 +15,8 @@ const ProtectedRoute = ({ allowedRoles, children }) => {
 
   if (allowedRoles && !allowedRoles.includes(role)) {
     // If logged in but wrong role, redirect to appropriate dashboard
-    return <Navigate to={role === 'PATIENT' ? '/patient' : '/doctor'} replace />;
+    const home = role === 'PATIENT' ? '/patient' : role === 'ADMIN' ? '/admin' : '/doctor';
+    return <Navigate to={home} replace />;
   }
 
   return children;

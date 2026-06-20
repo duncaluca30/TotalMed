@@ -77,6 +77,7 @@ model Patient {
   firstName   String
   lastName    String
   dateOfBirth DateTime
+  cnp         String?  @unique
   phone       String?
   sex         Sex?
   accessCode    AccessCode?
@@ -89,11 +90,12 @@ model Patient {
   userId      String   @unique
   user        User     @relation(fields: [userId], references: [id])
 
-  appointments   Appointment[]
-  medicalRecords MedicalRecord[]
-  allergies      Allergy[]
-  medications    Medication[]
-  births         Birth[]
+  appointments     Appointment[]
+  medicalRecords   MedicalRecord[]
+  allergies        Allergy[]
+  medications      Medication[]
+  births           Birth[]
+  emergencyAccesses EmergencyAccess[]
 }
 
 model Doctor {
@@ -106,8 +108,9 @@ model Doctor {
   userId        String   @unique
   user          User     @relation(fields: [userId], references: [id])
 
-  appointments   Appointment[]
-  medicalRecords MedicalRecord[]
+  appointments     Appointment[]
+  medicalRecords   MedicalRecord[]
+  emergencyAccesses EmergencyAccess[]
 }
 
 // A reminder on the patient's calendar (e.g. "Cardiology check-up · 12.06.2027 ·
@@ -121,6 +124,10 @@ model Appointment {
   specialty String?
   location  String?
   reason    String?
+
+  // Set once a 24h-ahead reminder email has been sent, so the daily job never
+  // emails the same appointment twice.
+  reminderSentAt DateTime?
 
   patientId String
   patient   Patient  @relation(fields: [patientId], references: [id])
@@ -138,9 +145,29 @@ model MedicalRecord {
 
   patientId   String
   patient     Patient  @relation(fields: [patientId], references: [id])
-  
+
   doctorId    String
   doctor      Doctor   @relation(fields: [doctorId], references: [id])
+
+  attachments Attachment[]
+}
+
+// A file (lab result, imaging, discharge letter…) attached to a medical record.
+// The bytes and the original file name are encrypted at rest; mimeType and
+// sizeBytes stay plaintext so the UI can render a chip without decrypting.
+// Attachments inherit the consent of their parent record: a doctor only ever
+// receives the metadata for records the patient chose to share, and the bytes
+// are streamed on demand behind the same authorisation checks.
+model Attachment {
+  id        String   @id @default(uuid())
+  fileName  String   // encrypted
+  mimeType  String
+  sizeBytes Int
+  data      Bytes    // encrypted blob (iv | authTag | ciphertext)
+  createdAt DateTime @default(now())
+
+  recordId  String
+  record    MedicalRecord @relation(fields: [recordId], references: [id])
 }
 
 // Patient-level allergy. Sensitive text fields (substance, reaction) are stored
@@ -209,9 +236,38 @@ model Passkey {
 
 model AuditLog {
   id        String   @id @default(uuid())
-  userId    String   
-  action    String   
-  details   String?  
+  userId    String
+  action    String
+  details   String?
   ipAddress String?
   createdAt DateTime @default(now())
+}
+
+// Records every break-the-glass access so the patient can be notified post-hoc
+// and administrators can audit the use of emergency override.
+model EmergencyAccess {
+  id          String    @id @default(uuid())
+  reason      String
+  notifiedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  doctorId    String
+  doctor      Doctor    @relation(fields: [doctorId], references: [id])
+  patientId   String
+  patient     Patient   @relation(fields: [patientId], references: [id])
+}
+
+// In-app notification for any user (patient or doctor). Persisted so the user
+// has a durable history of everything that touched their account, complementing
+// the transient Socket.IO events and the security emails.
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // RECORD_ADDED | EMERGENCY_ACCESS | NEW_LOGIN | VAULT_ACCESSED
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
 }

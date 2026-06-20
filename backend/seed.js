@@ -93,6 +93,16 @@ async function main() {
     });
     console.log(`✅ Created Appointment for tomorrow at ${tomorrow.toLocaleTimeString()}`);
 
+    // 4. Create an Administrator (oversees the audit trail + emergency accesses)
+    const admin = await prisma.user.create({
+        data: {
+            email: "admin@totalmed.com",
+            password: hashedPassword,
+            role: "ADMIN"
+        }
+    });
+    console.log(`✅ Created Admin: ${admin.email}`);
+
     console.log("🎉 Database seeding completed successfully!");
 }
 

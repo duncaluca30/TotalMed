@@ -9,6 +9,7 @@ const { generateRegistrationOptions, verifyRegistrationResponse,
 const prisma = require('../config/prisma');
 const { encrypt, decrypt } = require('../../utils/cipher');
 const { sendOTPEmail, sendSecurityAlertEmail, sendPasswordResetEmail, sendVerificationEmail } = require('../../utils/mailer');
+const notifications = require('./notification.service');
 
 // Tokens are emailed in the clear (in the link) but stored only as a SHA-256 hash.
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
@@ -19,7 +20,7 @@ const hashResetToken = hashToken;
  * Register a new patient user.
  * Returns the created user object.
  */
-async function registerUser({ email, password, firstName, lastName, dateOfBirth, phone }, baseUrl) {
+async function registerUser({ email, password, firstName, lastName, dateOfBirth, phone, cnp }, baseUrl) {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
         const error = new Error("Email is already registered");
@@ -47,7 +48,8 @@ async function registerUser({ email, password, firstName, lastName, dateOfBirth,
                     firstName,
                     lastName,
                     dateOfBirth: new Date(dateOfBirth),
-                    phone
+                    phone,
+                    ...(cnp ? { cnp } : {})
                 }
             }
         }
@@ -165,6 +167,12 @@ async function authenticateUser(email, password, req) {
         }
 
         await sendSecurityAlertEmail(user.email, locationString, currentDevice);
+        await notifications.create(
+            user.id,
+            'NEW_LOGIN',
+            'New login detected',
+            `A login to your account was detected from ${locationString}.`
+        );
     }
 
     await prisma.user.update({

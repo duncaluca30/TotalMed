@@ -13,7 +13,8 @@ const registerSchema = z.object({
     const dob = new Date(dateStr);
     return !isNaN(dob.getTime()) && dob <= new Date();
   }, { message: "Invalid date of birth or date is in the future" }),
-  phone: z.string().min(5, "Phone number is required")
+  phone: z.string().min(5, "Phone number is required"),
+  cnp: z.string().regex(/^\d{13}$/, "CNP must be exactly 13 digits").optional()
 });
 
 const loginSchema = z.object({

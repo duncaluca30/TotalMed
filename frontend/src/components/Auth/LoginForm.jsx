@@ -111,7 +111,7 @@ const LoginForm = () => {
         setCsrfToken(data.csrfToken);
         login(data.role);
         showToast('Identity Verified! Welcome.', 'success');
-        navigate(data.role === 'PATIENT' ? '/patient' : '/doctor');
+        navigate(data.role === 'PATIENT' ? '/patient' : data.role === 'ADMIN' ? '/admin' : '/doctor');
       } else {
         showToast(data.error, 'error');
       }
@@ -145,7 +145,7 @@ const LoginForm = () => {
         setCsrfToken(data.csrfToken);
         login(data.role);
         showToast('Identity Verified! Welcome.', 'success');
-        navigate(data.role === 'PATIENT' ? '/patient' : '/doctor');
+        navigate(data.role === 'PATIENT' ? '/patient' : data.role === 'ADMIN' ? '/admin' : '/doctor');
       } else {
         showToast(data.error, 'error');
       }

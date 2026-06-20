@@ -77,6 +77,7 @@ const HealthProfile = () => {
       const created = await fetchWithAuth('/api/patient/medications', { method: 'POST', body: JSON.stringify(payload) });
       setMedications([created, ...medications]);
       showToast('Medication added.', 'success');
+      return created;
     } catch (e) { showToast(e.message || 'Failed to add medication.', 'error'); throw e; }
   };
   const updateMedication = async (id, payload) => {

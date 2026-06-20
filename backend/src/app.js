@@ -9,6 +9,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const fs = require('fs'); // DEV-SHOT
 
 const setupSocketHandlers = require('./socket/handler');
 const authRoutes = require('./routes/auth.routes');
@@ -16,6 +17,7 @@ const patientRoutes = require('./routes/patient.routes');
 const doctorRoutes = require('./routes/doctor.routes');
 const adminRoutes = require('./routes/admin.routes');
 const notificationRoutes = require('./routes/notification.routes');
+const publicRoutes = require('./routes/public.routes');
 const prisma = require('./config/prisma');
 const { csrfProtection } = require('./middleware/csrf');
 
@@ -50,7 +52,7 @@ function createServer() {
         credentials: true
     }));
     app.set('trust proxy', 1);
-    app.use(express.json());
+    app.use(express.json({ limit: '25mb' }));
     app.use(cookieParser());
     app.use(helmet());
 
@@ -72,6 +74,12 @@ function createServer() {
         }
     });
 
+    app.use('/api/public', publicRoutes);
+    app.post('/api/dev/save-shot', (req, res) => { // DEV-SHOT
+        try { const { name, dataUrl } = req.body; const b64 = dataUrl.replace(/^data:image\/png;base64,/, '');
+        fs.writeFileSync(path.join(__dirname, '../../../shots', name.replace(/[^a-z0-9_-]/gi,'') + '.png'), Buffer.from(b64,'base64'));
+        res.json({ ok: true }); } catch (e) { res.status(500).json({ error: String(e) }); }
+    });
     app.use('/api/auth', authRoutes);
     app.use('/api/patient', patientRoutes);
     app.use('/api/doctor', doctorRoutes);

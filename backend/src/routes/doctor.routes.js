@@ -8,7 +8,7 @@ const { vaultLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 const { recordSchema, patientSearchSchema, emergencyAccessSchema } = require('../schemas/doctor.schema');
 const { vaultAccessSchema } = require('../schemas/vault.schema');
-const { doctorAllergySchema, doctorMedicationSchema, doctorBirthSchema, doctorPatientProfileSchema, doctorAppointmentSchema, doctorVitalSchema } = require('../schemas/health.schema');
+const { doctorAllergySchema, doctorMedicationSchema, doctorBirthSchema, doctorPatientProfileSchema, doctorAppointmentSchema, doctorVitalSchema, doctorVaccinationSchema } = require('../schemas/health.schema');
 
 const { lookupAccessCode, decryptRecords, createEncryptedRecord, createAuditLog, getDecryptedRecords } = require('../services/vault.service');
 const health = require('../services/health.service');
@@ -162,6 +162,7 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                 patientData.births = await health.getBirths(validCode.patientId);
                 patientData.appointments = await health.getDecryptedAppointments(validCode.patientId);
                 patientData.vitalSigns = await health.getVitalSigns(validCode.patientId);
+                patientData.vaccinations = await health.getVaccinations(validCode.patientId);
 
                 const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
                 await createAuditLog({
@@ -226,7 +227,7 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
 
-        const { patientId, vaultToken, diagnosis, treatment, notes } = req.body;
+        const { patientId, vaultToken, diagnosis, treatment, notes, icdCode } = req.body;
 
         // Validate the vault session token (issued during access-vault)
         let vaultSession;
@@ -248,7 +249,7 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
         }
 
         const newRecord = await createEncryptedRecord({
-            diagnosis, treatment, notes,
+            diagnosis, treatment, notes, icdCode,
             patientId: vaultSession.patientId,
             doctorId: doctor.id
         });
@@ -277,6 +278,7 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
                     diagnosis,
                     treatment,
                     notes: notes || null,
+                    icdCode: icdCode || null,
                     doctor: { lastName: doctor.lastName }
                 };
                 io.to(patientForSocket.userId).emit('vault-updated', { newRecord: decryptedRecord });
@@ -613,6 +615,26 @@ router.post('/vitals', authenticateToken, validate(doctorVitalSchema), async (re
     }
 });
 
+// ── Vaccinations (doctor, during an active vault session) ────────────────────
+
+// POST /api/doctor/vaccinations
+router.post('/vaccinations', authenticateToken, validate(doctorVaccinationSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
+        const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
+
+        const { patientId, vaultToken, vaccineName, date, doseNumber, nextDoseDate, notes } = req.body;
+        const check = verifyVaultSession(vaultToken, doctor.id, patientId);
+        if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+        const vaccination = await health.createVaccination({ patientId, vaccineName, date, doseNumber, nextDoseDate, notes });
+        res.status(201).json(vaccination);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to add vaccination." });
+    }
+});
+
 // ── Appointment reminders (doctor, during an active vault session) ───────────
 
 // POST /api/doctor/appointments
@@ -698,6 +720,7 @@ router.get('/consultations', authenticateToken, async (req, res) => {
         const consultations = rows.map(r => ({
             id: r.id,
             diagnosis: decrypt(r.diagnosis),
+            icdCode: r.icdCode ? decrypt(r.icdCode) : null,
             patient: `${r.patient.firstName} ${r.patient.lastName}`,
             createdAt: r.createdAt
         }));
@@ -771,6 +794,7 @@ router.post('/emergency-access', authenticateToken, vaultLimiter, validate(emerg
         const medications = await health.getDecryptedMedications(patientId);
         const births = await health.getBirths(patientId);
         const vitalSigns = await health.getVitalSigns(patientId);
+        const vaccinations = await health.getVaccinations(patientId);
 
         // Issue a standard vault token so the doctor can add records if needed
         const vaultToken = jwt.sign(
@@ -802,7 +826,7 @@ router.post('/emergency-access', authenticateToken, vaultLimiter, validate(emerg
         if (note) req.io.to(patientWithUser.userId).emit('notification', note);
 
         res.json({
-            patient: { ...patientWithUser, medicalRecords: records, allergies, medications, births, vitalSigns },
+            patient: { ...patientWithUser, medicalRecords: records, allergies, medications, births, vitalSigns, vaccinations },
             vaultToken
         });
     } catch (error) {

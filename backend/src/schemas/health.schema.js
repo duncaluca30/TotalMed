@@ -34,6 +34,22 @@ const appointmentFields = {
   reason: z.string().max(500, 'Note too long (max 500 chars)').optional().nullable()
 };
 
+const vaccinationFields = {
+  vaccineName: z.string().min(1, 'Vaccine name is required').max(200, 'Name too long (max 200 chars)'),
+  date: z.string().min(1, 'Date is required'),
+  doseNumber: z.coerce.number().int().min(1).max(50).optional().nullable(),
+  nextDoseDate: z.string().optional().nullable(),
+  notes: z.string().max(500, 'Note too long (max 500 chars)').optional().nullable()
+};
+
+const emergencyProfileFields = {
+  bloodType: z.string().max(10, 'Blood type too long').optional().nullable(),
+  emergencyContactName: z.string().max(120, 'Name too long').optional().nullable(),
+  emergencyContactPhone: z.string().max(40, 'Phone too long').optional().nullable(),
+  enabled: z.boolean().optional(),
+  regenerate: z.boolean().optional()
+};
+
 const vitalFields = {
   type: z.enum(['BLOOD_PRESSURE', 'WEIGHT', 'GLUCOSE', 'HEART_RATE', 'TEMPERATURE']),
   value: z.coerce.number().finite('Value must be a number'),
@@ -54,6 +70,8 @@ const birthSchema = z.object(birthFields);
 const patientProfileSchema = z.object(patientProfileFields);
 const appointmentSchema = z.object(appointmentFields);
 const vitalSchema = z.object(vitalFields);
+const vaccinationSchema = z.object(vaccinationFields);
+const emergencyProfileSchema = z.object(emergencyProfileFields);
 
 const doctorAllergySchema = z.object({ ...allergyFields, ...vaultFields });
 const doctorMedicationSchema = z.object({ ...medicationFields, ...vaultFields });
@@ -61,6 +79,7 @@ const doctorBirthSchema = z.object({ ...birthFields, ...vaultFields });
 const doctorPatientProfileSchema = z.object({ ...patientProfileFields, ...vaultFields });
 const doctorAppointmentSchema = z.object({ ...appointmentFields, ...vaultFields });
 const doctorVitalSchema = z.object({ ...vitalFields, ...vaultFields });
+const doctorVaccinationSchema = z.object({ ...vaccinationFields, ...vaultFields });
 
 module.exports = {
   allergySchema,
@@ -69,10 +88,13 @@ module.exports = {
   patientProfileSchema,
   appointmentSchema,
   vitalSchema,
+  vaccinationSchema,
+  emergencyProfileSchema,
   doctorAllergySchema,
   doctorMedicationSchema,
   doctorBirthSchema,
   doctorPatientProfileSchema,
   doctorAppointmentSchema,
-  doctorVitalSchema
+  doctorVitalSchema,
+  doctorVaccinationSchema
 };

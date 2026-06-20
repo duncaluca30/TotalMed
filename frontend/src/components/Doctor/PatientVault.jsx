@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Typography, Button, TextField, InputAdornment } from '@mui/material';
+import { Box, Typography, Button, TextField, InputAdornment, Autocomplete, Chip } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import MinimizeIcon from '@mui/icons-material/Minimize';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
@@ -13,12 +13,14 @@ import HealthLists from '../Health/HealthLists';
 import GynecologySection from '../Health/GynecologySection';
 import AppointmentReminders from '../Health/AppointmentReminders';
 import VitalSigns from '../Health/VitalSigns';
+import Vaccinations from '../Health/Vaccinations';
 import RecordAttachments from '../Health/RecordAttachments';
 import RecordAmendments from '../Health/RecordAmendments';
 import { filterRecords } from '../../utils/recordSearch';
+import { ICD10_CODES, icdLabel } from '../../data/icd10';
 
 const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, onMinimize }) => {
-  const [newRecord, setNewRecord] = useState({ diagnosis: '', treatment: '', notes: '' });
+  const [newRecord, setNewRecord] = useState({ diagnosis: '', treatment: '', notes: '', icdCode: '' });
   const [recordSearch, setRecordSearch] = useState('');
   const [records, setRecords] = useState(patient.medicalRecords || []);
   const [allergies, setAllergies] = useState(patient.allergies || []);
@@ -26,6 +28,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
   const [births, setBirths] = useState(patient.births || []);
   const [appointments, setAppointments] = useState(patient.appointments || []);
   const [vitalSigns, setVitalSigns] = useState(patient.vitalSigns || []);
+  const [vaccinations, setVaccinations] = useState(patient.vaccinations || []);
   const [profile, setProfile] = useState({
     sex: patient.sex || null,
     menarcheDate: patient.menarcheDate || null,
@@ -140,6 +143,13 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
       showToast('Reading added.', 'success');
     } catch (e) { showToast(e.message || 'Failed to add reading.', 'error'); throw e; }
   };
+  const addVaccination = async (payload) => {
+    try {
+      const created = await fetchWithAuth('/api/doctor/vaccinations', { method: 'POST', body: vaultBody(payload) });
+      setVaccinations((prev) => [created, ...prev]);
+      showToast('Vaccination added.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to add vaccination.', 'error'); throw e; }
+  };
 
   const setRecordAttachments = (recordId, updater) => {
     setRecords((prev) => prev.map((r) =>
@@ -232,7 +242,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
       head: [["Date", "Diagnosis", "Treatment Plan", "Attending Dr.", "Clinical Notes"]],
       body: records.map(record => [
         new Date(record.createdAt).toLocaleDateString(),
-        record.diagnosis,
+        record.diagnosis + (record.icdCode ? ` (${record.icdCode})` : ''),
         record.treatment || "N/A",
         `Dr. ${record.doctor?.lastName || 'Unknown'}`,
         record.notes || "None"
@@ -358,6 +368,9 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
           <Box sx={{ borderTop: '1px solid rgba(231, 76, 60, 0.15)', mt: 3, pt: 3 }}>
             <VitalSigns vitals={vitalSigns} onAdd={addVital} />
           </Box>
+          <Box sx={{ borderTop: '1px solid rgba(231, 76, 60, 0.15)', mt: 3, pt: 3 }}>
+            <Vaccinations vaccinations={vaccinations} onAdd={addVaccination} />
+          </Box>
         </Box>
 
         {/* Shared records */}
@@ -385,6 +398,10 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
                 <h4 style={{ margin: 0 }}>{record.diagnosis}</h4>
                 <span className="text-muted" style={{ whiteSpace: 'nowrap' }}>{new Date(record.createdAt).toLocaleDateString()}</span>
               </div>
+              {record.icdCode && (
+                <Chip size="small" label={icdLabel(record.icdCode)} title={icdLabel(record.icdCode)}
+                  sx={{ mb: 0.5, maxWidth: '100%', backgroundColor: 'rgba(91,79,230,0.1)', color: '#5b4fe6', fontWeight: 600 }} />
+              )}
               <p style={{ margin: '4px 0', fontSize: '0.9em' }}><strong>Attending:</strong> Dr. {record.doctor?.lastName || 'Unknown'}</p>
               {record.treatment && <p style={{ margin: '4px 0', fontSize: '0.9em' }}><strong>Treatment:</strong> {record.treatment}</p>}
               {record.notes && <div className="record-notes">"{record.notes}"</div>}
@@ -444,6 +461,14 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
             fullWidth
             value={newRecord.diagnosis}
             onChange={(e) => setNewRecord({...newRecord, diagnosis: e.target.value})}
+          />
+          <Autocomplete
+            options={ICD10_CODES}
+            getOptionLabel={(o) => `${o.code} — ${o.description}`}
+            isOptionEqualToValue={(o, v) => o.code === v.code}
+            value={ICD10_CODES.find((o) => o.code === newRecord.icdCode) || null}
+            onChange={(e, option) => setNewRecord({ ...newRecord, icdCode: option ? option.code : '' })}
+            renderInput={(params) => <TextField {...params} label="ICD-10 code (optional)" placeholder="Search by code or diagnosis…" />}
           />
           <TextField
             label="Treatment Plan"

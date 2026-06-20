@@ -232,4 +232,37 @@ const sendAppointmentReminderEmail = async (targetEmail, whenStr, specialty, loc
     }
 };
 
-module.exports = { sendOTPEmail, sendSecurityAlertEmail, sendPasswordResetEmail, sendVerificationEmail, sendEmergencyAccessEmail, sendAppointmentReminderEmail };
+const sendMedicationReminderEmail = async (targetEmail, meds) => {
+    try {
+        const rows = meds.map(m =>
+            `<li style="margin:4px 0;"><strong>${m.name}</strong>${m.dosage ? ` · ${m.dosage}` : ''}${m.frequency ? ` · ${m.frequency}` : ''}</li>`
+        ).join('');
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'api-key': process.env.BREVO_API_KEY,
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                sender: { name: "TotalMed Reminders", email: "duncaluca@gmail.com" },
+                to: [{ email: targetEmail }],
+                subject: '💊 Your medication reminder',
+                htmlContent: `
+                    <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #dfe6e9; padding: 20px; border-radius: 8px;">
+                        <h2 style="color: #5b4fe6; text-align: center;">Medication Reminder</h2>
+                        <p>A friendly reminder to take today's medications:</p>
+                        <ul style="background-color: #f8f9fa; padding: 15px 15px 15px 35px; border-radius: 6px; border-left: 4px solid #5b4fe6;">${rows}</ul>
+                        <p style="color: #636e72; font-size: 0.85em;">You can turn these reminders off per medication in your TotalMed health profile.</p>
+                    </div>
+                `
+            })
+        });
+        if (!response.ok) throw new Error("Failed to send medication reminder");
+        console.log(`💊 Medication reminder sent to ${targetEmail}`);
+    } catch (error) {
+        console.error("🚨 BREVO MEDICATION REMINDER ERROR:", error);
+    }
+};
+
+module.exports = { sendOTPEmail, sendSecurityAlertEmail, sendPasswordResetEmail, sendVerificationEmail, sendEmergencyAccessEmail, sendAppointmentReminderEmail, sendMedicationReminderEmail };

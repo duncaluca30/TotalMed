@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Box, Button, TextField, InputAdornment } from '@mui/material';
+import { Box, Button, TextField, InputAdornment, Chip } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import DataObjectIcon from '@mui/icons-material/DataObject';
 import SearchIcon from '@mui/icons-material/Search';
@@ -11,6 +11,7 @@ import { filterRecords } from '../../utils/recordSearch';
 import { uploadFile, downloadFile, fetchWithAuth } from '../../services/api';
 import RecordAttachments from '../Health/RecordAttachments';
 import RecordAmendments from '../Health/RecordAmendments';
+import { icdLabel } from '../../data/icd10';
 
 const MedicalHistory = () => {
   const { patientData, setPatientData, pagination, fetchMoreRecords, loadingMore } = useOutletContext();
@@ -121,7 +122,7 @@ const MedicalHistory = () => {
     recordsToPrint.forEach(record => {
       tableRows.push([
         new Date(record.createdAt).toLocaleDateString(),
-        record.diagnosis,
+        record.diagnosis + (record.icdCode ? ` (${record.icdCode})` : ''),
         record.treatment || "N/A",
         `Dr. ${record.doctor?.lastName || 'Unknown'}`,
         record.notes || "None"
@@ -163,6 +164,10 @@ const MedicalHistory = () => {
               <h4 style={{ margin: 0 }}>{record.diagnosis}</h4>
               <span className="text-muted">{new Date(record.createdAt).toLocaleDateString()}</span>
             </div>
+            {record.icdCode && (
+              <Chip size="small" label={icdLabel(record.icdCode)} title={icdLabel(record.icdCode)}
+                sx={{ mb: 1, maxWidth: '100%', backgroundColor: 'rgba(91,79,230,0.1)', color: '#5b4fe6', fontWeight: 600 }} />
+            )}
             <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Attending Physician:</strong> Dr. {record.doctor?.lastName || 'Unknown'}</p>
             {record.treatment && <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Treatment Plan:</strong> {record.treatment}</p>}
             {record.notes && <div className="record-notes">"{record.notes}"</div>}

@@ -17,6 +17,7 @@ import DoctorLayout from './components/Doctor/DoctorLayout';
 import DoctorDashboard from './components/Doctor/DoctorDashboard';
 import AdminLayout from './components/Admin/AdminLayout';
 import AdminDashboard from './components/Admin/AdminDashboard';
+import EmergencyCard from './components/Public/EmergencyCard';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import './App.css';
 
@@ -31,6 +32,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordForm />} />
           <Route path="/reset-password" element={<ResetPasswordForm />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/emergency/:token" element={<EmergencyCard />} />
           
           <Route 
             path="/patient" 

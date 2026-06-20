@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const prisma = require('../config/prisma');
 const { decrypt } = require('../../utils/cipher');
-const { sendAppointmentReminderEmail } = require('../../utils/mailer');
+const { sendAppointmentReminderEmail, sendMedicationReminderEmail } = require('../../utils/mailer');
 
 // Send a reminder for every SCHEDULED appointment happening within the next 24h
 // that hasn't been reminded yet, then stamp reminderSentAt so it's never emailed
@@ -40,12 +40,46 @@ async function runReminderSweep() {
     }
 }
 
+// Once a day, email each patient a digest of the medications they've opted into
+// reminders for. Grouped per patient so they get one email, not one per drug.
+async function runMedicationReminderSweep() {
+    const meds = await prisma.medication.findMany({
+        where: { reminderEnabled: true },
+        include: { patient: { include: { user: { select: { email: true } } } } }
+    });
+
+    const byEmail = new Map();
+    for (const m of meds) {
+        const email = m.patient?.user?.email;
+        if (!email) continue;
+        const list = byEmail.get(email) || [];
+        list.push({
+            name: decrypt(m.name),
+            dosage: m.dosage ? decrypt(m.dosage) : null,
+            frequency: m.frequency ? decrypt(m.frequency) : null
+        });
+        byEmail.set(email, list);
+    }
+
+    for (const [email, list] of byEmail) {
+        await sendMedicationReminderEmail(email, list);
+    }
+    if (byEmail.size > 0) {
+        console.log(`💊 Sent ${byEmail.size} medication reminder digest(s).`);
+    }
+}
+
 function startReminderJob() {
-    // Top of every hour.
+    // Appointment reminders — top of every hour.
     cron.schedule('0 * * * *', () => {
         runReminderSweep().catch((e) => console.error("🚨 Reminder sweep failed:", e));
+    });
+    // Medication reminders — once a day at 08:00.
+    cron.schedule('0 8 * * *', () => {
+        runMedicationReminderSweep().catch((e) => console.error("🚨 Medication reminder sweep failed:", e));
     });
 }
 
 module.exports = startReminderJob;
 module.exports.runReminderSweep = runReminderSweep;
+module.exports.runMedicationReminderSweep = runMedicationReminderSweep;

@@ -21,6 +21,7 @@ async function buildFhirBundle(patientId) {
     const appointments = await health.getDecryptedAppointments(patientId);
     const births = await health.getBirths(patientId);
     const vitals = await health.getVitalSigns(patientId);
+    const vaccinations = await health.getVaccinations(patientId);
 
     const entries = [];
 
@@ -39,12 +40,16 @@ async function buildFhirBundle(patientId) {
     });
 
     for (const r of records) {
+        const code = { text: r.diagnosis };
+        if (r.icdCode) {
+            code.coding = [{ system: 'http://hl7.org/fhir/sid/icd-10', code: r.icdCode }];
+        }
         entries.push({
             resource: {
                 resourceType: 'Condition',
                 id: r.id,
                 subject: { reference: `Patient/${patient.id}` },
-                code: { text: r.diagnosis },
+                code,
                 note: [r.treatment ? { text: `Treatment: ${r.treatment}` } : null,
                        r.notes ? { text: r.notes } : null].filter(Boolean),
                 recordedDate: r.createdAt
@@ -115,6 +120,21 @@ async function buildFhirBundle(patientId) {
                 code: { text: v.type },
                 effectiveDateTime: v.measuredAt,
                 valueString: `${v.value2 != null ? `${v.value}/${v.value2}` : v.value} ${v.unit}`
+            }
+        });
+    }
+
+    for (const vac of vaccinations) {
+        entries.push({
+            resource: {
+                resourceType: 'Immunization',
+                id: vac.id,
+                status: 'completed',
+                patient: { reference: `Patient/${patient.id}` },
+                vaccineCode: { text: vac.vaccineName },
+                occurrenceDateTime: vac.date,
+                doseQuantity: vac.doseNumber != null ? { value: vac.doseNumber } : undefined,
+                note: vac.notes ? [{ text: vac.notes }] : undefined
             }
         });
     }

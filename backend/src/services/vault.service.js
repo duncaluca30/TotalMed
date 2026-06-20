@@ -85,6 +85,9 @@ async function getDecryptedRecords(patientId, page = 1, limit = 10) {
     records.forEach(record => {
         if (record.diagnosis) record.diagnosis = decrypt(record.diagnosis);
         if (record.treatment) record.treatment = decrypt(record.treatment);
+        if (record.icdCode) {
+            try { record.icdCode = decrypt(record.icdCode); } catch (e) { console.error("Failed to decrypt icdCode for record", record.id); }
+        }
         if (record.notes) {
             try {
                 record.notes = decrypt(record.notes);
@@ -107,6 +110,9 @@ function decryptRecords(records) {
     records.forEach(record => {
         if (record.diagnosis) record.diagnosis = decrypt(record.diagnosis);
         if (record.treatment) record.treatment = decrypt(record.treatment);
+        if (record.icdCode) {
+            try { record.icdCode = decrypt(record.icdCode); } catch (e) { console.error("Failed to decrypt icdCode for record", record.id); }
+        }
         if (record.notes) {
             try {
                 record.notes = decrypt(record.notes);
@@ -121,12 +127,13 @@ function decryptRecords(records) {
 /**
  * Create an encrypted medical record.
  */
-async function createEncryptedRecord({ diagnosis, treatment, notes, patientId, doctorId }) {
+async function createEncryptedRecord({ diagnosis, treatment, notes, icdCode, patientId, doctorId }) {
     return prisma.medicalRecord.create({
         data: {
             diagnosis: encrypt(diagnosis),
             treatment: encrypt(treatment),
             notes: notes ? encrypt(notes) : null,
+            icdCode: icdCode ? encrypt(icdCode) : null,
             patientId,
             doctorId
         }

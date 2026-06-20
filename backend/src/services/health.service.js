@@ -145,6 +145,17 @@ async function deleteMedication({ id, patientId }) {
     return result.count > 0;
 }
 
+/** Toggle the daily reminder for a medication, scoped to its owner. */
+async function setMedicationReminder({ id, patientId, enabled }) {
+    const result = await prisma.medication.updateMany({
+        where: { id, patientId },
+        data: { reminderEnabled: !!enabled }
+    });
+    if (result.count === 0) return null;
+    const updated = await prisma.medication.findUnique({ where: { id } });
+    return decryptMedication(updated);
+}
+
 // ── Gynecological / obstetric profile ───────────────────────────────────────
 
 /**
@@ -263,6 +274,49 @@ async function deleteAppointment({ id, patientId }) {
     return result.count > 0;
 }
 
+// ── Vaccinations ─────────────────────────────────────────────────────────────
+// Vaccine name + notes are encrypted; date/dose are structured typed columns.
+
+function decryptVaccination(v) {
+    if (!v) return v;
+    if (v.vaccineName) v.vaccineName = decrypt(v.vaccineName);
+    if (v.notes) {
+        try { v.notes = decrypt(v.notes); } catch (e) { console.error('Failed to decrypt notes for vaccination', v.id); }
+    }
+    return v;
+}
+
+/** Fetch and decrypt a patient's vaccinations (most recent first). */
+async function getVaccinations(patientId) {
+    const rows = await prisma.vaccination.findMany({
+        where: { patientId },
+        orderBy: { date: 'desc' }
+    });
+    rows.forEach(decryptVaccination);
+    return rows;
+}
+
+/** Create an encrypted vaccination, returning it decrypted. */
+async function createVaccination({ patientId, vaccineName, date, doseNumber, nextDoseDate, notes }) {
+    const created = await prisma.vaccination.create({
+        data: {
+            patientId,
+            vaccineName: encrypt(vaccineName),
+            date: new Date(date),
+            doseNumber: doseNumber ?? null,
+            nextDoseDate: nextDoseDate ? new Date(nextDoseDate) : null,
+            notes: notes ? encrypt(notes) : null
+        }
+    });
+    return decryptVaccination(created);
+}
+
+/** Delete a vaccination scoped to its owning patient. Returns true if deleted. */
+async function deleteVaccination({ id, patientId }) {
+    const result = await prisma.vaccination.deleteMany({ where: { id, patientId } });
+    return result.count > 0;
+}
+
 // ── Vital signs ──────────────────────────────────────────────────────────────
 // Numeric measurements — stored as plain typed columns (non-identifying and
 // needed for charting), so no encryption, unlike the free-text health fields.
@@ -296,6 +350,9 @@ async function deleteVitalSign({ id, patientId }) {
 }
 
 module.exports = {
+    getVaccinations,
+    createVaccination,
+    deleteVaccination,
     getVitalSigns,
     createVitalSign,
     deleteVitalSign,
@@ -309,6 +366,7 @@ module.exports = {
     createMedication,
     updateMedication,
     deleteMedication,
+    setMedicationReminder,
     updatePatientProfile,
     getBirths,
     createBirth,

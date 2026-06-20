@@ -6,6 +6,8 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import MedicationOutlinedIcon from '@mui/icons-material/MedicationOutlined';
+import NotificationsActiveOutlinedIcon from '@mui/icons-material/NotificationsActiveOutlined';
+import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
 
 const SEVERITY = {
   MILD: { label: 'Mild', color: '#0f6e56', bg: 'rgba(0, 184, 148, 0.12)' },
@@ -30,6 +32,7 @@ const HealthLists = ({
   editable = true,
   onAddAllergy, onUpdateAllergy, onDeleteAllergy,
   onAddMedication, onUpdateMedication, onDeleteMedication,
+  onToggleMedicationReminder,
 }) => {
   const [allergyDraft, setAllergyDraft] = useState(emptyAllergy);
   const [editingAllergyId, setEditingAllergyId] = useState(null);
@@ -164,6 +167,18 @@ const HealthLists = ({
                 </Box>
                 {editable && (
                   <Box sx={{ display: 'flex', flexShrink: 0 }}>
+                    {onToggleMedicationReminder && (
+                      <IconButton
+                        size="small"
+                        onClick={() => onToggleMedicationReminder(m.id, !m.reminderEnabled)}
+                        title={m.reminderEnabled ? 'Daily reminder on' : 'Daily reminder off'}
+                        aria-label="Toggle medication reminder"
+                      >
+                        {m.reminderEnabled
+                          ? <NotificationsActiveOutlinedIcon fontSize="small" sx={{ color: '#5b4fe6' }} />
+                          : <NotificationsNoneOutlinedIcon fontSize="small" />}
+                      </IconButton>
+                    )}
                     <IconButton size="small" onClick={() => startEditMed(m)} aria-label="Edit medication"><EditOutlinedIcon fontSize="small" /></IconButton>
                     <IconButton size="small" color="error" onClick={() => onDeleteMedication(m.id)} aria-label="Delete medication"><DeleteOutlineIcon fontSize="small" /></IconButton>
                   </Box>

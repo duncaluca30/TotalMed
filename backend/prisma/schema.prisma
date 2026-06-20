@@ -91,6 +91,16 @@ model Patient {
   menarcheDate DateTime?
   atMenopause  Boolean  @default(false)
 
+  // Emergency Medical ID — an opt-in, minimal "in case of emergency" profile a
+  // first responder can read without logging in, via an unguessable token URL.
+  // Free-text fields are encrypted at rest; the card is only served when
+  // emergencyEnabled is true. emergencyId is the bearer capability in the URL.
+  bloodType            String?  // encrypted
+  emergencyContactName String?  // encrypted
+  emergencyContactPhone String? // encrypted
+  emergencyId          String?  @unique
+  emergencyEnabled     Boolean  @default(false)
+
   userId      String   @unique
   user        User     @relation(fields: [userId], references: [id])
 
@@ -101,6 +111,22 @@ model Patient {
   births           Birth[]
   emergencyAccesses EmergencyAccess[]
   vitalSigns       VitalSign[]
+  vaccinations     Vaccination[]
+}
+
+// A single immunization in the patient's history. Vaccine name and notes are
+// encrypted at rest; the structured date/dose fields stay typed and chartable.
+model Vaccination {
+  id           String    @id @default(uuid())
+  vaccineName  String    // encrypted
+  date         DateTime
+  doseNumber   Int?
+  nextDoseDate DateTime?
+  notes        String?   // encrypted
+  createdAt    DateTime  @default(now())
+
+  patientId    String
+  patient      Patient   @relation(fields: [patientId], references: [id])
 }
 
 // A single time-stamped vital-sign measurement. Values are numeric and
@@ -167,6 +193,9 @@ model MedicalRecord {
   diagnosis   String
   treatment   String?
   notes       String?
+  // Optional ICD-10 code for the diagnosis. Encrypted at rest like the diagnosis
+  // text itself, so a DB leak can't reveal coded diagnoses either.
+  icdCode     String?
   createdAt   DateTime @default(now())
 
   patientId   String
@@ -233,6 +262,8 @@ model Medication {
   name      String
   dosage    String?
   frequency String?
+  // When true, the patient receives a daily reminder email for this medication.
+  reminderEnabled Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

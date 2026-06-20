@@ -6,6 +6,8 @@ import { useToast } from '../../hooks/useToast';
 import HealthLists from '../Health/HealthLists';
 import GynecologySection from '../Health/GynecologySection';
 import VitalSigns from '../Health/VitalSigns';
+import Vaccinations from '../Health/Vaccinations';
+import EmergencyMedicalId from '../Health/EmergencyMedicalId';
 
 const HealthProfile = () => {
   const { patientData, setPatientData } = useOutletContext();
@@ -15,11 +17,28 @@ const HealthProfile = () => {
   const medications = patientData.medications || [];
   const births = patientData.births || [];
   const vitalSigns = patientData.vitalSigns || [];
+  const vaccinations = patientData.vaccinations || [];
 
   const setAllergies = (next) => setPatientData({ ...patientData, allergies: next });
   const setMedications = (next) => setPatientData({ ...patientData, medications: next });
   const setBirths = (next) => setPatientData({ ...patientData, births: next });
   const setVitals = (next) => setPatientData({ ...patientData, vitalSigns: next });
+  const setVaccinations = (next) => setPatientData({ ...patientData, vaccinations: next });
+
+  const addVaccination = async (payload) => {
+    try {
+      const created = await fetchWithAuth('/api/patient/vaccinations', { method: 'POST', body: JSON.stringify(payload) });
+      setVaccinations([created, ...vaccinations]);
+      showToast('Vaccination added.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to add vaccination.', 'error'); throw e; }
+  };
+  const deleteVaccination = async (id) => {
+    try {
+      await fetchWithAuth(`/api/patient/vaccinations/${id}`, { method: 'DELETE' });
+      setVaccinations(vaccinations.filter((v) => v.id !== id));
+      showToast('Vaccination removed.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to remove vaccination.', 'error'); }
+  };
 
   const addVital = async (payload) => {
     try {
@@ -112,6 +131,13 @@ const HealthProfile = () => {
       showToast('Medication removed.', 'success');
     } catch (e) { showToast(e.message || 'Failed to remove medication.', 'error'); }
   };
+  const toggleMedicationReminder = async (id, enabled) => {
+    try {
+      const updated = await fetchWithAuth(`/api/patient/medications/${id}/reminder`, { method: 'POST', body: JSON.stringify({ enabled }) });
+      setMedications(medications.map((m) => (m.id === id ? updated : m)));
+      showToast(enabled ? 'Daily reminder on.' : 'Daily reminder off.', 'success');
+    } catch (e) { showToast(e.message || 'Failed to update reminder.', 'error'); }
+  };
 
   return (
     <Box>
@@ -144,11 +170,20 @@ const HealthProfile = () => {
           onAddMedication={addMedication}
           onUpdateMedication={updateMedication}
           onDeleteMedication={deleteMedication}
+          onToggleMedicationReminder={toggleMedicationReminder}
         />
       </div>
 
       <div className="card" style={{ marginTop: '20px' }}>
         <VitalSigns vitals={vitalSigns} onAdd={addVital} onDelete={deleteVital} />
+      </div>
+
+      <div className="card" style={{ marginTop: '20px' }}>
+        <Vaccinations vaccinations={vaccinations} onAdd={addVaccination} onDelete={deleteVaccination} />
+      </div>
+
+      <div className="card" style={{ marginTop: '20px' }}>
+        <EmergencyMedicalId />
       </div>
     </Box>
   );

@@ -6,8 +6,9 @@ const authenticateToken = require('../middleware/authenticate');
 const validate = require('../middleware/validate');
 const { getDecryptedRecords, generateAccessCode, getPatientAccessLog } = require('../services/vault.service');
 const { revokeVaultAccess } = require('../services/vaultRevocations');
-const { allergySchema, medicationSchema, birthSchema, patientProfileSchema, appointmentSchema, vitalSchema } = require('../schemas/health.schema');
+const { allergySchema, medicationSchema, birthSchema, patientProfileSchema, appointmentSchema, vitalSchema, vaccinationSchema, emergencyProfileSchema } = require('../schemas/health.schema');
 const health = require('../services/health.service');
+const emergency = require('../services/emergency.service');
 const attachments = require('../services/attachment.service');
 const { buildFhirBundle } = require('../services/export.service');
 const { createAuditLog } = require('../services/vault.service');
@@ -24,6 +25,16 @@ async function getPatientId(userId) {
         select: { id: true }
     });
     return patient ? patient.id : null;
+}
+
+// Enrich an emergency profile with the public card URL + a QR of it, built from
+// wherever the patient opened the app (so the link points at a real page).
+async function withEmergencyLink(req, profile) {
+    if (!profile || !profile.emergencyEnabled || !profile.emergencyId) return profile;
+    const base = req.headers.origin || process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+    const emergencyUrl = `${base}/emergency/${profile.emergencyId}`;
+    const qrDataUrl = await qrcode.toDataURL(emergencyUrl);
+    return { ...profile, emergencyUrl, qrDataUrl };
 }
 
 // GET /api/patient/dashboard
@@ -60,6 +71,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         patientData.births = await health.getBirths(patientData.id);
         patientData.appointments = await health.getDecryptedAppointments(patientData.id);
         patientData.vitalSigns = await health.getVitalSigns(patientData.id);
+        patientData.vaccinations = await health.getVaccinations(patientData.id);
 
         if (patientData.accessCode) {
             patientData.accessCode.code = decrypt(patientData.accessCode.code);
@@ -243,6 +255,22 @@ router.delete('/medications/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// POST /api/patient/medications/:id/reminder — toggle the daily reminder
+router.post('/medications/:id/reminder', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const medication = await health.setMedicationReminder({ id: req.params.id, patientId, enabled: req.body.enabled });
+        if (!medication) return res.status(404).json({ error: "Medication not found." });
+        res.json(medication);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update reminder." });
+    }
+});
+
 // ── Gynecological profile (patient self-service) ─────────────────────────────
 
 // PUT /api/patient/profile — patch sex / menopause / menarche
@@ -395,6 +423,72 @@ router.delete('/vitals/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// ── Vaccinations (patient self-service) ──────────────────────────────────────
+
+// POST /api/patient/vaccinations
+router.post('/vaccinations', authenticateToken, validate(vaccinationSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const { vaccineName, date, doseNumber, nextDoseDate, notes } = req.body;
+        const vaccination = await health.createVaccination({ patientId, vaccineName, date, doseNumber, nextDoseDate, notes });
+        res.status(201).json(vaccination);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to add vaccination." });
+    }
+});
+
+// DELETE /api/patient/vaccinations/:id
+router.delete('/vaccinations/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const deleted = await health.deleteVaccination({ id: req.params.id, patientId });
+        if (!deleted) return res.status(404).json({ error: "Vaccination not found." });
+        res.json({ message: "Vaccination removed." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to remove vaccination." });
+    }
+});
+
+// ── Emergency Medical ID (patient self-service) ──────────────────────────────
+
+// GET /api/patient/emergency-profile — the owner's view (decrypted + token)
+router.get('/emergency-profile', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const profile = await emergency.getProfile(patientId);
+        res.json(await withEmergencyLink(req, profile));
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to load emergency profile." });
+    }
+});
+
+// PUT /api/patient/emergency-profile — update fields / enable / regenerate token
+router.put('/emergency-profile', authenticateToken, validate(emergencyProfileSchema), async (req, res) => {
+    try {
+        if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
+        const patientId = await getPatientId(req.user.id);
+        if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
+
+        const profile = await emergency.updateProfile(patientId, req.body);
+        res.json(await withEmergencyLink(req, profile));
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update emergency profile." });
+    }
+});
+
 // ── Data portability (GDPR) ──────────────────────────────────────────────────
 
 // GET /api/patient/export — download the full history as a FHIR-style JSON Bundle.
@@ -510,6 +604,7 @@ router.delete('/account', authenticateToken, async (req, res) => {
             prisma.amendment.deleteMany({ where: { recordId: { in: recordIds } } }),
             prisma.attachment.deleteMany({ where: { recordId: { in: recordIds } } }),
             prisma.vitalSign.deleteMany({ where: { patientId } }),
+            prisma.vaccination.deleteMany({ where: { patientId } }),
             prisma.appointment.deleteMany({ where: { patientId } }),
             prisma.medicalRecord.deleteMany({ where: { patientId } }),
             prisma.allergy.deleteMany({ where: { patientId } }),

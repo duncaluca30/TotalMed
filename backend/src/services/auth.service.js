@@ -248,8 +248,7 @@ async function sendEmailOTP(userId) {
         data: { emailOtpCode: hashedOtp, emailOtpExpiresAt: expiresAt }
     });
 
-    console.log('[DEVOTP]', otpCode); // DEV-SHOT
-    try { await sendOTPEmail(user.email, otpCode); } catch(e){ console.log('[DEVOTP] mail skipped'); }
+    await sendOTPEmail(user.email, otpCode);
 }
 
 /**

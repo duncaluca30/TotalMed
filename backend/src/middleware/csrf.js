@@ -43,8 +43,7 @@ const EXEMPT_ROUTES = [
     '/api/auth/2fa/validate',
     '/api/auth/webauthn/generate-authentication',
     '/api/auth/webauthn/verify-authentication',
-    '/api/status',
-    '/api/dev/save-shot' // DEV-SHOT
+    '/api/status'
 ];
 
 function csrfProtection(req, res, next) {

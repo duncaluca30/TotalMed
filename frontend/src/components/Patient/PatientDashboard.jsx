@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
 import CakeOutlinedIcon from '@mui/icons-material/CakeOutlined';
 import VerifiedUserOutlinedIcon from '@mui/icons-material/VerifiedUserOutlined';
@@ -11,6 +12,7 @@ import SecurityCard from '../Layout/SecurityCard';
 import AppointmentReminders from '../Health/AppointmentReminders';
 
 const PatientDashboard = () => {
+  const { t, i18n } = useTranslation();
   const { patientData, setPatientData } = useOutletContext();
   const showToast = useToast();
   const navigate = useNavigate();
@@ -23,22 +25,22 @@ const PatientDashboard = () => {
     try {
       const created = await fetchWithAuth('/api/patient/appointments', { method: 'POST', body: JSON.stringify(payload) });
       setAppointments([...appointments, created].sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime)));
-      showToast('Appointment added.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to add appointment.', 'error'); throw e; }
+      showToast(t('Appointment added.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to add appointment.'), 'error'); throw e; }
   };
   const updateAppointment = async (id, payload) => {
     try {
       const updated = await fetchWithAuth(`/api/patient/appointments/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
       setAppointments(appointments.map((a) => (a.id === id ? updated : a)).sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime)));
-      showToast('Appointment updated.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to update appointment.', 'error'); throw e; }
+      showToast(t('Appointment updated.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to update appointment.'), 'error'); throw e; }
   };
   const deleteAppointment = async (id) => {
     try {
       await fetchWithAuth(`/api/patient/appointments/${id}`, { method: 'DELETE' });
       setAppointments(appointments.filter((a) => a.id !== id));
-      showToast('Appointment removed.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to remove appointment.', 'error'); }
+      showToast(t('Appointment removed.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to remove appointment.'), 'error'); }
   };
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -49,11 +51,11 @@ const PatientDashboard = () => {
     setDeleting(true);
     try {
       await fetchWithAuth('/api/patient/account', { method: 'DELETE' });
-      showToast('Your account has been deleted.', 'success');
+      showToast(t('Your account has been deleted.'), 'success');
       logout();
       navigate('/login');
     } catch (e) {
-      showToast(e.message || 'Failed to delete account.', 'error');
+      showToast(e.message || t('Failed to delete account.'), 'error');
       setDeleting(false);
     }
   };
@@ -62,14 +64,14 @@ const PatientDashboard = () => {
     try {
       const data = await fetchWithAuth('/api/patient/generate-code', { method: 'POST' });
       setPatientData({ ...patientData, accessCode: { code: data.code, expiresAt: data.expiresAt, qrDataUrl: data.qrDataUrl } });
-      showToast("Code generated successfully!", "success");
+      showToast(t('Code generated successfully!'), 'success');
     } catch (error) {
-      showToast(error.message || "Failed to generate code.", "error");
+      showToast(error.message || t('Failed to generate code.'), 'error');
     }
   };
 
   const initials = `${patientData.firstName?.[0] || ''}${patientData.lastName?.[0] || ''}`.toUpperCase();
-  const dob = new Date(patientData.dateOfBirth).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const dob = new Date(patientData.dateOfBirth).toLocaleDateString(i18n.language === 'ro' ? 'ro-RO' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const rawCode = patientData.accessCode?.code || '';
   const prettyCode = rawCode.length === 6 ? `${rawCode.slice(0, 3)} ${rawCode.slice(3)}` : rawCode;
 
@@ -86,12 +88,12 @@ const PatientDashboard = () => {
               {patientData.firstName} {patientData.lastName}
             </Typography>
             <Typography sx={{ fontSize: '0.9rem', color: 'var(--light-text)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <CakeOutlinedIcon sx={{ fontSize: 16 }} /> Date of birth · {dob}
+              <CakeOutlinedIcon sx={{ fontSize: 16 }} /> {t('Date of birth')} · {dob}
             </Typography>
           </Box>
           {patientData?.user?.isTwoFactorEnabled && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, background: 'rgba(0, 184, 148, 0.12)', color: '#0f6e56', px: 1.25, py: 0.5, borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600 }}>
-              <VerifiedUserOutlinedIcon sx={{ fontSize: 15 }} /> 2FA on
+              <VerifiedUserOutlinedIcon sx={{ fontSize: 15 }} /> {t('2FA on')}
             </Box>
           )}
         </Box>
@@ -111,31 +113,31 @@ const PatientDashboard = () => {
       <div className="card card--access-code" style={{ marginTop: '20px' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
           <VpnKeyOutlinedIcon sx={{ fontSize: 20, color: '#7c3aed' }} />
-          <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: '#4c1d95' }}>Share medical file</Typography>
+          <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: '#4c1d95' }}>{t('Share medical file')}</Typography>
         </Box>
         <Typography sx={{ color: '#6b5ca8', fontSize: '0.9rem', mb: 2 }}>
-          Generate a temporary 6-digit code to let a doctor view your history and add records. It expires in 60 minutes.
+          {t('Generate a temporary 6-digit code to let a doctor view your history and add records. It expires in 60 minutes.')}
         </Typography>
 
         {!patientData.accessCode ? (
           <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-            <button onClick={handleGenerateCode} style={{ color: 'white', fontWeight: 600 }}>Generate code</button>
+            <button onClick={handleGenerateCode} style={{ color: 'white', fontWeight: 600 }}>{t('Generate code')}</button>
           </Box>
         ) : (
           <Box sx={{ textAlign: 'center' }}>
-            <Typography sx={{ fontSize: '0.78rem', color: '#6b5ca8', mb: 0.5 }}>Your secure code</Typography>
+            <Typography sx={{ fontSize: '0.78rem', color: '#6b5ca8', mb: 0.5 }}>{t('Your secure code')}</Typography>
             <Typography sx={{ fontSize: '2.4rem', fontWeight: 700, letterSpacing: '8px', color: '#7c3aed', lineHeight: 1 }}>{prettyCode}</Typography>
             {patientData.accessCode.qrDataUrl && (
               <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
                 <img
                   src={patientData.accessCode.qrDataUrl}
-                  alt="Access code QR"
+                  alt={t('Access code QR')}
                   style={{ width: 150, height: 150, background: '#fff', padding: 8, borderRadius: 8, border: '1px solid #e0d9f5' }}
                 />
               </Box>
             )}
             <Typography sx={{ fontSize: '0.8rem', color: '#c0392b', mt: 1 }}>
-              Show the code or QR to your doctor. Keep this window open.
+              {t('Show the code or QR to your doctor. Keep this window open.')}
             </Typography>
           </Box>
         )}
@@ -153,25 +155,26 @@ const PatientDashboard = () => {
 
       {/* Danger zone */}
       <div className="card" style={{ marginTop: '20px', border: '1px solid #ffd6d6' }}>
-        <Typography sx={{ fontWeight: 600, color: '#c0392b', mb: 0.5 }}>Delete account</Typography>
+        <Typography sx={{ fontWeight: 600, color: '#c0392b', mb: 0.5 }}>{t('Delete account')}</Typography>
         <Typography sx={{ color: 'var(--light-text)', fontSize: '0.9rem', mb: 1.5 }}>
-          Permanently erase your account and all medical data. This cannot be undone.
+          {t('Permanently erase your account and all medical data. This cannot be undone.')}
         </Typography>
-        <Button variant="outlined" color="error" onClick={() => setDeleteOpen(true)}>Delete my account</Button>
+        <Button variant="outlined" color="error" onClick={() => setDeleteOpen(true)}>{t('Delete my account')}</Button>
       </div>
 
       <Dialog open={deleteOpen} onClose={() => !deleting && setDeleteOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ color: '#c0392b', fontWeight: 700 }}>Delete account permanently?</DialogTitle>
+        <DialogTitle sx={{ color: '#c0392b', fontWeight: 700 }}>{t('Delete account permanently?')}</DialogTitle>
         <DialogContent>
           <Typography sx={{ mb: 2, fontSize: '0.92rem' }}>
-            This will erase your profile, medical records, allergies, medications, gynecological history and appointments. This action is irreversible. Type <strong>DELETE</strong> to confirm.
+            {t('This will erase your profile, medical records, allergies, medications, gynecological history and appointments. This action is irreversible.')}{' '}
+            {t('Type')} <strong>DELETE</strong> {t('to confirm.')}
           </Typography>
           <TextField fullWidth size="small" value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder="DELETE" autoFocus />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDeleteOpen(false)} disabled={deleting} sx={{ textTransform: 'none', color: '#636e72' }}>Cancel</Button>
+          <Button onClick={() => setDeleteOpen(false)} disabled={deleting} sx={{ textTransform: 'none', color: '#636e72' }}>{t('Cancel')}</Button>
           <Button onClick={handleDeleteAccount} variant="contained" color="error" disabled={deleting || deleteConfirm !== 'DELETE'} sx={{ textTransform: 'none' }}>
-            {deleting ? 'Deleting…' : 'Delete forever'}
+            {deleting ? t('Deleting…') : t('Delete forever')}
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { IconButton, Badge, Menu, MenuItem, Typography, Box, Button, Divider } from '@mui/material';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import { fetchWithAuth } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 const NotificationBell = () => {
+  const { t } = useTranslation();
   const { socket } = useAuth();
   const [items, setItems] = useState([]);
   const [unread, setUnread] = useState(0);
@@ -67,15 +69,15 @@ const NotificationBell = () => {
         slotProps={{ paper: { sx: { width: 360, maxHeight: 440 } } }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1 }}>
-          <Typography sx={{ fontWeight: 700 }}>Notifications</Typography>
+          <Typography sx={{ fontWeight: 700 }}>{t('Notifications')}</Typography>
           {unread > 0 && (
-            <Button size="small" onClick={markAllRead} sx={{ textTransform: 'none' }}>Mark all read</Button>
+            <Button size="small" onClick={markAllRead} sx={{ textTransform: 'none' }}>{t('Mark all read')}</Button>
           )}
         </Box>
         <Divider />
         {items.length === 0 ? (
           <MenuItem disabled>
-            <Typography sx={{ color: 'text.secondary', fontStyle: 'italic' }}>No notifications yet.</Typography>
+            <Typography sx={{ color: 'text.secondary', fontStyle: 'italic' }}>{t('No notifications yet.')}</Typography>
           </MenuItem>
         ) : (
           items.map((n) => (

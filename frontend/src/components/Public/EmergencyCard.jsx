@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Chip, CircularProgress } from '@mui/material';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
@@ -9,6 +10,7 @@ const SEVERITY_COLOR = { SEVERE: '#c0392b', MODERATE: '#b7791f', MILD: '#0f6e56'
 
 // PUBLIC page (no login) reached by scanning a patient's Emergency Medical ID QR.
 const EmergencyCard = () => {
+  const { t } = useTranslation();
   const { token } = useParams();
   const [card, setCard] = useState(undefined); // undefined = loading, null = not found
 
@@ -26,8 +28,8 @@ const EmergencyCard = () => {
   if (card === null) {
     return (
       <Box sx={{ maxWidth: 480, mx: 'auto', mt: 8, textAlign: 'center', px: 2 }}>
-        <Typography variant="h6" sx={{ color: '#636e72' }}>No emergency card found</Typography>
-        <Typography sx={{ color: '#b2bec3', mt: 1 }}>This link is invalid or the card has been disabled.</Typography>
+        <Typography variant="h6" sx={{ color: '#636e72' }}>{t('No emergency card found')}</Typography>
+        <Typography sx={{ color: '#b2bec3', mt: 1 }}>{t('This link is invalid or the card has been disabled.')}</Typography>
       </Box>
     );
   }
@@ -47,23 +49,23 @@ const EmergencyCard = () => {
       }}>
         <MedicalServicesIcon />
         <Box>
-          <Typography sx={{ fontWeight: 800, letterSpacing: '1px', lineHeight: 1 }}>EMERGENCY MEDICAL ID</Typography>
-          <Typography sx={{ fontSize: '0.8rem', opacity: 0.9 }}>TotalMed · for first responders</Typography>
+          <Typography sx={{ fontWeight: 800, letterSpacing: '1px', lineHeight: 1 }}>{t('EMERGENCY MEDICAL ID')}</Typography>
+          <Typography sx={{ fontSize: '0.8rem', opacity: 0.9 }}>{t('TotalMed · for first responders')}</Typography>
         </Box>
       </Box>
 
       <Box sx={{ border: '1px solid #eee', borderTop: 'none', borderRadius: '0 0 14px 14px', p: 3 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>{card.firstName} {card.lastName}</Typography>
         <Box sx={{ mt: 1 }}>
-          <Row label="Date of birth" value={card.dateOfBirth ? new Date(card.dateOfBirth).toLocaleDateString() : null} />
-          <Row label="Sex" value={card.sex ? { MALE: 'Male', FEMALE: 'Female', OTHER: 'Other' }[card.sex] : null} />
-          <Row label="Blood type" value={card.bloodType} />
+          <Row label={t('Date of birth')} value={card.dateOfBirth ? new Date(card.dateOfBirth).toLocaleDateString() : null} />
+          <Row label={t('Sex')} value={card.sex ? t({ MALE: 'Male', FEMALE: 'Female', OTHER: 'Other' }[card.sex]) : null} />
+          <Row label={t('Blood type')} value={card.bloodType === 'Unknown' ? t('Unknown') : card.bloodType} />
         </Box>
 
         <Box sx={{ mt: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
             <WarningAmberIcon sx={{ fontSize: 18, color: '#c0392b' }} />
-            <Typography sx={{ fontWeight: 700, color: '#c0392b' }}>Allergies</Typography>
+            <Typography sx={{ fontWeight: 700, color: '#c0392b' }}>{t('Allergies')}</Typography>
           </Box>
           {card.allergies?.length ? (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
@@ -72,23 +74,23 @@ const EmergencyCard = () => {
                   sx={{ backgroundColor: `${SEVERITY_COLOR[a.severity] || '#636e72'}22`, color: SEVERITY_COLOR[a.severity] || '#636e72', fontWeight: 600 }} />
               ))}
             </Box>
-          ) : <Typography sx={{ color: '#b2bec3', fontStyle: 'italic' }}>None recorded</Typography>}
+          ) : <Typography sx={{ color: '#b2bec3', fontStyle: 'italic' }}>{t('None recorded')}</Typography>}
         </Box>
 
         <Box sx={{ mt: 2 }}>
-          <Typography sx={{ fontWeight: 700, color: '#5b4fe6', mb: 0.5 }}>Current medications</Typography>
+          <Typography sx={{ fontWeight: 700, color: '#5b4fe6', mb: 0.5 }}>{t('Current medications')}</Typography>
           {card.medications?.length ? (
             card.medications.map((m, i) => (
               <Typography key={i} sx={{ fontSize: '0.92rem' }}>
                 • {m.name}{m.dosage ? ` · ${m.dosage}` : ''}{m.frequency ? ` · ${m.frequency}` : ''}
               </Typography>
             ))
-          ) : <Typography sx={{ color: '#b2bec3', fontStyle: 'italic' }}>None recorded</Typography>}
+          ) : <Typography sx={{ color: '#b2bec3', fontStyle: 'italic' }}>{t('None recorded')}</Typography>}
         </Box>
 
         {(card.emergencyContactName || card.emergencyContactPhone) && (
           <Box sx={{ mt: 2, p: 2, backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-            <Typography sx={{ fontWeight: 700, mb: 0.5 }}>In case of emergency, contact</Typography>
+            <Typography sx={{ fontWeight: 700, mb: 0.5 }}>{t('In case of emergency, contact')}</Typography>
             <Typography>{card.emergencyContactName}</Typography>
             {card.emergencyContactPhone && (
               <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>

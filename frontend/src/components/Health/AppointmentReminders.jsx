@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, TextField, Button, IconButton } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -19,6 +20,7 @@ const AppointmentReminders = ({
   editable = true,
   onAdd, onUpdate, onDelete,
 }) => {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(emptyDraft);
   const [editingId, setEditingId] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -47,7 +49,7 @@ const AppointmentReminders = ({
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
         <EventOutlinedIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />
-        <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>Appointment reminders</Typography>
+        <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>{t('Appointment reminders')}</Typography>
       </Box>
 
       {appointments.length > 0 ? (
@@ -77,22 +79,22 @@ const AppointmentReminders = ({
           ))}
         </Box>
       ) : (
-        <Typography className="text-muted" sx={{ fontStyle: 'italic', fontSize: '0.9rem' }}>No upcoming appointments.</Typography>
+        <Typography className="text-muted" sx={{ fontStyle: 'italic', fontSize: '0.9rem' }}>{t('No upcoming appointments.')}</Typography>
       )}
 
       {editable && (
         <Box component="form" onSubmit={submit} sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 1.5, mt: 2 }}>
-          <TextField size="small" label="Specialty / title" required value={draft.specialty}
+          <TextField size="small" label={t('Specialty / title')} required value={draft.specialty}
             onChange={(e) => setDraft({ ...draft, specialty: e.target.value })} sx={{ flex: '1 1 160px' }} />
-          <TextField size="small" type="date" label="Date" required value={draft.dateTime}
+          <TextField size="small" type="date" label={t('Date')} required value={draft.dateTime}
             onChange={(e) => setDraft({ ...draft, dateTime: e.target.value })}
             slotProps={{ inputLabel: { shrink: true } }} sx={{ flex: '0 0 170px' }} />
-          <TextField size="small" label="Location (optional)" value={draft.location}
+          <TextField size="small" label={t('Location (optional)')} value={draft.location}
             onChange={(e) => setDraft({ ...draft, location: e.target.value })} sx={{ flex: '1 1 160px' }} />
-          <TextField size="small" label="Note (optional)" value={draft.reason}
+          <TextField size="small" label={t('Note (optional)')} value={draft.reason}
             onChange={(e) => setDraft({ ...draft, reason: e.target.value })} sx={{ flex: '1 1 160px' }} />
           <Button type="submit" variant="contained" disabled={busy} startIcon={editingId ? null : <AddIcon />} sx={{ flexShrink: 0 }}>
-            {editingId ? 'Save' : 'Add'}
+            {editingId ? t('Save') : t('Add')}
           </Button>
           {editingId && <IconButton onClick={reset} aria-label="Cancel edit"><CloseIcon /></IconButton>}
         </Box>

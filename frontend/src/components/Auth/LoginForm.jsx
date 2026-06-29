@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Typography, Box, TextField, Button, Tabs, Tab } from '@mui/material';
 import { startAuthentication } from '@simplewebauthn/browser';
 import { API_URL, setCsrfToken } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../hooks/useToast';
+import LanguageSwitcher from '../Layout/LanguageSwitcher';
 
 const LoginForm = () => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [requires2FA, setRequires2FA] = useState(false);
   const [savedUserId, setSavedUserId] = useState('');
@@ -26,7 +29,7 @@ const LoginForm = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    showToast('Verifying credentials...', 'info');
+    showToast(t('Verifying credentials...'), 'info');
     try {
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
@@ -47,18 +50,18 @@ const LoginForm = () => {
         setSavedUserId(data.userId);
         setRequires2FA(true);
         setAvailable2FAMethods(data.methods);
-        
+
         const defaultMethod = data.methods.includes('APP') ? 'APP' : 'EMAIL';
         setSelected2FAMethod(defaultMethod);
-        
+
         if (defaultMethod === 'EMAIL') {
           handleSendEmailCode(data.userId);
         } else {
-          showToast("Please open Google Authenticator.", "info");
+          showToast(t('Please open Google Authenticator.'), 'info');
         }
       }
-    } catch (error) { 
-      showToast('Failed to connect.', 'error'); 
+    } catch (error) {
+      showToast(t('Failed to connect.'), 'error');
     }
   };
 
@@ -70,14 +73,14 @@ const LoginForm = () => {
         credentials: 'include',
         body: JSON.stringify({ email: formData.email })
       });
-      showToast('Confirmation email re-sent. Check your inbox.', 'success');
+      showToast(t('Confirmation email re-sent. Check your inbox.'), 'success');
     } catch {
-      showToast('Failed to resend email.', 'error');
+      showToast(t('Failed to resend email.'), 'error');
     }
   };
 
   const handleSendEmailCode = async (uid = savedUserId) => {
-    showToast('Dispatching secure code to your email...', 'info');
+    showToast(t('Dispatching secure code to your email...'), 'info');
     try {
       const response = await fetch(`${API_URL}/api/auth/2fa/send-email`, {
         method: 'POST',
@@ -87,13 +90,13 @@ const LoginForm = () => {
       });
       if (response.ok) {
         setEmailCodeSent(true);
-        showToast('Code successfully sent to your email!', 'success');
+        showToast(t('Code successfully sent to your email!'), 'success');
       } else {
         const data = await response.json();
-        showToast(data.error || 'Failed to send email.', 'error');
+        showToast(data.error || t('Failed to send email.'), 'error');
       }
-    } catch (error) { 
-      showToast('Failed to send email.', 'error'); 
+    } catch (error) {
+      showToast(t('Failed to send email.'), 'error');
     }
   };
 
@@ -102,7 +105,7 @@ const LoginForm = () => {
     try {
       const response = await fetch(`${API_URL}/api/auth/2fa/validate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, 
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ userId: savedUserId, token: twoFactorToken, method: selected2FAMethod })
       });
@@ -110,18 +113,18 @@ const LoginForm = () => {
       if (response.ok) {
         setCsrfToken(data.csrfToken);
         login(data.role);
-        showToast('Identity Verified! Welcome.', 'success');
+        showToast(t('Identity Verified! Welcome.'), 'success');
         navigate(data.role === 'PATIENT' ? '/patient' : data.role === 'ADMIN' ? '/admin' : '/doctor');
       } else {
         showToast(data.error, 'error');
       }
-    } catch (error) { 
-      showToast('Failed to validate 2FA.', 'error'); 
+    } catch (error) {
+      showToast(t('Failed to validate 2FA.'), 'error');
     }
   };
 
   const handleBiometricLogin = async () => {
-    showToast('Waiting for fingerprint/Face ID...', 'info');
+    showToast(t('Waiting for fingerprint/Face ID...'), 'info');
     try {
       const optionsRes = await fetch(`${API_URL}/api/auth/webauthn/generate-authentication`, {
         method: 'POST',
@@ -144,72 +147,75 @@ const LoginForm = () => {
       if (verifyRes.ok) {
         setCsrfToken(data.csrfToken);
         login(data.role);
-        showToast('Identity Verified! Welcome.', 'success');
+        showToast(t('Identity Verified! Welcome.'), 'success');
         navigate(data.role === 'PATIENT' ? '/patient' : data.role === 'ADMIN' ? '/admin' : '/doctor');
       } else {
         showToast(data.error, 'error');
       }
     } catch (error) {
       console.error(error);
-      showToast('Biometric login failed or cancelled.', 'error');
+      showToast(t('Biometric login failed or cancelled.'), 'error');
     }
   };
 
   return (
     <div className="container">
+      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
+        <LanguageSwitcher />
+      </Box>
       <div className="login-branding">
         <h1>TotalMed</h1>
-        <p>Secure Ephemeral Health Vault</p>
+        <p>{t('Secure Ephemeral Health Vault')}</p>
       </div>
 
       <div className="card" style={{ maxWidth: '400px', margin: '0 auto', padding: '30px' }}>
         <Typography variant="h4" sx={{ mb: 3, textAlign: 'center', fontWeight: 'bold', color: '#2d3436' }}>
-          Sign In
+          {t('Sign In')}
         </Typography>
 
         {requires2FA ? (
           <Box component="form" onSubmit={handle2FAValidation} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {available2FAMethods.length > 1 && (
-              <Tabs 
-                value={selected2FAMethod} 
+              <Tabs
+                value={selected2FAMethod}
                 onChange={(e, newValue) => {
                   setSelected2FAMethod(newValue);
                   if (newValue === 'EMAIL' && !emailCodeSent) handleSendEmailCode();
-                }} 
-                centered 
+                }}
+                centered
                 sx={{ mb: 2 }}
               >
-                {available2FAMethods.includes('APP') && <Tab label="App" value="APP" />}
-                {available2FAMethods.includes('EMAIL') && <Tab label="Email" value="EMAIL" />}
-                {available2FAMethods.includes('BIOMETRICS') && <Tab label="Biometrics" value="BIOMETRICS" />}
-                {available2FAMethods.includes('BACKUP') && <Tab label="Backup code" value="BACKUP" />}
+                {available2FAMethods.includes('APP') && <Tab label={t('App')} value="APP" />}
+                {available2FAMethods.includes('EMAIL') && <Tab label={t('Email')} value="EMAIL" />}
+                {available2FAMethods.includes('BIOMETRICS') && <Tab label={t('Biometrics')} value="BIOMETRICS" />}
+                {available2FAMethods.includes('BACKUP') && <Tab label={t('Backup code')} value="BACKUP" />}
               </Tabs>
             )}
 
             {selected2FAMethod === 'BIOMETRICS' ? (
               <Box sx={{ textAlign: 'center', py: 2 }}>
-                <Typography sx={{ color: '#636e72', mb: 3 }}>Use your device's secure hardware to log in.</Typography>
-                <Button 
-                  variant="contained" 
-                  onClick={handleBiometricLogin} 
+                <Typography sx={{ color: '#636e72', mb: 3 }}>{t("Use your device's secure hardware to log in.")}</Typography>
+                <Button
+                  variant="contained"
+                  onClick={handleBiometricLogin}
                   sx={{ backgroundColor: '#7c3aed', py: 1.5, fontSize: '1.1rem', width: '100%', textTransform: 'none' }}
                 >
-                  Scan Fingerprint / Face ID
+                  {t('Scan Fingerprint / Face ID')}
                 </Button>
               </Box>
             ) : (
               <>
                 <Typography sx={{ textAlign: 'center', color: '#2d3436', mb: 1, fontWeight: 'bold' }}>
                   {selected2FAMethod === 'APP'
-                    ? "Enter the 6-digit code from your authenticator app"
+                    ? t('Enter the 6-digit code from your authenticator app')
                     : selected2FAMethod === 'BACKUP'
-                      ? "Enter one of your saved backup codes"
-                      : "Enter the 6-digit code sent to your email"}
+                      ? t('Enter one of your saved backup codes')
+                      : t('Enter the 6-digit code sent to your email')}
                 </Typography>
 
                 {selected2FAMethod === 'BACKUP' ? (
                   <TextField
-                    label="Backup code"
+                    label={t('Backup code')}
                     value={twoFactorToken}
                     onChange={(e) => setTwoFactorToken(e.target.value)}
                     placeholder="xxxxx-xxxxx"
@@ -220,7 +226,7 @@ const LoginForm = () => {
                   />
                 ) : (
                   <TextField
-                    label="6-Digit Code"
+                    label={t('6-Digit Code')}
                     value={twoFactorToken}
                     onChange={(e) => setTwoFactorToken(e.target.value.replace(/\D/g, ''))}
                     slotProps={{ htmlInput: { maxLength: 6, style: { letterSpacing: '8px', textAlign: 'center', fontSize: '1.5em', fontWeight: 'bold' } } }}
@@ -231,27 +237,27 @@ const LoginForm = () => {
                 )}
 
                 <Button type="submit" variant="contained" size="large" sx={{ mt: 1, backgroundColor: '#00b894', py: 1.5, fontSize: '1.1rem', textTransform: 'none' }}>
-                  Verify & Access Vault
+                  {t('Verify & Access Vault')}
                 </Button>
 
                 {selected2FAMethod === 'EMAIL' && (
                    <Button onClick={() => handleSendEmailCode()} variant="text" sx={{ color: '#5b4fe6', textTransform: 'none' }}>
-                     Didn't receive it? Resend Email
+                     {t("Didn't receive it? Resend Email")}
                    </Button>
                 )}
               </>
             )}
 
             <Button onClick={() => { setRequires2FA(false); setEmailCodeSent(false); }} variant="text" sx={{ color: '#636e72', textTransform: 'none' }}>
-              Cancel & Return to Login
+              {t('Cancel & Return to Login')}
             </Button>
           </Box>
         ) : (
           <Box component="form" onSubmit={handleLogin} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField label="Email Address" name="email" type="email" onChange={handleChange} required fullWidth />
-            <TextField label="Password" name="password" type="password" onChange={handleChange} required fullWidth />
+            <TextField label={t('Email Address')} name="email" type="email" onChange={handleChange} required fullWidth />
+            <TextField label={t('Password')} name="password" type="password" onChange={handleChange} required fullWidth />
             <Button type="submit" variant="contained" size="large" sx={{ mt: 1, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', boxShadow: '0 6px 16px rgba(79,70,229,0.3)', py: 1.5, fontSize: '1.1rem', textTransform: 'none', borderRadius: '10px' }}>
-              Secure Login
+              {t('Secure Login')}
             </Button>
           </Box>
         )}
@@ -259,10 +265,10 @@ const LoginForm = () => {
         {!requires2FA && needsVerification && (
           <Box sx={{ mt: 2, p: 1.5, borderRadius: '8px', backgroundColor: '#fff8e1', border: '1px solid #ffe0a3', textAlign: 'center' }}>
             <Typography sx={{ fontSize: '0.85rem', color: '#8a6d3b', mb: 0.5 }}>
-              Your email isn't confirmed yet.
+              {t("Your email isn't confirmed yet.")}
             </Typography>
             <Button onClick={handleResendVerification} variant="text" sx={{ textTransform: 'none', color: '#b7791f', fontWeight: 600 }}>
-              Resend confirmation email
+              {t('Resend confirmation email')}
             </Button>
           </Box>
         )}
@@ -270,10 +276,10 @@ const LoginForm = () => {
         {!requires2FA && (
           <div style={{ marginTop: '16px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <Button component={Link} to="/forgot-password" variant="text" sx={{ textTransform: 'none', color: '#5b4fe6' }}>
-              Forgot your password?
+              {t('Forgot your password?')}
             </Button>
             <Button component={Link} to="/register" variant="text" sx={{ textTransform: 'none', color: '#636e72' }}>
-              New patient? Sign up here
+              {t('New patient? Sign up here')}
             </Button>
           </div>
         )}

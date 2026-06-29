@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, TextField, Button, MenuItem, IconButton } from '@mui/material';
 import MonitorHeartOutlinedIcon from '@mui/icons-material/MonitorHeartOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import AddIcon from '@mui/icons-material/Add';
 import { LineChart } from '@mui/x-charts/LineChart';
 
-// Metric definitions. `dual` metrics (blood pressure) carry two values.
+// Metric definitions. `dual` metrics (blood pressure) carry two values. Text
+// fields are translation keys, resolved with t() at render time.
 const TYPES = {
   BLOOD_PRESSURE: { label: 'Blood pressure', unit: 'mmHg', dual: true, v1: 'Systolic', v2: 'Diastolic' },
   WEIGHT: { label: 'Weight', unit: 'kg' },
@@ -22,6 +24,7 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
  * the doctor view). When `editable` is false, only the chart + history show.
  */
 const VitalSigns = ({ vitals = [], editable = true, onAdd, onDelete }) => {
+  const { t } = useTranslation();
   const [type, setType] = useState('BLOOD_PRESSURE');
   const [draft, setDraft] = useState({ value: '', value2: '', measuredAt: todayStr() });
   const [busy, setBusy] = useState(false);
@@ -54,14 +57,14 @@ const VitalSigns = ({ vitals = [], editable = true, onAdd, onDelete }) => {
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
         <MonitorHeartOutlinedIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />
-        <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>Vital signs</Typography>
+        <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>{t('Vital signs')}</Typography>
       </Box>
 
       <TextField
-        size="small" select label="Metric" value={type}
+        size="small" select label={t('Metric')} value={type}
         onChange={(e) => setType(e.target.value)} sx={{ minWidth: 200, mb: 2 }}
       >
-        {Object.keys(TYPES).map((k) => <MenuItem key={k} value={k}>{TYPES[k].label}</MenuItem>)}
+        {Object.keys(TYPES).map((k) => <MenuItem key={k} value={k}>{t(TYPES[k].label)}</MenuItem>)}
       </TextField>
 
       {series.length > 0 ? (
@@ -70,14 +73,14 @@ const VitalSigns = ({ vitals = [], editable = true, onAdd, onDelete }) => {
           xAxis={[{ data: dates, scaleType: 'point' }]}
           series={cfg.dual
             ? [
-                { data: series.map((v) => v.value), label: `${cfg.v1} (${cfg.unit})`, color: '#5b4fe6' },
-                { data: series.map((v) => v.value2), label: `${cfg.v2} (${cfg.unit})`, color: '#e17055' },
+                { data: series.map((v) => v.value), label: `${t(cfg.v1)} (${cfg.unit})`, color: '#5b4fe6' },
+                { data: series.map((v) => v.value2), label: `${t(cfg.v2)} (${cfg.unit})`, color: '#e17055' },
               ]
-            : [{ data: series.map((v) => v.value), label: `${cfg.label} (${cfg.unit})`, color: '#5b4fe6' }]}
+            : [{ data: series.map((v) => v.value), label: `${t(cfg.label)} (${cfg.unit})`, color: '#5b4fe6' }]}
         />
       ) : (
         <Typography className="text-muted" sx={{ fontStyle: 'italic', fontSize: '0.9rem', py: 2 }}>
-          No {cfg.label.toLowerCase()} readings yet.
+          {t('No {{metric}} readings yet.', { metric: t(cfg.label).toLowerCase() })}
         </Typography>
       )}
 
@@ -101,19 +104,19 @@ const VitalSigns = ({ vitals = [], editable = true, onAdd, onDelete }) => {
 
       {editable && (
         <Box component="form" onSubmit={submit} sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 1.5, mt: 2 }}>
-          <TextField size="small" type="date" label="Date" value={draft.measuredAt}
+          <TextField size="small" type="date" label={t('Date')} value={draft.measuredAt}
             onChange={(e) => setDraft({ ...draft, measuredAt: e.target.value })}
             slotProps={{ inputLabel: { shrink: true } }} sx={{ flex: '0 0 150px' }} />
-          <TextField size="small" type="number" label={cfg.dual ? `${cfg.v1} (${cfg.unit})` : `Value (${cfg.unit})`}
+          <TextField size="small" type="number" label={cfg.dual ? `${t(cfg.v1)} (${cfg.unit})` : t('Value ({{unit}})', { unit: cfg.unit })}
             value={draft.value} onChange={(e) => setDraft({ ...draft, value: e.target.value })}
             required sx={{ flex: '1 1 120px' }} />
           {cfg.dual && (
-            <TextField size="small" type="number" label={`${cfg.v2} (${cfg.unit})`}
+            <TextField size="small" type="number" label={`${t(cfg.v2)} (${cfg.unit})`}
               value={draft.value2} onChange={(e) => setDraft({ ...draft, value2: e.target.value })}
               required sx={{ flex: '1 1 120px' }} />
           )}
           <Button type="submit" variant="contained" disabled={busy} startIcon={<AddIcon />} sx={{ flexShrink: 0 }}>
-            {busy ? 'Adding…' : 'Add'}
+            {busy ? t('Adding…') : t('Add')}
           </Button>
         </Box>
       )}

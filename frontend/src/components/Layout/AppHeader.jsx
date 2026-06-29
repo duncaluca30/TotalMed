@@ -1,10 +1,13 @@
 import React from 'react';
-import { AppBar, Toolbar, Typography, Button } from '@mui/material';
+import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import NotificationBell from './NotificationBell';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const AppHeader = ({ title }) => {
+  const { t } = useTranslation();
   const { logout } = useAuth();
 
   return (
@@ -12,10 +15,13 @@ const AppHeader = ({ title }) => {
       <Toolbar>
         <MedicalServicesIcon sx={{ mr: 2 }} />
         <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold', letterSpacing: '1px' }}>
-          {title}
+          {t(title)}
         </Typography>
+        <Box sx={{ mr: 1.5, '& .MuiToggleButton-root': { color: 'rgba(255,255,255,0.85)', borderColor: 'rgba(255,255,255,0.4)' }, '& .Mui-selected': { color: '#fff !important', backgroundColor: 'rgba(255,255,255,0.18) !important' } }}>
+          <LanguageSwitcher />
+        </Box>
         <NotificationBell />
-        <Button color="inherit" onClick={logout} sx={{ fontWeight: 'bold' }}>Secure Logout</Button>
+        <Button color="inherit" onClick={logout} sx={{ fontWeight: 'bold' }}>{t('Secure Logout')}</Button>
       </Toolbar>
     </AppBar>
   );

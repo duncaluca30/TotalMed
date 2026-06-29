@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Button, Skeleton } from '@mui/material';
 import HistoryIcon from '@mui/icons-material/History';
 import { fetchWithAuth } from '../../services/api';
@@ -7,6 +8,7 @@ import { useToast } from '../../hooks/useToast';
 // Read-only list of records the logged-in doctor has authored, so they have a
 // trail of whom they've treated even after a vault is locked.
 const ConsultationHistory = () => {
+  const { t } = useTranslation();
   const showToast = useToast();
   const [items, setItems] = useState(null);
   const [pagination, setPagination] = useState(null);
@@ -16,7 +18,7 @@ const ConsultationHistory = () => {
       const data = await fetchWithAuth(`/api/doctor/consultations?page=${page}&limit=20`);
       setItems((prev) => (page === 1 ? data.consultations : [...(prev || []), ...data.consultations]));
       setPagination(data.pagination);
-    } catch (e) { showToast(e.message || 'Failed to load consultations.', 'error'); }
+    } catch (e) { showToast(e.message || t('Failed to load consultations.'), 'error'); }
   };
 
   useEffect(() => { load(1); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
@@ -25,7 +27,7 @@ const ConsultationHistory = () => {
     <div className="card" style={{ marginTop: '20px' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
         <HistoryIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />
-        <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>Recent consultations</Typography>
+        <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>{t('Recent consultations')}</Typography>
       </Box>
 
       {items === null ? (
@@ -34,7 +36,7 @@ const ConsultationHistory = () => {
         </Box>
       ) : items.length === 0 ? (
         <Typography className="text-muted" sx={{ fontStyle: 'italic', fontSize: '0.9rem' }}>
-          You haven't added any records yet.
+          {t("You haven't added any records yet.")}
         </Typography>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -54,7 +56,7 @@ const ConsultationHistory = () => {
           ))}
           {pagination?.hasMore && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
-              <Button variant="text" onClick={() => load(pagination.page + 1)} sx={{ textTransform: 'none' }}>Load more</Button>
+              <Button variant="text" onClick={() => load(pagination.page + 1)} sx={{ textTransform: 'none' }}>{t('Load more')}</Button>
             </Box>
           )}
         </Box>

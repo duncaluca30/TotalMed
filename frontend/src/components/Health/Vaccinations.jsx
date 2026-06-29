@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, TextField, Button, IconButton } from '@mui/material';
 import VaccinesOutlinedIcon from '@mui/icons-material/VaccinesOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
@@ -11,6 +12,7 @@ const empty = { vaccineName: '', date: '', doseNumber: '', nextDoseDate: '', not
  * handlers. When `editable` is false (or no onDelete), controls are hidden.
  */
 const Vaccinations = ({ vaccinations = [], editable = true, onAdd, onDelete }) => {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(empty);
   const [busy, setBusy] = useState(false);
 
@@ -34,7 +36,7 @@ const Vaccinations = ({ vaccinations = [], editable = true, onAdd, onDelete }) =
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
         <VaccinesOutlinedIcon sx={{ fontSize: 20, color: '#00b894' }} />
-        <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>Vaccinations</Typography>
+        <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>{t('Vaccinations')}</Typography>
       </Box>
 
       {vaccinations.length > 0 ? (
@@ -46,11 +48,11 @@ const Vaccinations = ({ vaccinations = [], editable = true, onAdd, onDelete }) =
             }}>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography sx={{ fontWeight: 600, color: 'var(--dark-text)' }}>
-                  {v.vaccineName}{v.doseNumber ? ` · dose ${v.doseNumber}` : ''}
+                  {v.vaccineName}{v.doseNumber ? ` · ${t('dose')} ${v.doseNumber}` : ''}
                 </Typography>
                 <Typography sx={{ fontSize: '0.85rem', color: 'var(--light-text)' }}>
                   {new Date(v.date).toLocaleDateString()}
-                  {v.nextDoseDate ? ` · next due ${new Date(v.nextDoseDate).toLocaleDateString()}` : ''}
+                  {v.nextDoseDate ? ` · ${t('next due')} ${new Date(v.nextDoseDate).toLocaleDateString()}` : ''}
                   {v.notes ? ` · ${v.notes}` : ''}
                 </Typography>
               </Box>
@@ -63,25 +65,25 @@ const Vaccinations = ({ vaccinations = [], editable = true, onAdd, onDelete }) =
           ))}
         </Box>
       ) : (
-        <Typography className="text-muted" sx={{ fontStyle: 'italic', fontSize: '0.9rem' }}>No vaccinations recorded.</Typography>
+        <Typography className="text-muted" sx={{ fontStyle: 'italic', fontSize: '0.9rem' }}>{t('No vaccinations recorded.')}</Typography>
       )}
 
       {editable && (
         <Box component="form" onSubmit={submit} sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 1.5, mt: 2 }}>
-          <TextField size="small" label="Vaccine" required value={draft.vaccineName}
+          <TextField size="small" label={t('Vaccine')} required value={draft.vaccineName}
             onChange={(e) => setDraft({ ...draft, vaccineName: e.target.value })} sx={{ flex: '1 1 160px' }} />
-          <TextField size="small" type="date" label="Date" required value={draft.date}
+          <TextField size="small" type="date" label={t('Date')} required value={draft.date}
             onChange={(e) => setDraft({ ...draft, date: e.target.value })}
             slotProps={{ inputLabel: { shrink: true } }} sx={{ flex: '0 0 150px' }} />
-          <TextField size="small" type="number" label="Dose #" value={draft.doseNumber}
+          <TextField size="small" type="number" label={t('Dose #')} value={draft.doseNumber}
             onChange={(e) => setDraft({ ...draft, doseNumber: e.target.value })} sx={{ flex: '0 0 90px' }} />
-          <TextField size="small" type="date" label="Next due" value={draft.nextDoseDate}
+          <TextField size="small" type="date" label={t('Next due')} value={draft.nextDoseDate}
             onChange={(e) => setDraft({ ...draft, nextDoseDate: e.target.value })}
             slotProps={{ inputLabel: { shrink: true } }} sx={{ flex: '0 0 150px' }} />
-          <TextField size="small" label="Notes (optional)" value={draft.notes}
+          <TextField size="small" label={t('Notes (optional)')} value={draft.notes}
             onChange={(e) => setDraft({ ...draft, notes: e.target.value })} sx={{ flex: '1 1 160px' }} />
           <Button type="submit" variant="contained" disabled={busy} startIcon={<AddIcon />} sx={{ flexShrink: 0 }}>
-            {busy ? 'Adding…' : 'Add'}
+            {busy ? t('Adding…') : t('Add')}
           </Button>
         </Box>
       )}

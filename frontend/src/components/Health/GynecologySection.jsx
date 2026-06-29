@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, TextField, Button, IconButton, MenuItem, Chip, FormControlLabel, Checkbox } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -35,6 +36,7 @@ const GynecologySection = ({
   onSaveProfile,
   onAddBirth, onUpdateBirth, onDeleteBirth,
 }) => {
+  const { t } = useTranslation();
   const [profileDraft, setProfileDraft] = useState({ menarcheDate: toDateInput(menarcheDate), atMenopause });
   const [profileBusy, setProfileBusy] = useState(false);
   const [birthDraft, setBirthDraft] = useState(emptyBirth);
@@ -86,7 +88,7 @@ const GynecologySection = ({
     setBirthDraft({ modality: b.modality, year: b.year || '' });
   };
 
-  const sexLabel = SEX_OPTIONS.find((o) => o.value === sex)?.label || 'Not specified';
+  const sexLabel = t(SEX_OPTIONS.find((o) => o.value === sex)?.label || 'Not specified');
   const todayStr = new Date().toISOString().slice(0, 10);
   const currentYear = new Date().getFullYear();
 
@@ -95,21 +97,21 @@ const GynecologySection = ({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
         <PregnantWomanOutlinedIcon sx={{ fontSize: 20, color: '#d6336c' }} />
         <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>
-          Sex &amp; gynecological history
+          {t('Sex & gynecological history')}
         </Typography>
       </Box>
 
       {/* Sex */}
       {editable ? (
         <TextField
-          select size="small" label="Biological sex" value={sex || ''}
+          select size="small" label={t('Biological sex')} value={sex || ''}
           onChange={(e) => changeSex(e.target.value)}
           sx={{ minWidth: 200, mb: 1 }}
         >
-          {SEX_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+          {SEX_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{t(o.label)}</MenuItem>)}
         </TextField>
       ) : (
-        <Typography sx={{ mb: 1 }}><strong>Sex:</strong> {sexLabel}</Typography>
+        <Typography sx={{ mb: 1 }}><strong>{t('Sex:')}</strong> {sexLabel}</Typography>
       )}
 
       {/* Female-only obstetric / gynecological section */}
@@ -119,7 +121,7 @@ const GynecologySection = ({
           {editable ? (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
               <TextField
-                size="small" type="date" label="First menstruation (menarche)"
+                size="small" type="date" label={t('First menstruation (menarche)')}
                 value={profileDraft.menarcheDate}
                 onChange={(e) => setProfileDraft({ ...profileDraft, menarcheDate: e.target.value })}
                 slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayStr } }}
@@ -128,24 +130,24 @@ const GynecologySection = ({
               <FormControlLabel
                 control={<Checkbox checked={profileDraft.atMenopause}
                   onChange={(e) => setProfileDraft({ ...profileDraft, atMenopause: e.target.checked })} />}
-                label="At menopause"
+                label={t('At menopause')}
               />
-              <Button variant="outlined" size="small" disabled={profileBusy} onClick={saveProfile}>Save</Button>
+              <Button variant="outlined" size="small" disabled={profileBusy} onClick={saveProfile}>{t('Save')}</Button>
             </Box>
           ) : (
             <Box sx={{ mb: 2 }}>
               <Typography sx={{ fontSize: '0.9rem' }}>
-                <strong>First menstruation:</strong> {menarcheDate ? new Date(menarcheDate).toLocaleDateString() : '—'}
+                <strong>{t('First menstruation:')}</strong> {menarcheDate ? new Date(menarcheDate).toLocaleDateString() : '—'}
               </Typography>
               <Typography sx={{ fontSize: '0.9rem' }}>
-                <strong>Menopause:</strong> {atMenopause ? 'Yes' : 'No'}
+                <strong>{t('Menopause:')}</strong> {atMenopause ? t('Yes') : t('No')}
               </Typography>
             </Box>
           )}
 
           {/* Births */}
           <Typography sx={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--dark-text)', mb: 1 }}>
-            Births <Typography component="span" sx={{ color: 'var(--light-text)', fontWeight: 400 }}>({births.length})</Typography>
+            {t('Births')} <Typography component="span" sx={{ color: 'var(--light-text)', fontWeight: 400 }}>({births.length})</Typography>
           </Typography>
 
           {births.length > 0 ? (
@@ -158,8 +160,8 @@ const GynecologySection = ({
                     border: '1px solid #eee', borderLeft: `4px solid ${mod.color}`,
                     borderRadius: '8px', px: 2, py: 1,
                   }}>
-                    <Chip label={mod.label} size="small" sx={{ backgroundColor: mod.bg, color: mod.color, fontWeight: 600 }} />
-                    <Typography sx={{ color: 'var(--dark-text)' }}>{b.year || 'Year unknown'}</Typography>
+                    <Chip label={t(mod.label)} size="small" sx={{ backgroundColor: mod.bg, color: mod.color, fontWeight: 600 }} />
+                    <Typography sx={{ color: 'var(--dark-text)' }}>{b.year || t('Year unknown')}</Typography>
                     {editable && (
                       <Box sx={{ display: 'flex', ml: 'auto', flexShrink: 0 }}>
                         <IconButton size="small" onClick={() => startEditBirth(b)} aria-label="Edit birth"><EditOutlinedIcon fontSize="small" /></IconButton>
@@ -171,20 +173,20 @@ const GynecologySection = ({
               })}
             </Box>
           ) : (
-            <Typography className="text-muted" sx={{ fontStyle: 'italic', fontSize: '0.9rem' }}>No births recorded.</Typography>
+            <Typography className="text-muted" sx={{ fontStyle: 'italic', fontSize: '0.9rem' }}>{t('No births recorded.')}</Typography>
           )}
 
           {editable && (
             <Box component="form" onSubmit={submitBirth} sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 1.5, mt: 2 }}>
-              <TextField size="small" select label="Modality" value={birthDraft.modality}
+              <TextField size="small" select label={t('Modality')} value={birthDraft.modality}
                 onChange={(e) => setBirthDraft({ ...birthDraft, modality: e.target.value })} sx={{ flex: '0 0 150px' }}>
-                {Object.keys(MODALITY).map((k) => <MenuItem key={k} value={k}>{MODALITY[k].label}</MenuItem>)}
+                {Object.keys(MODALITY).map((k) => <MenuItem key={k} value={k}>{t(MODALITY[k].label)}</MenuItem>)}
               </TextField>
-              <TextField size="small" type="number" label="Year (optional)" value={birthDraft.year}
+              <TextField size="small" type="number" label={t('Year (optional)')} value={birthDraft.year}
                 onChange={(e) => setBirthDraft({ ...birthDraft, year: e.target.value })}
                 slotProps={{ htmlInput: { min: 1900, max: currentYear } }} sx={{ flex: '0 0 140px' }} />
               <Button type="submit" variant="contained" disabled={birthBusy} startIcon={editingBirthId ? null : <AddIcon />} sx={{ flexShrink: 0 }}>
-                {editingBirthId ? 'Save' : 'Add'}
+                {editingBirthId ? t('Save') : t('Add')}
               </Button>
               {editingBirthId && (
                 <IconButton onClick={resetBirth} aria-label="Cancel edit"><CloseIcon /></IconButton>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Box } from '@mui/material';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
@@ -10,6 +11,7 @@ import Vaccinations from '../Health/Vaccinations';
 import EmergencyMedicalId from '../Health/EmergencyMedicalId';
 
 const HealthProfile = () => {
+  const { t } = useTranslation();
   const { patientData, setPatientData } = useOutletContext();
   const showToast = useToast();
 
@@ -29,30 +31,30 @@ const HealthProfile = () => {
     try {
       const created = await fetchWithAuth('/api/patient/vaccinations', { method: 'POST', body: JSON.stringify(payload) });
       setVaccinations([created, ...vaccinations]);
-      showToast('Vaccination added.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to add vaccination.', 'error'); throw e; }
+      showToast(t('Vaccination added.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to add vaccination.'), 'error'); throw e; }
   };
   const deleteVaccination = async (id) => {
     try {
       await fetchWithAuth(`/api/patient/vaccinations/${id}`, { method: 'DELETE' });
       setVaccinations(vaccinations.filter((v) => v.id !== id));
-      showToast('Vaccination removed.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to remove vaccination.', 'error'); }
+      showToast(t('Vaccination removed.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to remove vaccination.'), 'error'); }
   };
 
   const addVital = async (payload) => {
     try {
       const created = await fetchWithAuth('/api/patient/vitals', { method: 'POST', body: JSON.stringify(payload) });
       setVitals([...vitalSigns, created]);
-      showToast('Reading added.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to add reading.', 'error'); throw e; }
+      showToast(t('Reading added.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to add reading.'), 'error'); throw e; }
   };
   const deleteVital = async (id) => {
     try {
       await fetchWithAuth(`/api/patient/vitals/${id}`, { method: 'DELETE' });
       setVitals(vitalSigns.filter((v) => v.id !== id));
-      showToast('Reading removed.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to remove reading.', 'error'); }
+      showToast(t('Reading removed.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to remove reading.'), 'error'); }
   };
 
   // ── Sex & gynecological profile ──
@@ -60,29 +62,29 @@ const HealthProfile = () => {
     try {
       const updated = await fetchWithAuth('/api/patient/profile', { method: 'PUT', body: JSON.stringify(fields) });
       setPatientData({ ...patientData, sex: updated.sex, atMenopause: updated.atMenopause, menarcheDate: updated.menarcheDate });
-      showToast('Profile updated.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to update profile.', 'error'); throw e; }
+      showToast(t('Profile updated.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to update profile.'), 'error'); throw e; }
   };
   const addBirth = async (payload) => {
     try {
       const created = await fetchWithAuth('/api/patient/births', { method: 'POST', body: JSON.stringify(payload) });
       setBirths([created, ...births]);
-      showToast('Birth added.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to add birth.', 'error'); throw e; }
+      showToast(t('Birth added.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to add birth.'), 'error'); throw e; }
   };
   const updateBirth = async (id, payload) => {
     try {
       const updated = await fetchWithAuth(`/api/patient/births/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
       setBirths(births.map((b) => (b.id === id ? updated : b)));
-      showToast('Birth updated.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to update birth.', 'error'); throw e; }
+      showToast(t('Birth updated.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to update birth.'), 'error'); throw e; }
   };
   const deleteBirth = async (id) => {
     try {
       await fetchWithAuth(`/api/patient/births/${id}`, { method: 'DELETE' });
       setBirths(births.filter((b) => b.id !== id));
-      showToast('Birth removed.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to remove birth.', 'error'); }
+      showToast(t('Birth removed.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to remove birth.'), 'error'); }
   };
 
   // ── Allergies ──
@@ -90,22 +92,22 @@ const HealthProfile = () => {
     try {
       const created = await fetchWithAuth('/api/patient/allergies', { method: 'POST', body: JSON.stringify(payload) });
       setAllergies([created, ...allergies]);
-      showToast('Allergy added.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to add allergy.', 'error'); throw e; }
+      showToast(t('Allergy added.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to add allergy.'), 'error'); throw e; }
   };
   const updateAllergy = async (id, payload) => {
     try {
       const updated = await fetchWithAuth(`/api/patient/allergies/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
       setAllergies(allergies.map((a) => (a.id === id ? updated : a)));
-      showToast('Allergy updated.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to update allergy.', 'error'); throw e; }
+      showToast(t('Allergy updated.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to update allergy.'), 'error'); throw e; }
   };
   const deleteAllergy = async (id) => {
     try {
       await fetchWithAuth(`/api/patient/allergies/${id}`, { method: 'DELETE' });
       setAllergies(allergies.filter((a) => a.id !== id));
-      showToast('Allergy removed.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to remove allergy.', 'error'); }
+      showToast(t('Allergy removed.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to remove allergy.'), 'error'); }
   };
 
   // ── Medications ──
@@ -113,39 +115,39 @@ const HealthProfile = () => {
     try {
       const created = await fetchWithAuth('/api/patient/medications', { method: 'POST', body: JSON.stringify(payload) });
       setMedications([created, ...medications]);
-      showToast('Medication added.', 'success');
+      showToast(t('Medication added.'), 'success');
       return created;
-    } catch (e) { showToast(e.message || 'Failed to add medication.', 'error'); throw e; }
+    } catch (e) { showToast(e.message || t('Failed to add medication.'), 'error'); throw e; }
   };
   const updateMedication = async (id, payload) => {
     try {
       const updated = await fetchWithAuth(`/api/patient/medications/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
       setMedications(medications.map((m) => (m.id === id ? updated : m)));
-      showToast('Medication updated.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to update medication.', 'error'); throw e; }
+      showToast(t('Medication updated.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to update medication.'), 'error'); throw e; }
   };
   const deleteMedication = async (id) => {
     try {
       await fetchWithAuth(`/api/patient/medications/${id}`, { method: 'DELETE' });
       setMedications(medications.filter((m) => m.id !== id));
-      showToast('Medication removed.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to remove medication.', 'error'); }
+      showToast(t('Medication removed.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to remove medication.'), 'error'); }
   };
   const toggleMedicationReminder = async (id, enabled) => {
     try {
       const updated = await fetchWithAuth(`/api/patient/medications/${id}/reminder`, { method: 'POST', body: JSON.stringify({ enabled }) });
       setMedications(medications.map((m) => (m.id === id ? updated : m)));
-      showToast(enabled ? 'Daily reminder on.' : 'Daily reminder off.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to update reminder.', 'error'); }
+      showToast(enabled ? t('Daily reminder on.') : t('Daily reminder off.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to update reminder.'), 'error'); }
   };
 
   return (
     <Box>
       <Box className="page-heading">
-        <h3 style={{ margin: 0 }}>Health profile</h3>
+        <h3 style={{ margin: 0 }}>{t('Health profile')}</h3>
       </Box>
       <p className="text-muted" style={{ marginTop: 0, marginBottom: 20 }}>
-        Keep this up to date — it is always shared with any doctor you grant vault access to, so they can treat you safely.
+        {t('Keep this up to date — it is always shared with any doctor you grant vault access to, so they can treat you safely.')}
       </p>
       <div className="card" style={{ marginBottom: '20px' }}>
         <GynecologySection

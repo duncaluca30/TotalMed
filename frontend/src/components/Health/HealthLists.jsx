@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, TextField, Button, IconButton, MenuItem, Chip, Alert } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -34,6 +35,7 @@ const HealthLists = ({
   onAddMedication, onUpdateMedication, onDeleteMedication,
   onToggleMedicationReminder,
 }) => {
+  const { t } = useTranslation();
   const [allergyDraft, setAllergyDraft] = useState(emptyAllergy);
   const [editingAllergyId, setEditingAllergyId] = useState(null);
   const [medDraft, setMedDraft] = useState(emptyMedication);
@@ -88,7 +90,7 @@ const HealthLists = ({
       <Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
           <WarningAmberIcon sx={{ fontSize: 20, color: '#c0392b' }} />
-          <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>Allergies</Typography>
+          <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>{t('Allergies')}</Typography>
         </Box>
 
         {allergies.length > 0 ? (
@@ -104,10 +106,10 @@ const HealthLists = ({
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography sx={{ fontWeight: 600, color: 'var(--dark-text)' }}>{a.substance}</Typography>
                     {a.reaction && (
-                      <Typography sx={{ fontSize: '0.85rem', color: 'var(--light-text)' }}>Reaction: {a.reaction}</Typography>
+                      <Typography sx={{ fontSize: '0.85rem', color: 'var(--light-text)' }}>{t('Reaction:')} {a.reaction}</Typography>
                     )}
                   </Box>
-                  <Chip label={sev.label} size="small" sx={{ backgroundColor: sev.bg, color: sev.color, fontWeight: 600 }} />
+                  <Chip label={t(sev.label)} size="small" sx={{ backgroundColor: sev.bg, color: sev.color, fontWeight: 600 }} />
                   {editable && (
                     <Box sx={{ display: 'flex', flexShrink: 0 }}>
                       <IconButton size="small" onClick={() => startEditAllergy(a)} aria-label="Edit allergy"><EditOutlinedIcon fontSize="small" /></IconButton>
@@ -119,21 +121,21 @@ const HealthLists = ({
             })}
           </Box>
         ) : (
-          <Typography className="text-muted" sx={{ fontStyle: 'italic', fontSize: '0.9rem' }}>No known allergies recorded.</Typography>
+          <Typography className="text-muted" sx={{ fontStyle: 'italic', fontSize: '0.9rem' }}>{t('No known allergies recorded.')}</Typography>
         )}
 
         {editable && (
           <Box component="form" onSubmit={submitAllergy} sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 1.5, mt: 2 }}>
-            <TextField size="small" label="Substance" required value={allergyDraft.substance}
+            <TextField size="small" label={t('Substance')} required value={allergyDraft.substance}
               onChange={(e) => setAllergyDraft({ ...allergyDraft, substance: e.target.value })} sx={{ flex: '1 1 160px' }} />
-            <TextField size="small" label="Reaction (optional)" value={allergyDraft.reaction}
+            <TextField size="small" label={t('Reaction (optional)')} value={allergyDraft.reaction}
               onChange={(e) => setAllergyDraft({ ...allergyDraft, reaction: e.target.value })} sx={{ flex: '1 1 160px' }} />
-            <TextField size="small" select label="Severity" value={allergyDraft.severity}
+            <TextField size="small" select label={t('Severity')} value={allergyDraft.severity}
               onChange={(e) => setAllergyDraft({ ...allergyDraft, severity: e.target.value })} sx={{ flex: '0 0 130px' }}>
-              {Object.keys(SEVERITY).map((k) => <MenuItem key={k} value={k}>{SEVERITY[k].label}</MenuItem>)}
+              {Object.keys(SEVERITY).map((k) => <MenuItem key={k} value={k}>{t(SEVERITY[k].label)}</MenuItem>)}
             </TextField>
             <Button type="submit" variant="contained" disabled={busy} startIcon={editingAllergyId ? null : <AddIcon />} sx={{ flexShrink: 0 }}>
-              {editingAllergyId ? 'Save' : 'Add'}
+              {editingAllergyId ? t('Save') : t('Add')}
             </Button>
             {editingAllergyId && (
               <IconButton onClick={resetAllergy} aria-label="Cancel edit"><CloseIcon /></IconButton>
@@ -146,7 +148,7 @@ const HealthLists = ({
       <Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
           <MedicationOutlinedIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />
-          <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>Current medications</Typography>
+          <Typography sx={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dark-text)' }}>{t('Current medications')}</Typography>
         </Box>
 
         {medications.length > 0 ? (
@@ -171,7 +173,7 @@ const HealthLists = ({
                       <IconButton
                         size="small"
                         onClick={() => onToggleMedicationReminder(m.id, !m.reminderEnabled)}
-                        title={m.reminderEnabled ? 'Daily reminder on' : 'Daily reminder off'}
+                        title={m.reminderEnabled ? t('Daily reminder on') : t('Daily reminder off')}
                         aria-label="Toggle medication reminder"
                       >
                         {m.reminderEnabled
@@ -187,26 +189,26 @@ const HealthLists = ({
             ))}
           </Box>
         ) : (
-          <Typography className="text-muted" sx={{ fontStyle: 'italic', fontSize: '0.9rem' }}>No current medications recorded.</Typography>
+          <Typography className="text-muted" sx={{ fontStyle: 'italic', fontSize: '0.9rem' }}>{t('No current medications recorded.')}</Typography>
         )}
 
         {medWarnings.length > 0 && (
           <Alert severity="warning" onClose={() => setMedWarnings([])} sx={{ mt: 2 }}>
-            <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Safety check — medication still saved</Typography>
+            <Typography sx={{ fontWeight: 600, mb: 0.5 }}>{t('Safety check — medication still saved')}</Typography>
             {medWarnings.map((w, i) => <Typography key={i} sx={{ fontSize: '0.85rem' }}>• {w}</Typography>)}
           </Alert>
         )}
 
         {editable && (
           <Box component="form" onSubmit={submitMed} sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 1.5, mt: 2 }}>
-            <TextField size="small" label="Medication" required value={medDraft.name}
+            <TextField size="small" label={t('Medication')} required value={medDraft.name}
               onChange={(e) => setMedDraft({ ...medDraft, name: e.target.value })} sx={{ flex: '1 1 160px' }} />
-            <TextField size="small" label="Dosage (optional)" value={medDraft.dosage}
+            <TextField size="small" label={t('Dosage (optional)')} value={medDraft.dosage}
               onChange={(e) => setMedDraft({ ...medDraft, dosage: e.target.value })} sx={{ flex: '1 1 120px' }} />
-            <TextField size="small" label="Frequency (optional)" value={medDraft.frequency}
+            <TextField size="small" label={t('Frequency (optional)')} value={medDraft.frequency}
               onChange={(e) => setMedDraft({ ...medDraft, frequency: e.target.value })} sx={{ flex: '1 1 140px' }} />
             <Button type="submit" variant="contained" disabled={busy} startIcon={editingMedId ? null : <AddIcon />} sx={{ flexShrink: 0 }}>
-              {editingMedId ? 'Save' : 'Add'}
+              {editingMedId ? t('Save') : t('Add')}
             </Button>
             {editingMedId && (
               <IconButton onClick={resetMed} aria-label="Cancel edit"><CloseIcon /></IconButton>

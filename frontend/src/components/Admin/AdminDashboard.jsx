@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Chip, Skeleton, Button, Table, TableBody, TableCell, TableHead, TableRow, Paper } from '@mui/material';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
@@ -11,6 +12,7 @@ const StatCard = ({ label, value }) => (
 );
 
 const AdminDashboard = () => {
+  const { t } = useTranslation();
   const showToast = useToast();
   const [stats, setStats] = useState(null);
   const [logs, setLogs] = useState(null);
@@ -24,9 +26,9 @@ const AdminDashboard = () => {
     try {
       const result = await fetchWithAuth('/api/admin/audit-logs/verify');
       setIntegrity(result);
-      showToast(result.ok ? 'Audit chain is intact.' : 'Audit chain is BROKEN.', result.ok ? 'success' : 'error');
+      showToast(result.ok ? t('Audit chain is intact.') : t('Audit chain is BROKEN.'), result.ok ? 'success' : 'error');
     } catch (e) {
-      showToast(e.message || 'Verification failed.', 'error');
+      showToast(e.message || t('Verification failed.'), 'error');
     } finally { setVerifying(false); }
   };
 
@@ -35,49 +37,49 @@ const AdminDashboard = () => {
       const data = await fetchWithAuth(`/api/admin/audit-logs?page=${page}&limit=25`);
       setLogs((prev) => (page === 1 ? data.logs : [...(prev || []), ...data.logs]));
       setPagination(data.pagination);
-    } catch (e) { showToast(e.message || 'Failed to load audit logs.', 'error'); }
+    } catch (e) { showToast(e.message || t('Failed to load audit logs.'), 'error'); }
   };
 
   useEffect(() => {
-    fetchWithAuth('/api/admin/stats').then(setStats).catch((e) => showToast(e.message || 'Failed to load stats.', 'error'));
+    fetchWithAuth('/api/admin/stats').then(setStats).catch((e) => showToast(e.message || t('Failed to load stats.'), 'error'));
     loadLogs(1);
     fetchWithAuth('/api/admin/emergency-access')
       .then((d) => setEmergencies(d.accesses || []))
-      .catch((e) => showToast(e.message || 'Failed to load emergency log.', 'error'));
+      .catch((e) => showToast(e.message || t('Failed to load emergency log.'), 'error'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <Box>
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: 'var(--dark-text)' }}>Overview</Typography>
+      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: 'var(--dark-text)' }}>{t('Overview')}</Typography>
       {!stats ? (
         <Skeleton variant="rectangular" height={90} sx={{ borderRadius: 2, mb: 3 }} />
       ) : (
         <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 4 }}>
-          <StatCard label="Users" value={stats.users} />
-          <StatCard label="Patients" value={stats.patients} />
-          <StatCard label="Doctors" value={stats.doctors} />
-          <StatCard label="Records" value={stats.records} />
-          <StatCard label="Attachments" value={stats.attachments} />
-          <StatCard label="Emergency accesses" value={stats.emergencies} />
+          <StatCard label={t('Users')} value={stats.users} />
+          <StatCard label={t('Patients')} value={stats.patients} />
+          <StatCard label={t('Doctors')} value={stats.doctors} />
+          <StatCard label={t('Records')} value={stats.records} />
+          <StatCard label={t('Attachments')} value={stats.attachments} />
+          <StatCard label={t('Emergency accesses')} value={stats.emergencies} />
         </Box>
       )}
 
-      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5, color: '#c0392b' }}>Emergency access (break-the-glass)</Typography>
+      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5, color: '#c0392b' }}>{t('Emergency access (break-the-glass)')}</Typography>
       {!emergencies ? (
         <Skeleton variant="rectangular" height={120} sx={{ borderRadius: 2, mb: 4 }} />
       ) : emergencies.length === 0 ? (
-        <p className="text-muted" style={{ fontStyle: 'italic' }}>No emergency accesses recorded.</p>
+        <p className="text-muted" style={{ fontStyle: 'italic' }}>{t('No emergency accesses recorded.')}</p>
       ) : (
         <Paper variant="outlined" sx={{ mb: 4, overflowX: 'auto' }}>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>When</TableCell>
-                <TableCell>Doctor</TableCell>
-                <TableCell>Patient</TableCell>
-                <TableCell>Reason</TableCell>
-                <TableCell>Patient notified</TableCell>
+                <TableCell>{t('When')}</TableCell>
+                <TableCell>{t('Doctor')}</TableCell>
+                <TableCell>{t('Patient')}</TableCell>
+                <TableCell>{t('Reason')}</TableCell>
+                <TableCell>{t('Patient notified')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -89,8 +91,8 @@ const AdminDashboard = () => {
                   <TableCell sx={{ maxWidth: 260 }}>{e.reason}</TableCell>
                   <TableCell>
                     {e.notifiedAt
-                      ? <Chip size="small" label="Sent" sx={{ backgroundColor: 'rgba(0,184,148,0.16)', color: '#0f6e56' }} />
-                      : <Chip size="small" label="Pending" sx={{ backgroundColor: 'rgba(237,137,54,0.16)', color: '#b7791f' }} />}
+                      ? <Chip size="small" label={t('Sent')} sx={{ backgroundColor: 'rgba(0,184,148,0.16)', color: '#0f6e56' }} />
+                      : <Chip size="small" label={t('Pending')} sx={{ backgroundColor: 'rgba(237,137,54,0.16)', color: '#b7791f' }} />}
                   </TableCell>
                 </TableRow>
               ))}
@@ -100,37 +102,37 @@ const AdminDashboard = () => {
       )}
 
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--dark-text)' }}>Audit trail</Typography>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--dark-text)' }}>{t('Audit trail')}</Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           {integrity && (
             <Chip
               size="small"
-              label={integrity.ok ? `Chain intact (${integrity.checked})` : `Broken at ${integrity.brokenAtId?.slice(0, 8)}…`}
+              label={integrity.ok ? t('Chain intact ({{count}})', { count: integrity.checked }) : t('Broken at {{id}}…', { id: integrity.brokenAtId?.slice(0, 8) })}
               sx={integrity.ok
                 ? { backgroundColor: 'rgba(0,184,148,0.16)', color: '#0f6e56', fontWeight: 600 }
                 : { backgroundColor: 'rgba(231,76,60,0.16)', color: '#c0392b', fontWeight: 600 }}
             />
           )}
           <Button variant="outlined" size="small" onClick={verifyIntegrity} disabled={verifying}>
-            {verifying ? 'Verifying…' : 'Verify integrity'}
+            {verifying ? t('Verifying…') : t('Verify integrity')}
           </Button>
         </Box>
       </Box>
       {!logs ? (
         <Skeleton variant="rectangular" height={200} sx={{ borderRadius: 2 }} />
       ) : logs.length === 0 ? (
-        <p className="text-muted" style={{ fontStyle: 'italic' }}>No audit entries yet.</p>
+        <p className="text-muted" style={{ fontStyle: 'italic' }}>{t('No audit entries yet.')}</p>
       ) : (
         <>
           <Paper variant="outlined" sx={{ overflowX: 'auto' }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>When</TableCell>
-                  <TableCell>Action</TableCell>
-                  <TableCell>Actor</TableCell>
-                  <TableCell>IP</TableCell>
-                  <TableCell>Details</TableCell>
+                  <TableCell>{t('When')}</TableCell>
+                  <TableCell>{t('Action')}</TableCell>
+                  <TableCell>{t('Actor')}</TableCell>
+                  <TableCell>{t('IP')}</TableCell>
+                  <TableCell>{t('Details')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -148,7 +150,7 @@ const AdminDashboard = () => {
           </Paper>
           {pagination?.hasMore && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-              <Button variant="outlined" onClick={() => loadLogs(pagination.page + 1)}>Load more</Button>
+              <Button variant="outlined" onClick={() => loadLogs(pagination.page + 1)}>{t('Load more')}</Button>
             </Box>
           )}
         </>

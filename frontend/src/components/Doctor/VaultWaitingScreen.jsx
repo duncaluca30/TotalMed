@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Button, CircularProgress } from '@mui/material';
 
 // Mirrors the server-side approval timeout in doctor.routes.js (30s).
 const TIMEOUT_SECONDS = 30;
 
 const VaultWaitingScreen = ({ onCancel }) => {
+  const { t } = useTranslation();
   const [secondsLeft, setSecondsLeft] = useState(TIMEOUT_SECONDS);
 
   useEffect(() => {
@@ -44,18 +46,17 @@ const VaultWaitingScreen = ({ onCancel }) => {
         </Box>
 
         <Typography variant="h5" sx={{ fontWeight: 700, color: 'var(--dark-text)', mb: 1 }}>
-          Waiting for patient approval
+          {t('Waiting for patient approval')}
         </Typography>
         <Typography sx={{ color: 'var(--light-text)', maxWidth: 420, mb: 1 }}>
-          The patient has been notified and is reviewing your request — choosing exactly
-          which records to share with you.
+          {t('The patient has been notified and is reviewing your request — choosing exactly which records to share with you.')}
         </Typography>
         <Typography sx={{ color: 'var(--light-text)', fontSize: '0.85em', fontStyle: 'italic', mb: 4 }}>
-          This request expires automatically in {secondsLeft} second{secondsLeft === 1 ? '' : 's'}.
+          {t('This request expires automatically in {{count}} second(s).', { count: secondsLeft })}
         </Typography>
 
         <Button onClick={onCancel} variant="outlined" color="error" size="small">
-          Cancel Request
+          {t('Cancel Request')}
         </Button>
       </Box>
     </div>

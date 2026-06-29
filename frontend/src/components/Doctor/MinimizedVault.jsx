@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Button } from '@mui/material';
 import LockClockIcon from '@mui/icons-material/LockClock';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -27,6 +28,7 @@ function formatRemaining(secs) {
 // stays alive so they can resume without a new access code, until the patient's
 // chosen duration runs out (or they lock it).
 const MinimizedVault = ({ patient, vaultToken, onResume, onLock }) => {
+  const { t } = useTranslation();
   const expMs = tokenExpMs(vaultToken);
   const [now, setNow] = useState(Date.now());
 
@@ -53,20 +55,22 @@ const MinimizedVault = ({ patient, vaultToken, onResume, onLock }) => {
       }}>
         <LockClockIcon sx={{ fontSize: 32, color: '#00b894' }} />
       </Box>
-      <Typography variant="h6" sx={{ fontWeight: 700, color: '#2d3436' }}>Vault minimized</Typography>
+      <Typography variant="h6" sx={{ fontWeight: 700, color: '#2d3436' }}>{t('Vault minimized')}</Typography>
       <Typography sx={{ fontWeight: 600, color: 'var(--dark-text)', mt: 0.5 }}>
         {patient.firstName} {patient.lastName}
       </Typography>
       <Typography sx={{ color: '#636e72', mb: 3 }}>
-        Access is still active{secs !== null ? ` — expires in ${formatRemaining(secs)}` : ''}. Resume anytime without a new code.
+        {secs !== null
+          ? t('Access is still active — expires in {{time}}. Resume anytime without a new code.', { time: formatRemaining(secs) })
+          : t('Access is still active. Resume anytime without a new code.')}
       </Typography>
 
       <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'center', flexWrap: 'wrap' }}>
         <Button onClick={onResume} variant="contained" startIcon={<VisibilityIcon />} sx={{ backgroundColor: '#00b894' }}>
-          Resume vault
+          {t('Resume vault')}
         </Button>
         <Button onClick={onLock} variant="outlined" color="error">
-          Lock Vault &amp; Exit
+          {t('Lock Vault & Exit')}
         </Button>
       </Box>
     </div>

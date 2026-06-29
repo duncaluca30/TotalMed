@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
+import { useTranslation } from 'react-i18next';
 import { API_URL, fetchWithAuth, clearCsrfToken } from '../services/api';
 import { useToast } from '../hooks/useToast';
 
@@ -15,6 +16,7 @@ export const AuthProvider = ({ children }) => {
   const [authRequest, setAuthRequest] = useState(null);
 
   const showToast = useToast();
+  const { t } = useTranslation();
 
   useEffect(() => {
     // Check session on mount
@@ -50,7 +52,7 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
     setRole(null);
     setAuthRequest(null);
-    showToast("Logged out safely.", "info");
+    showToast(t('Logged out safely.'), "info");
   };
 
   useEffect(() => {
@@ -65,7 +67,7 @@ export const AuthProvider = ({ children }) => {
       
       newSocket.on('session-replaced', () => {
         logout();
-        showToast('You were logged in on another device. This session has ended.', 'warning');
+        showToast(t('You were logged in on another device. This session has ended.'), 'warning');
       });
 
       return () => {

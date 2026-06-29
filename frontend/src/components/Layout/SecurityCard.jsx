@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import FingerprintIcon from '@mui/icons-material/Fingerprint';
@@ -31,14 +32,9 @@ const SectionHeader = ({ icon, title, pill }) => (
 /**
  * Reusable security settings card: TOTP 2FA setup + WebAuthn biometric login.
  * Used by both the patient and doctor dashboards (2FA is per-user, not per-role).
- *
- * Props:
- *  - isTwoFactorEnabled: boolean
- *  - passkeys: array of registered passkeys (length used to reflect state)
- *  - onTwoFactorEnabled():  called after 2FA is successfully activated
- *  - onPasskeyAdded():      called after a new device is registered
  */
 const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, onPasskeyAdded }) => {
+  const { t } = useTranslation();
   const showToast = useToast();
 
   const [setupStep, setSetupStep] = useState('initial'); // initial | scan
@@ -61,7 +57,7 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
       const data = await fetchWithAuth('/api/auth/2fa/backup-codes', { method: 'POST' });
       setBackupCodes(data.codes || []);
     } catch (err) {
-      showToast(err.message || 'Failed to generate backup codes.', 'error');
+      showToast(err.message || t('Failed to generate backup codes.'), 'error');
     } finally { setGeneratingCodes(false); }
   };
 
@@ -81,9 +77,9 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
     try {
       const data = await fetchWithAuth('/api/auth/logout-all', { method: 'POST' });
       if (data?.csrfToken) setCsrfToken(data.csrfToken);
-      showToast('Signed out of all other devices.', 'success');
+      showToast(t('Signed out of all other devices.'), 'success');
     } catch (err) {
-      showToast(err.message || 'Failed to sign out other devices.', 'error');
+      showToast(err.message || t('Failed to sign out other devices.'), 'error');
     } finally { setSigningOut(false); }
   };
 
@@ -97,7 +93,7 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
       setTwoFactorSecret(data.secret);
       setSetupStep('scan');
     } catch (err) {
-      showToast(err.message || 'Failed to generate 2FA', 'error');
+      showToast(err.message || t('Failed to generate 2FA'), 'error');
     }
   };
 
@@ -110,16 +106,16 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
       });
       setSetupStep('initial');
       setSetupPin('');
-      showToast('2FA activated successfully!', 'success');
+      showToast(t('2FA activated successfully!'), 'success');
       onTwoFactorEnabled?.();
     } catch (err) {
-      showToast(err.message || 'Failed to verify 2FA', 'error');
+      showToast(err.message || t('Failed to verify 2FA'), 'error');
     }
   };
 
   const handleEnableBiometrics = async () => {
     setRegistering(true);
-    showToast('Initiating biometric setup...', 'info');
+    showToast(t('Initiating biometric setup...'), 'info');
     try {
       const options = await fetchWithAuth('/api/auth/webauthn/generate-registration');
       const attestationResponse = await startRegistration({ optionsJSON: options });
@@ -129,15 +125,15 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
         body: JSON.stringify(attestationResponse),
       });
 
-      showToast('Fingerprint/Face ID securely registered!', 'success');
+      showToast(t('Fingerprint/Face ID securely registered!'), 'success');
       onPasskeyAdded?.();
     } catch (error) {
       if (error.name === 'NotAllowedError') {
-        showToast('Biometric setup cancelled.', 'warning');
+        showToast(t('Biometric setup cancelled.'), 'warning');
       } else if (error.name === 'InvalidStateError') {
-        showToast('This device is already registered.', 'info');
+        showToast(t('This device is already registered.'), 'info');
       } else {
-        showToast(`Failed: ${error.message || error.name}`, 'error');
+        showToast(t('Failed: {{msg}}', { msg: error.message || error.name }), 'error');
       }
     } finally {
       setRegistering(false);
@@ -146,7 +142,7 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    if (pw.next !== pw.confirm) return showToast('New passwords do not match.', 'error');
+    if (pw.next !== pw.confirm) return showToast(t('New passwords do not match.'), 'error');
     setSavingPw(true);
     try {
       const data = await fetchWithAuth('/api/auth/change-password', {
@@ -157,9 +153,9 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
       if (data?.csrfToken) setCsrfToken(data.csrfToken);
       setPw({ current: '', next: '', confirm: '' });
       setPwOpen(false);
-      showToast('Password changed. Other devices have been signed out.', 'success');
+      showToast(t('Password changed. Other devices have been signed out.'), 'success');
     } catch (err) {
-      showToast(err.message || 'Failed to change password.', 'error');
+      showToast(err.message || t('Failed to change password.'), 'error');
     } finally {
       setSavingPw(false);
     }
@@ -170,25 +166,25 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
       {/* ---- Two-Factor Authentication ---- */}
       <SectionHeader
         icon={<ShieldOutlinedIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />}
-        title="Two-factor authentication"
-        pill={twoFactorActive ? <StatusPill>Enabled</StatusPill> : null}
+        title={t('Two-factor authentication')}
+        pill={twoFactorActive ? <StatusPill>{t('Enabled')}</StatusPill> : null}
       />
-      <p className="text-muted">Protect your account with an authenticator app.</p>
+      <p className="text-muted">{t('Protect your account with an authenticator app.')}</p>
 
       {!twoFactorActive && (
         <>
           {setupStep === 'initial' && (
-            <Button variant="outlined" onClick={handleStart2FASetup} sx={{ mt: 1 }}>Enable 2FA</Button>
+            <Button variant="outlined" onClick={handleStart2FASetup} sx={{ mt: 1 }}>{t('Enable 2FA')}</Button>
           )}
           {setupStep === 'scan' && (
             <Box sx={{ textAlign: 'center', mt: 2 }}>
-              <Typography sx={{ mb: 2 }}>Scan this QR code with your Authenticator App:</Typography>
-              <img src={qrCodeUrl} alt="QR Code" style={{ width: '180px', border: '10px solid white', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
-              <Typography sx={{ mt: 1, fontSize: '0.85em', color: '#636e72' }}>Manual Key: <strong>{twoFactorSecret}</strong></Typography>
+              <Typography sx={{ mb: 2 }}>{t('Scan this QR code with your Authenticator App:')}</Typography>
+              <img src={qrCodeUrl} alt={t('QR Code')} style={{ width: '180px', border: '10px solid white', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
+              <Typography sx={{ mt: 1, fontSize: '0.85em', color: '#636e72' }}>{t('Manual Key:')} <strong>{twoFactorSecret}</strong></Typography>
 
               <Box component="form" onSubmit={handleVerify2FASetup} sx={{ display: 'flex', gap: 1, mt: 3, justifyContent: 'center' }}>
-                <TextField size="small" label="Enter 6-digit code" value={setupPin} onChange={(e) => setSetupPin(e.target.value.replace(/\D/g, ''))} slotProps={{ htmlInput: { maxLength: 6 } }} required />
-                <Button type="submit" variant="contained" sx={{ backgroundColor: '#5b4fe6' }}>Verify</Button>
+                <TextField size="small" label={t('Enter 6-digit code')} value={setupPin} onChange={(e) => setSetupPin(e.target.value.replace(/\D/g, ''))} slotProps={{ htmlInput: { maxLength: 6 } }} required />
+                <Button type="submit" variant="contained" sx={{ backgroundColor: '#5b4fe6' }}>{t('Verify')}</Button>
               </Box>
             </Box>
           )}
@@ -200,31 +196,31 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
       {/* ---- Biometric Login ---- */}
       <SectionHeader
         icon={<FingerprintIcon sx={{ fontSize: 22, color: '#7c3aed' }} />}
-        title="Biometric login"
-        pill={hasPasskeys ? <StatusPill>{passkeys.length} device{passkeys.length > 1 ? 's' : ''}</StatusPill> : null}
+        title={t('Biometric login')}
+        pill={hasPasskeys ? <StatusPill>{t('{{count}} device(s)', { count: passkeys.length })}</StatusPill> : null}
       />
       {hasPasskeys ? (
         <>
-          <p className="text-muted">Sign in with Fingerprint, Face ID, or Windows Hello on your registered devices.</p>
+          <p className="text-muted">{t('Sign in with Fingerprint, Face ID, or Windows Hello on your registered devices.')}</p>
           <Button
             variant="outlined"
             onClick={handleEnableBiometrics}
             disabled={registering}
             sx={{ mt: 1.5, textTransform: 'none', borderColor: '#7c3aed', color: '#7c3aed' }}
           >
-            {registering ? 'Registering…' : 'Register another device'}
+            {registering ? t('Registering…') : t('Register another device')}
           </Button>
         </>
       ) : (
         <>
-          <p className="text-muted">Register this device to log in with Fingerprint, Face ID, or Windows Hello.</p>
+          <p className="text-muted">{t('Register this device to log in with Fingerprint, Face ID, or Windows Hello.')}</p>
           <Button
             variant="contained"
             onClick={handleEnableBiometrics}
             disabled={registering}
             sx={{ mt: 1, backgroundColor: '#7c3aed', '&:hover': { backgroundColor: '#a29bfe' }, textTransform: 'none' }}
           >
-            {registering ? 'Registering…' : 'Register Current Device'}
+            {registering ? t('Registering…') : t('Register Current Device')}
           </Button>
         </>
       )}
@@ -234,29 +230,29 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
       {/* ---- Change password ---- */}
       <SectionHeader
         icon={<KeyOutlinedIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />}
-        title="Password"
+        title={t('Password')}
       />
       {!pwOpen ? (
         <>
-          <p className="text-muted">Change your account password. This signs you out on all other devices.</p>
-          <Button variant="outlined" onClick={() => setPwOpen(true)} sx={{ mt: 1, textTransform: 'none' }}>Change password</Button>
+          <p className="text-muted">{t('Change your account password. This signs you out on all other devices.')}</p>
+          <Button variant="outlined" onClick={() => setPwOpen(true)} sx={{ mt: 1, textTransform: 'none' }}>{t('Change password')}</Button>
         </>
       ) : (
         <Box component="form" onSubmit={handleChangePassword} sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-          <TextField size="small" type="password" label="Current password" value={pw.current}
+          <TextField size="small" type="password" label={t('Current password')} value={pw.current}
             onChange={(e) => setPw({ ...pw, current: e.target.value })} required fullWidth />
-          <TextField size="small" type="password" label="New password" value={pw.next}
+          <TextField size="small" type="password" label={t('New password')} value={pw.next}
             onChange={(e) => setPw({ ...pw, next: e.target.value })} required fullWidth />
           <PasswordChecklist password={pw.next} />
-          <TextField size="small" type="password" label="Confirm new password" value={pw.confirm}
+          <TextField size="small" type="password" label={t('Confirm new password')} value={pw.confirm}
             onChange={(e) => setPw({ ...pw, confirm: e.target.value })} required fullWidth />
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button type="submit" variant="contained" disabled={savingPw || !isPasswordValid(pw.next) || pw.next !== pw.confirm}
               sx={{ backgroundColor: '#5b4fe6', textTransform: 'none' }}>
-              {savingPw ? 'Saving…' : 'Update password'}
+              {savingPw ? t('Saving…') : t('Update password')}
             </Button>
             <Button onClick={() => { setPwOpen(false); setPw({ current: '', next: '', confirm: '' }); }} variant="text" sx={{ textTransform: 'none', color: '#636e72' }}>
-              Cancel
+              {t('Cancel')}
             </Button>
           </Box>
         </Box>
@@ -267,11 +263,11 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
       {/* ---- Backup codes ---- */}
       <SectionHeader
         icon={<RestartAltIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />}
-        title="Backup codes"
+        title={t('Backup codes')}
       />
-      <p className="text-muted">Single-use codes to sign in if you lose access to your other methods.</p>
+      <p className="text-muted">{t('Single-use codes to sign in if you lose access to your other methods.')}</p>
       <Button variant="outlined" onClick={handleGenerateBackupCodes} disabled={generatingCodes} sx={{ mt: 1, textTransform: 'none' }}>
-        {generatingCodes ? 'Generating…' : 'Generate backup codes'}
+        {generatingCodes ? t('Generating…') : t('Generate backup codes')}
       </Button>
 
       <hr className="section-divider" />
@@ -279,19 +275,19 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
       {/* ---- Active sessions ---- */}
       <SectionHeader
         icon={<DevicesOutlinedIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />}
-        title="Active sessions"
+        title={t('Active sessions')}
       />
-      <p className="text-muted">Sign out everywhere else if you used a shared or lost device. This device stays signed in.</p>
+      <p className="text-muted">{t('Sign out everywhere else if you used a shared or lost device. This device stays signed in.')}</p>
       <Button variant="outlined" color="error" onClick={handleSignOutEverywhere} disabled={signingOut} sx={{ mt: 1, textTransform: 'none' }}>
-        {signingOut ? 'Signing out…' : 'Sign out of all other devices'}
+        {signingOut ? t('Signing out…') : t('Sign out of all other devices')}
       </Button>
 
       {/* Backup codes shown once after generation */}
       <Dialog open={!!backupCodes} onClose={() => setBackupCodes(null)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Your backup codes</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>{t('Your backup codes')}</DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: '0.9rem', color: '#636e72', mb: 2 }}>
-            Save these now — they won't be shown again. Each code works once.
+            {t("Save these now — they won't be shown again. Each code works once.")}
           </Typography>
           <Box sx={{
             display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1,
@@ -302,8 +298,8 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={handleDownloadCodes} sx={{ textTransform: 'none' }}>Download .txt</Button>
-          <Button onClick={() => setBackupCodes(null)} variant="contained" sx={{ textTransform: 'none', backgroundColor: '#5b4fe6' }}>Done</Button>
+          <Button onClick={handleDownloadCodes} sx={{ textTransform: 'none' }}>{t('Download .txt')}</Button>
+          <Button onClick={() => setBackupCodes(null)} variant="contained" sx={{ textTransform: 'none', backgroundColor: '#5b4fe6' }}>{t('Done')}</Button>
         </DialogActions>
       </Dialog>
     </div>

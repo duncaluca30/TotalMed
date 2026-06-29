@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Box, Tabs, Tab, Skeleton, Typography, Button } from '@mui/material';
 import { fetchWithAuth } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -8,13 +9,14 @@ import AppHeader from '../Layout/AppHeader';
 import AuthRequestDialog from './AuthRequestDialog';
 
 const PatientLayout = () => {
+  const { t } = useTranslation();
   const [patientData, setPatientData] = useState(null);
   const [pagination, setPagination] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [viewingDoctor, setViewingDoctor] = useState(null);
   const [viewingUntil, setViewingUntil] = useState(null); // epoch ms when the grant expires
   const [now, setNow] = useState(Date.now());
-  
+
   const { logout, authRequest, setAuthRequest, socket } = useAuth();
   const showToast = useToast();
   const navigate = useNavigate();
@@ -35,7 +37,7 @@ const PatientLayout = () => {
     try {
       const nextPage = pagination.page + 1;
       const data = await fetchWithAuth(`/api/patient/dashboard?page=${nextPage}&limit=${pagination.limit}`);
-      
+
       setPatientData(prev => ({
         ...prev,
         medicalRecords: [...prev.medicalRecords, ...data.medicalRecords]
@@ -62,7 +64,7 @@ const PatientLayout = () => {
       navigate('/patient/history');
     };
     const handleViewingStarted = (data) => {
-      setViewingDoctor(data?.doctorName || 'Your doctor');
+      setViewingDoctor(data?.doctorName || t('Your doctor'));
       const minutes = data?.durationMinutes || 15;
       setViewingUntil(Date.now() + minutes * 60 * 1000);
       // The access code was consumed on the server the moment access was granted.
@@ -80,16 +82,16 @@ const PatientLayout = () => {
       socket.off('vault-viewing-started', handleViewingStarted);
       socket.off('vault-viewing-ended', handleViewingEnded);
     };
-  }, [socket, navigate]);
+  }, [socket, navigate, t]);
 
   // Tick once a second while a doctor is viewing, so the countdown updates and
   // the banner clears itself the moment the grant expires.
   useEffect(() => {
     if (!viewingUntil) return;
     const id = setInterval(() => {
-      const t = Date.now();
-      setNow(t);
-      if (t >= viewingUntil) { setViewingDoctor(null); setViewingUntil(null); }
+      const tNow = Date.now();
+      setNow(tNow);
+      if (tNow >= viewingUntil) { setViewingDoctor(null); setViewingUntil(null); }
     }, 1000);
     return () => clearInterval(id);
   }, [viewingUntil]);
@@ -99,9 +101,9 @@ const PatientLayout = () => {
       await fetchWithAuth('/api/patient/revoke-access', { method: 'POST' });
       setViewingDoctor(null);
       setViewingUntil(null);
-      showToast('Access revoked. The doctor can no longer add records.', 'success');
+      showToast(t('Access revoked. The doctor can no longer add records.'), 'success');
     } catch (error) {
-      showToast(error.message || 'Failed to revoke access.', 'error');
+      showToast(error.message || t('Failed to revoke access.'), 'error');
     }
   };
 
@@ -110,6 +112,8 @@ const PatientLayout = () => {
     : location.pathname.includes('/health') ? 1
     : 0;
 
+  const tabLabels = [t('Dashboard & Vault Key'), t('Health Profile'), t('Medical History'), t('Access Log')];
+
   if (!patientData) {
     return (
       <div className="container">
@@ -117,10 +121,7 @@ const PatientLayout = () => {
         <Box sx={{ width: '100%', mt: 3 }}>
           <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
             <Tabs value={currentTab} textColor="primary" indicatorColor="primary">
-              <Tab label="Dashboard & Vault Key" sx={{ fontWeight: 'bold' }} />
-              <Tab label="Health Profile" sx={{ fontWeight: 'bold' }} />
-              <Tab label="Medical History" sx={{ fontWeight: 'bold' }} />
-              <Tab label="Access Log" sx={{ fontWeight: 'bold' }} />
+              {tabLabels.map((label) => <Tab key={label} label={label} sx={{ fontWeight: 'bold' }} />)}
             </Tabs>
           </Box>
           <div className="card" style={{ marginBottom: '20px' }}>
@@ -162,14 +163,14 @@ const PatientLayout = () => {
             },
           }} />
           <Typography sx={{ color: '#5b4fe6', fontWeight: 600 }}>
-            {viewingDoctor} is currently viewing the records you shared.
+            {t('{{doctor}} is currently viewing the records you shared.', { doctor: viewingDoctor })}
             {viewingUntil && (() => {
               const secs = Math.max(0, Math.round((viewingUntil - now) / 1000));
               const h = Math.floor(secs / 3600);
               const m = Math.floor((secs % 3600) / 60);
               const s = secs % 60;
               const pretty = h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
-              return ` Access expires in ${pretty}.`;
+              return ' ' + t('Access expires in {{time}}.', { time: pretty });
             })()}
           </Typography>
           <Button
@@ -179,7 +180,7 @@ const PatientLayout = () => {
             size="small"
             sx={{ ml: 'auto', flexShrink: 0 }}
           >
-            Revoke Access
+            {t('Revoke Access')}
           </Button>
         </Box>
       )}
@@ -187,10 +188,7 @@ const PatientLayout = () => {
       <Box sx={{ width: '100%' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
           <Tabs value={currentTab} onChange={handleTabChange} textColor="primary" indicatorColor="primary">
-            <Tab label="Dashboard & Vault Key" sx={{ fontWeight: 'bold' }} />
-            <Tab label="Health Profile" sx={{ fontWeight: 'bold' }} />
-            <Tab label="Medical History" sx={{ fontWeight: 'bold' }} />
-            <Tab label="Access Log" sx={{ fontWeight: 'bold' }} />
+            {tabLabels.map((label) => <Tab key={label} label={label} sx={{ fontWeight: 'bold' }} />)}
           </Tabs>
         </Box>
 
@@ -198,8 +196,8 @@ const PatientLayout = () => {
       </Box>
 
       {authRequest && (
-        <AuthRequestDialog 
-          authRequest={authRequest} 
+        <AuthRequestDialog
+          authRequest={authRequest}
           patientData={patientData}
           onClose={() => setAuthRequest(null)}
           socket={socket}

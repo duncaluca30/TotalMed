@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Box, Button, TextField, InputAdornment, Chip } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import DataObjectIcon from '@mui/icons-material/DataObject';
@@ -14,6 +15,7 @@ import RecordAmendments from '../Health/RecordAmendments';
 import { icdLabel } from '../../data/icd10';
 
 const MedicalHistory = () => {
+  const { t } = useTranslation();
   const { patientData, setPatientData, pagination, fetchMoreRecords, loadingMore } = useOutletContext();
   const showToast = useToast();
   const [search, setSearch] = useState('');
@@ -35,24 +37,24 @@ const MedicalHistory = () => {
       fd.append('recordId', record.id);
       const meta = await uploadFile('/api/patient/attachments', fd);
       setRecordAttachments(record.id, (list) => [...list, meta]);
-      showToast('File attached.', 'success');
-    } catch (e) { showToast(e.message || 'Upload failed.', 'error'); }
+      showToast(t('File attached.'), 'success');
+    } catch (e) { showToast(e.message || t('Upload failed.'), 'error'); }
   };
   const downloadAttachment = async (att) => {
     try { await downloadFile(`/api/patient/attachments/${att.id}/download`, att.fileName); }
-    catch (e) { showToast(e.message || 'Download failed.', 'error'); }
+    catch (e) { showToast(e.message || t('Download failed.'), 'error'); }
   };
   const deleteAttachment = async (record, att) => {
     try {
       await fetchWithAuth(`/api/patient/attachments/${att.id}`, { method: 'DELETE' });
       setRecordAttachments(record.id, (list) => list.filter((a) => a.id !== att.id));
-      showToast('Attachment removed.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to remove attachment.', 'error'); }
+      showToast(t('Attachment removed.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to remove attachment.'), 'error'); }
   };
 
   const handleExportJson = async () => {
     try { await downloadFile('/api/patient/export', 'totalmed-export.json'); }
-    catch (e) { showToast(e.message || 'Export failed.', 'error'); }
+    catch (e) { showToast(e.message || t('Export failed.'), 'error'); }
   };
 
   const visibleRecords = filterRecords(patientData.medicalRecords, search);
@@ -63,7 +65,7 @@ const MedicalHistory = () => {
     const medications = patientData.medications || [];
     const births = patientData.births || [];
     if (recordsToPrint.length === 0 && allergies.length === 0 && medications.length === 0) {
-      return showToast("No data to download.", "error");
+      return showToast(t('No data to download.'), "error");
     }
     const doc = new jsPDF();
     doc.setFontSize(22);
@@ -140,16 +142,16 @@ const MedicalHistory = () => {
   return (
     <Box>
       <Box className="page-heading">
-        <h3 style={{ margin: 0 }}>Your medical history</h3>
+        <h3 style={{ margin: 0 }}>{t('Your medical history')}</h3>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <Button variant="outlined" startIcon={<DataObjectIcon />} onClick={handleExportJson}>Export (JSON)</Button>
-          <Button variant="contained" startIcon={<PictureAsPdfIcon />} onClick={handleDownloadPDF}>Download PDF</Button>
+          <Button variant="outlined" startIcon={<DataObjectIcon />} onClick={handleExportJson}>{t('Export (JSON)')}</Button>
+          <Button variant="contained" startIcon={<PictureAsPdfIcon />} onClick={handleDownloadPDF}>{t('Download PDF')}</Button>
         </Box>
       </Box>
 
       {patientData.medicalRecords && patientData.medicalRecords.length > 0 && (
         <TextField
-          fullWidth size="small" placeholder="Search by diagnosis, treatment, notes, doctor or date…"
+          fullWidth size="small" placeholder={t('Search by diagnosis, treatment, notes, doctor or date…')}
           value={search} onChange={(e) => setSearch(e.target.value)}
           sx={{ mb: 2 }}
           slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
@@ -168,8 +170,8 @@ const MedicalHistory = () => {
               <Chip size="small" label={icdLabel(record.icdCode)} title={icdLabel(record.icdCode)}
                 sx={{ mb: 1, maxWidth: '100%', backgroundColor: 'rgba(91,79,230,0.1)', color: '#5b4fe6', fontWeight: 600 }} />
             )}
-            <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Attending Physician:</strong> Dr. {record.doctor?.lastName || 'Unknown'}</p>
-            {record.treatment && <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>Treatment Plan:</strong> {record.treatment}</p>}
+            <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>{t('Attending Physician:')}</strong> Dr. {record.doctor?.lastName || t('Unknown')}</p>
+            {record.treatment && <p style={{ margin: '5px 0', fontSize: '0.95em' }}><strong>{t('Treatment Plan:')}</strong> {record.treatment}</p>}
             {record.notes && <div className="record-notes">"{record.notes}"</div>}
             <RecordAttachments
               attachments={record.attachments}
@@ -181,10 +183,10 @@ const MedicalHistory = () => {
           </div>
         ))
         ) : (
-          <p className="text-muted" style={{ fontStyle: 'italic' }}>No records match "{search}".</p>
+          <p className="text-muted" style={{ fontStyle: 'italic' }}>{t('No records match "{{search}}".', { search })}</p>
         )
       ) : (
-        <p className="text-muted" style={{ fontStyle: 'italic' }}>Your medical vault is currently empty.</p>
+        <p className="text-muted" style={{ fontStyle: 'italic' }}>{t('Your medical vault is currently empty.')}</p>
       )}
 
       {pagination?.hasMore && (
@@ -195,7 +197,7 @@ const MedicalHistory = () => {
             disabled={loadingMore}
             sx={{ fontWeight: 'bold' }}
           >
-            {loadingMore ? "Loading..." : "Load More Records"}
+            {loadingMore ? t('Loading...') : t('Load More Records')}
           </Button>
         </Box>
       )}

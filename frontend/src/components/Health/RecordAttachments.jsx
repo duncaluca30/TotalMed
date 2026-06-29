@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Chip, Button, CircularProgress } from '@mui/material';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -14,6 +15,7 @@ function prettySize(bytes) {
 // control. The parent owns the actual network calls so this stays reusable
 // across the patient view and the doctor vault.
 const RecordAttachments = ({ attachments = [], onUpload, onDownload, onDelete }) => {
+  const { t } = useTranslation();
   const inputRef = useRef(null);
   const [busy, setBusy] = useState(false);
 
@@ -52,7 +54,7 @@ const RecordAttachments = ({ attachments = [], onUpload, onDownload, onDelete })
             disabled={busy}
             sx={{ textTransform: 'none' }}
           >
-            {busy ? 'Uploading…' : 'Attach file'}
+            {busy ? t('Uploading…') : t('Attach file')}
           </Button>
         </>
       )}

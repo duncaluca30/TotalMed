@@ -1,10 +1,13 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import { PASSWORD_RULES } from '../../utils/passwordRules';
 
-const PasswordChecklist = ({ password = '' }) => (
+const PasswordChecklist = ({ password = '' }) => {
+  const { t } = useTranslation();
+  return (
   <Box sx={{
     backgroundColor: '#f8f9fa', border: '1px solid #e9ecef',
     borderRadius: '8px', px: 2, py: 1.5,
@@ -22,12 +25,13 @@ const PasswordChecklist = ({ password = '' }) => (
             fontWeight: met ? 600 : 400,
             transition: 'color 0.15s ease',
           }}>
-            {rule.label}
+            {t(rule.label)}
           </Typography>
         </Box>
       );
     })}
   </Box>
-);
+  );
+};
 
 export default PasswordChecklist;

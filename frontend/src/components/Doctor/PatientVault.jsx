@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Button, TextField, InputAdornment, Autocomplete, Chip } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import MinimizeIcon from '@mui/icons-material/Minimize';
@@ -20,6 +21,7 @@ import { filterRecords } from '../../utils/recordSearch';
 import { ICD10_CODES, icdLabel } from '../../data/icd10';
 
 const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, onMinimize }) => {
+  const { t } = useTranslation();
   const [newRecord, setNewRecord] = useState({ diagnosis: '', treatment: '', notes: '', icdCode: '' });
   const [recordSearch, setRecordSearch] = useState('');
   const [records, setRecords] = useState(patient.medicalRecords || []);
@@ -44,73 +46,73 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
     try {
       const created = await fetchWithAuth('/api/doctor/allergies', { method: 'POST', body: vaultBody(payload) });
       setAllergies((prev) => [created, ...prev]);
-      showToast('Allergy added.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to add allergy.', 'error'); throw e; }
+      showToast(t('Allergy added.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to add allergy.'), 'error'); throw e; }
   };
   const updateAllergy = async (id, payload) => {
     try {
       const updated = await fetchWithAuth(`/api/doctor/allergies/${id}`, { method: 'PUT', body: vaultBody(payload) });
       setAllergies((prev) => prev.map((a) => (a.id === id ? updated : a)));
-      showToast('Allergy updated.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to update allergy.', 'error'); throw e; }
+      showToast(t('Allergy updated.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to update allergy.'), 'error'); throw e; }
   };
   const deleteAllergy = async (id) => {
     try {
       await fetchWithAuth(`/api/doctor/allergies/${id}`, { method: 'DELETE', body: vaultBody({}) });
       setAllergies((prev) => prev.filter((a) => a.id !== id));
-      showToast('Allergy removed.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to remove allergy.', 'error'); }
+      showToast(t('Allergy removed.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to remove allergy.'), 'error'); }
   };
   const addMedication = async (payload) => {
     try {
       const created = await fetchWithAuth('/api/doctor/medications', { method: 'POST', body: vaultBody(payload) });
       setMedications((prev) => [created, ...prev]);
-      showToast('Medication added.', 'success');
+      showToast(t('Medication added.'), 'success');
       return created;
-    } catch (e) { showToast(e.message || 'Failed to add medication.', 'error'); throw e; }
+    } catch (e) { showToast(e.message || t('Failed to add medication.'), 'error'); throw e; }
   };
   const updateMedication = async (id, payload) => {
     try {
       const updated = await fetchWithAuth(`/api/doctor/medications/${id}`, { method: 'PUT', body: vaultBody(payload) });
       setMedications((prev) => prev.map((m) => (m.id === id ? updated : m)));
-      showToast('Medication updated.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to update medication.', 'error'); throw e; }
+      showToast(t('Medication updated.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to update medication.'), 'error'); throw e; }
   };
   const deleteMedication = async (id) => {
     try {
       await fetchWithAuth(`/api/doctor/medications/${id}`, { method: 'DELETE', body: vaultBody({}) });
       setMedications((prev) => prev.filter((m) => m.id !== id));
-      showToast('Medication removed.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to remove medication.', 'error'); }
+      showToast(t('Medication removed.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to remove medication.'), 'error'); }
   };
 
   const saveProfile = async (fields) => {
     try {
       const updated = await fetchWithAuth('/api/doctor/patient-profile', { method: 'PUT', body: vaultBody(fields) });
       setProfile({ sex: updated.sex, menarcheDate: updated.menarcheDate, atMenopause: updated.atMenopause });
-      showToast('Profile updated.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to update profile.', 'error'); throw e; }
+      showToast(t('Profile updated.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to update profile.'), 'error'); throw e; }
   };
   const addBirth = async (payload) => {
     try {
       const created = await fetchWithAuth('/api/doctor/births', { method: 'POST', body: vaultBody(payload) });
       setBirths((prev) => [created, ...prev]);
-      showToast('Birth added.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to add birth.', 'error'); throw e; }
+      showToast(t('Birth added.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to add birth.'), 'error'); throw e; }
   };
   const updateBirth = async (id, payload) => {
     try {
       const updated = await fetchWithAuth(`/api/doctor/births/${id}`, { method: 'PUT', body: vaultBody(payload) });
       setBirths((prev) => prev.map((b) => (b.id === id ? updated : b)));
-      showToast('Birth updated.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to update birth.', 'error'); throw e; }
+      showToast(t('Birth updated.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to update birth.'), 'error'); throw e; }
   };
   const deleteBirth = async (id) => {
     try {
       await fetchWithAuth(`/api/doctor/births/${id}`, { method: 'DELETE', body: vaultBody({}) });
       setBirths((prev) => prev.filter((b) => b.id !== id));
-      showToast('Birth removed.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to remove birth.', 'error'); }
+      showToast(t('Birth removed.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to remove birth.'), 'error'); }
   };
 
   const sortByDate = (list) => [...list].sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
@@ -118,37 +120,37 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
     try {
       const created = await fetchWithAuth('/api/doctor/appointments', { method: 'POST', body: vaultBody(payload) });
       setAppointments((prev) => sortByDate([...prev, created]));
-      showToast('Appointment added.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to add appointment.', 'error'); throw e; }
+      showToast(t('Appointment added.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to add appointment.'), 'error'); throw e; }
   };
   const updateAppointment = async (id, payload) => {
     try {
       const updated = await fetchWithAuth(`/api/doctor/appointments/${id}`, { method: 'PUT', body: vaultBody(payload) });
       setAppointments((prev) => sortByDate(prev.map((a) => (a.id === id ? updated : a))));
-      showToast('Appointment updated.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to update appointment.', 'error'); throw e; }
+      showToast(t('Appointment updated.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to update appointment.'), 'error'); throw e; }
   };
   const deleteAppointment = async (id) => {
     try {
       await fetchWithAuth(`/api/doctor/appointments/${id}`, { method: 'DELETE', body: vaultBody({}) });
       setAppointments((prev) => prev.filter((a) => a.id !== id));
-      showToast('Appointment removed.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to remove appointment.', 'error'); }
+      showToast(t('Appointment removed.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to remove appointment.'), 'error'); }
   };
 
   const addVital = async (payload) => {
     try {
       const created = await fetchWithAuth('/api/doctor/vitals', { method: 'POST', body: vaultBody(payload) });
       setVitalSigns((prev) => [...prev, created]);
-      showToast('Reading added.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to add reading.', 'error'); throw e; }
+      showToast(t('Reading added.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to add reading.'), 'error'); throw e; }
   };
   const addVaccination = async (payload) => {
     try {
       const created = await fetchWithAuth('/api/doctor/vaccinations', { method: 'POST', body: vaultBody(payload) });
       setVaccinations((prev) => [created, ...prev]);
-      showToast('Vaccination added.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to add vaccination.', 'error'); throw e; }
+      showToast(t('Vaccination added.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to add vaccination.'), 'error'); throw e; }
   };
 
   const setRecordAttachments = (recordId, updater) => {
@@ -165,25 +167,25 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
       fd.append('vaultToken', vaultToken);
       const meta = await uploadFile('/api/doctor/attachments', fd);
       setRecordAttachments(record.id, (list) => [...list, meta]);
-      showToast('File attached.', 'success');
-    } catch (e) { showToast(e.message || 'Upload failed.', 'error'); }
+      showToast(t('File attached.'), 'success');
+    } catch (e) { showToast(e.message || t('Upload failed.'), 'error'); }
   };
   const downloadAttachment = async (att) => {
     try {
       await downloadFile(`/api/doctor/attachments/${att.id}/download?vaultToken=${encodeURIComponent(vaultToken)}`, att.fileName);
-    } catch (e) { showToast(e.message || 'Download failed.', 'error'); }
+    } catch (e) { showToast(e.message || t('Download failed.'), 'error'); }
   };
   const addAmendment = async (record, text) => {
     try {
       const created = await fetchWithAuth(`/api/doctor/records/${record.id}/amendments`, { method: 'POST', body: vaultBody({ text }) });
       setRecords((prev) => prev.map((r) => (r.id === record.id ? { ...r, amendments: [...(r.amendments || []), created] } : r)));
-      showToast('Amendment added.', 'success');
-    } catch (e) { showToast(e.message || 'Failed to add amendment.', 'error'); throw e; }
+      showToast(t('Amendment added.'), 'success');
+    } catch (e) { showToast(e.message || t('Failed to add amendment.'), 'error'); throw e; }
   };
 
   const handleDownloadPDF = () => {
     if (records.length === 0 && allergies.length === 0 && medications.length === 0) {
-      return showToast("No data to download.", "error");
+      return showToast(t('No data to download.'), "error");
     }
     const doc = new jsPDF();
     doc.setFontSize(22);
@@ -276,10 +278,10 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
         method: 'POST',
         body: JSON.stringify({ ...newRecord, patientId: patient.id, vaultToken })
       });
-      showToast("Record successfully secured in the vault.", "success");
+      showToast(t('Record successfully secured in the vault.'), "success");
       onClose();
-    } catch (error) { 
-      showToast(error.message || "Failed to add record.", "error"); 
+    } catch (error) {
+      showToast(error.message || t('Failed to add record.'), "error");
     }
   };
 
@@ -299,7 +301,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
           <LockOpenIcon sx={{ fontSize: 30, color: '#00b894' }} />
           <Box>
             <Typography sx={{ fontSize: '0.8em', fontWeight: 700, letterSpacing: '1px', color: '#00b894', textTransform: 'uppercase' }}>
-              Vault Unlocked
+              {t('Vault Unlocked')}
             </Typography>
             <Typography sx={{ fontSize: '1.35em', fontWeight: 700, lineHeight: 1.2, color: 'var(--dark-text)' }}>
               {patient.firstName} {patient.lastName}
@@ -314,14 +316,14 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
             size="small"
             sx={{ borderColor: '#5b4fe6', color: '#5b4fe6' }}
           >
-            Download PDF
+            {t('Download PDF')}
           </Button>
           {onMinimize && (
             <Button onClick={onMinimize} variant="outlined" size="small" startIcon={<MinimizeIcon />} sx={{ borderColor: '#636e72', color: '#636e72' }}>
-              Minimize
+              {t('Minimize')}
             </Button>
           )}
-          <Button onClick={handleLockAndExit} variant="outlined" color="error" size="small">Lock Vault & Exit</Button>
+          <Button onClick={handleLockAndExit} variant="outlined" color="error" size="small">{t('Lock Vault & Exit')}</Button>
         </Box>
       </Box>
 
@@ -333,7 +335,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
             <HealthAndSafetyOutlinedIcon sx={{ fontSize: 22, color: '#c0392b' }} />
-            <Typography sx={{ fontWeight: 700, color: '#c0392b' }}>Allergies &amp; Current Medications</Typography>
+            <Typography sx={{ fontWeight: 700, color: '#c0392b' }}>{t('Allergies & Current Medications')}</Typography>
           </Box>
           <HealthLists
             allergies={allergies}
@@ -375,15 +377,15 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
 
         {/* Shared records */}
         <Typography variant="h6" sx={{ color: 'var(--dark-text)', mb: 2 }}>
-          Patient History
+          {t('Patient History')}
           <Typography component="span" sx={{ color: 'var(--light-text)', fontSize: '0.7em', fontWeight: 400, ml: 1 }}>
-            ({records.length} record{records.length === 1 ? '' : 's'} shared)
+            ({t('{{count}} record(s) shared', { count: records.length })})
           </Typography>
         </Typography>
 
         {records.length > 0 && (
           <TextField
-            fullWidth size="small" placeholder="Search by diagnosis, treatment, notes, doctor or date…"
+            fullWidth size="small" placeholder={t('Search by diagnosis, treatment, notes, doctor or date…')}
             value={recordSearch} onChange={(e) => setRecordSearch(e.target.value)}
             sx={{ mb: 2 }}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
@@ -402,8 +404,8 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
                 <Chip size="small" label={icdLabel(record.icdCode)} title={icdLabel(record.icdCode)}
                   sx={{ mb: 0.5, maxWidth: '100%', backgroundColor: 'rgba(91,79,230,0.1)', color: '#5b4fe6', fontWeight: 600 }} />
               )}
-              <p style={{ margin: '4px 0', fontSize: '0.9em' }}><strong>Attending:</strong> Dr. {record.doctor?.lastName || 'Unknown'}</p>
-              {record.treatment && <p style={{ margin: '4px 0', fontSize: '0.9em' }}><strong>Treatment:</strong> {record.treatment}</p>}
+              <p style={{ margin: '4px 0', fontSize: '0.9em' }}><strong>{t('Attending:')}</strong> Dr. {record.doctor?.lastName || t('Unknown')}</p>
+              {record.treatment && <p style={{ margin: '4px 0', fontSize: '0.9em' }}><strong>{t('Treatment:')}</strong> {record.treatment}</p>}
               {record.notes && <div className="record-notes">"{record.notes}"</div>}
               <RecordAttachments
                 attachments={record.attachments}
@@ -418,7 +420,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
           ))
           ) : (
             <Typography sx={{ color: 'var(--light-text)', fontStyle: 'italic', py: 2 }}>
-              No shared records match "{recordSearch}".
+              {t('No shared records match "{{search}}".', { search: recordSearch })}
             </Typography>
           )
         ) : (
@@ -428,7 +430,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
             border: '1px dashed #dfe6e9',
           }}>
             <Typography sx={{ color: 'var(--light-text)', fontStyle: 'italic' }}>
-              The patient chose not to share any past records.
+              {t('The patient chose not to share any past records.')}
             </Typography>
           </Box>
         )}
@@ -436,7 +438,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
         {pagination?.hasMore && (
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
             <Typography sx={{ color: '#636e72', fontSize: '0.85em', fontStyle: 'italic' }}>
-              {pagination.total - records.length} more record(s) not shown.
+              {t('{{count}} more record(s) not shown.', { count: pagination.total - records.length })}
             </Typography>
           </Box>
         )}
@@ -445,18 +447,18 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
 
         {/* Add record */}
         <Box component="form" onSubmit={handleAddRecord} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Typography variant="h6" sx={{ color: 'var(--dark-text)', mb: 0 }}>Add New Record</Typography>
+          <Typography variant="h6" sx={{ color: 'var(--dark-text)', mb: 0 }}>{t('Add New Record')}</Typography>
           <Box sx={{
             display: 'flex', alignItems: 'center', gap: 1,
             backgroundColor: '#fff3f3', border: '1px solid #ffd6d6',
             borderRadius: '8px', px: 2, py: 1.2,
           }}>
             <Typography sx={{ fontSize: '0.85em', color: '#c0392b' }}>
-              ⚠️ Adding a record will instantly secure and re-lock the patient's vault.
+              ⚠️ {t("Adding a record will instantly secure and re-lock the patient's vault.")}
             </Typography>
           </Box>
           <TextField
-            label="Diagnosis"
+            label={t('Diagnosis')}
             required
             fullWidth
             value={newRecord.diagnosis}
@@ -468,24 +470,24 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
             isOptionEqualToValue={(o, v) => o.code === v.code}
             value={ICD10_CODES.find((o) => o.code === newRecord.icdCode) || null}
             onChange={(e, option) => setNewRecord({ ...newRecord, icdCode: option ? option.code : '' })}
-            renderInput={(params) => <TextField {...params} label="ICD-10 code (optional)" placeholder="Search by code or diagnosis…" />}
+            renderInput={(params) => <TextField {...params} label={t('ICD-10 code (optional)')} placeholder={t('Search by code or diagnosis…')} />}
           />
           <TextField
-            label="Treatment Plan"
+            label={t('Treatment Plan')}
             multiline rows={2}
             fullWidth
             value={newRecord.treatment}
             onChange={(e) => setNewRecord({...newRecord, treatment: e.target.value})}
           />
           <TextField
-            label="Clinical Notes (Private/Encrypted)"
+            label={t('Clinical Notes (Private/Encrypted)')}
             multiline rows={3}
             fullWidth
             value={newRecord.notes}
             onChange={(e) => setNewRecord({...newRecord, notes: e.target.value})}
           />
           <Button type="submit" variant="contained" size="large" sx={{ backgroundColor: '#00b894', mt: 1 }}>
-            Save Record &amp; Lock Vault
+            {t('Save Record & Lock Vault')}
           </Button>
         </Box>
       </Box>

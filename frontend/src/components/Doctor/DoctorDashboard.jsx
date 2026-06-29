@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Button, TextField, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
@@ -13,6 +14,7 @@ import ConsultationHistory from './ConsultationHistory';
 import SecurityCard from '../Layout/SecurityCard';
 
 const DoctorDashboard = () => {
+  const { t } = useTranslation();
   const { doctorData, setDoctorData } = useOutletContext();
   const [vaultCode, setVaultCode] = useState('');
   const [unlockedPatient, setUnlockedPatient] = useState(null);
@@ -43,11 +45,11 @@ const DoctorDashboard = () => {
       setUnlockedPatient(data.patient);
       setVaultToken(data.vaultToken);
       setPagination(data.pagination);
-      showToast("Vault Unlocked", "success");
+      showToast(t('Vault Unlocked'), "success");
     } catch (error) {
       // Aborts are user-initiated (Cancel button) — no error toast needed.
       if (error.name !== 'AbortError') {
-        showToast(error.message || "Failed to connect.", "error");
+        showToast(error.message || t('Failed to connect.'), "error");
       }
     } finally {
       setIsWaiting(false);
@@ -57,7 +59,7 @@ const DoctorDashboard = () => {
 
   const handleCancelWait = () => {
     if (abortRef.current) abortRef.current.abort();
-    showToast("Request cancelled.", "info");
+    showToast(t('Request cancelled.'), "info");
   };
 
   const resetVault = () => {
@@ -84,7 +86,7 @@ const DoctorDashboard = () => {
       const data = await fetchWithAuth(`/api/doctor/patient-search?cnp=${encodeURIComponent(cnpSearch)}`);
       setFoundPatient(data.patient);
     } catch (error) {
-      showToast(error.message || "Patient not found.", "error");
+      showToast(error.message || t('Patient not found.'), "error");
     }
   };
 
@@ -101,9 +103,9 @@ const DoctorDashboard = () => {
       setCnpSearch('');
       setFoundPatient(null);
       setEmergencyReason('');
-      showToast("Emergency access granted. Patient has been notified.", "warning");
+      showToast(t('Emergency access granted. Patient has been notified.'), "warning");
     } catch (error) {
-      showToast(error.message || "Emergency access failed.", "error");
+      showToast(error.message || t('Emergency access failed.'), "error");
     }
   };
 
@@ -136,15 +138,14 @@ const DoctorDashboard = () => {
           }}>
             <LockOpenIcon sx={{ fontSize: 32, color: '#5b4fe6' }} />
           </Box>
-          <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1, color: '#2d3436' }}>Unlock Patient File</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1, color: '#2d3436' }}>{t('Unlock Patient File')}</Typography>
           <Typography sx={{ color: '#636e72', mb: 3, maxWidth: 380, mx: 'auto' }}>
-            Enter the 6-digit access code provided by the patient. They'll be asked to
-            approve and select which records to share.
+            {t("Enter the 6-digit access code provided by the patient. They'll be asked to approve and select which records to share.")}
           </Typography>
 
           <Box component="form" onSubmit={handleUnlockVault} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <TextField
-              label="6-Digit Vault Code"
+              label={t('6-Digit Vault Code')}
               variant="outlined"
               value={vaultCode}
               onChange={(e) => setVaultCode(e.target.value)}
@@ -152,27 +153,27 @@ const DoctorDashboard = () => {
               required
             />
             <Button type="submit" variant="contained" size="large" sx={{ backgroundColor: '#5b4fe6', px: 4 }}>
-              Request Access
+              {t('Request Access')}
             </Button>
           </Box>
 
           <Divider sx={{ my: 4 }}>
-            <Typography variant="caption" sx={{ color: 'var(--light-text)', px: 1 }}>Emergency Access</Typography>
+            <Typography variant="caption" sx={{ color: 'var(--light-text)', px: 1 }}>{t('Emergency Access')}</Typography>
           </Divider>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, justifyContent: 'center' }}>
             <WarningAmberIcon sx={{ color: '#e17055' }} />
             <Typography variant="body2" sx={{ color: '#e17055', fontWeight: 600 }}>
-              Break-the-glass — patient consent bypassed
+              {t('Break-the-glass — patient consent bypassed')}
             </Typography>
           </Box>
           <Typography variant="body2" sx={{ color: 'var(--light-text)', mb: 2, maxWidth: 380, mx: 'auto' }}>
-            Use only when the patient is unable to provide consent. All access is permanently logged and the patient is notified by email.
+            {t('Use only when the patient is unable to provide consent. All access is permanently logged and the patient is notified by email.')}
           </Typography>
 
           <Box component="form" onSubmit={handleCnpSearch} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <TextField
-              label="Patient CNP"
+              label={t('Patient CNP')}
               variant="outlined"
               value={cnpSearch}
               onChange={(e) => { setCnpSearch(e.target.value); setFoundPatient(null); }}
@@ -180,7 +181,7 @@ const DoctorDashboard = () => {
               required
             />
             <Button type="submit" variant="outlined" color="warning">
-              Search Patient
+              {t('Search Patient')}
             </Button>
           </Box>
 
@@ -190,10 +191,10 @@ const DoctorDashboard = () => {
                 {foundPatient.firstName} {foundPatient.lastName}
               </Typography>
               <Typography variant="body2" sx={{ color: 'var(--light-text)', mb: 2 }}>
-                DOB: {new Date(foundPatient.dateOfBirth).toLocaleDateString('ro-RO')}
+                {t('DOB:')} {new Date(foundPatient.dateOfBirth).toLocaleDateString('ro-RO')}
               </Typography>
               <TextField
-                label="Reason for emergency access"
+                label={t('Reason for emergency access')}
                 multiline
                 rows={2}
                 fullWidth
@@ -208,22 +209,21 @@ const DoctorDashboard = () => {
                 disabled={emergencyReason.trim().length < 10}
                 onClick={() => setConfirmOpen(true)}
               >
-                Override &amp; Access Vault
+                {t('Override & Access Vault')}
               </Button>
             </Box>
           )}
 
           <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-            <DialogTitle sx={{ color: '#d63031' }}>Confirm Emergency Access</DialogTitle>
+            <DialogTitle sx={{ color: '#d63031' }}>{t('Confirm Emergency Access')}</DialogTitle>
             <DialogContent>
               <DialogContentText>
-                You are about to access <strong>{foundPatient?.firstName} {foundPatient?.lastName}</strong>'s medical records without their consent.
-                This action is permanently logged and the patient will be notified immediately by email.
+                {t('You are about to access the medical records of {{name}} without their consent. This action is permanently logged and the patient will be notified immediately by email.', { name: `${foundPatient?.firstName || ''} ${foundPatient?.lastName || ''}`.trim() })}
               </DialogContentText>
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
-              <Button onClick={handleEmergencyAccess} color="error" variant="contained">Confirm Override</Button>
+              <Button onClick={() => setConfirmOpen(false)}>{t('Cancel')}</Button>
+              <Button onClick={handleEmergencyAccess} color="error" variant="contained">{t('Confirm Override')}</Button>
             </DialogActions>
           </Dialog>
         </div>

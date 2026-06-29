@@ -1,8 +1,10 @@
 import React from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
+import { useTranslation } from 'react-i18next';
 import { Button, Typography, Box } from '@mui/material';
 
 const ErrorFallback = ({ error, resetErrorBoundary }) => {
+  const { t } = useTranslation();
   return (
     <Box sx={{ 
       display: 'flex', 
@@ -16,10 +18,10 @@ const ErrorFallback = ({ error, resetErrorBoundary }) => {
     }}>
       <Box sx={{ backgroundColor: 'white', p: 4, borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', maxWidth: '500px' }}>
         <Typography variant="h4" sx={{ color: '#d63031', mb: 2, fontWeight: 'bold' }}>
-          ⚠️ Something went wrong
+          ⚠️ {t('Something went wrong')}
         </Typography>
         <Typography sx={{ color: '#2d3436', mb: 3 }}>
-          An unexpected error occurred in the application. Don't worry, your data is secure.
+          {t("An unexpected error occurred in the application. Don't worry, your data is secure.")}
         </Typography>
         <Box sx={{ backgroundColor: '#fdfbfb', p: 2, borderRadius: '4px', border: '1px solid #dfe6e9', mb: 3, overflowX: 'auto' }}>
           <pre style={{ color: '#d63031', fontSize: '0.85em', textAlign: 'left', margin: 0 }}>
@@ -31,7 +33,7 @@ const ErrorFallback = ({ error, resetErrorBoundary }) => {
           onClick={resetErrorBoundary}
           sx={{ backgroundColor: '#5b4fe6', textTransform: 'none', fontSize: '1.1rem' }}
         >
-          Reload Application
+          {t('Reload Application')}
         </Button>
       </Box>
     </Box>

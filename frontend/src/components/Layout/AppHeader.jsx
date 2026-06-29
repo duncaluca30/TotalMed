@@ -17,7 +17,7 @@ const AppHeader = ({ title }) => {
         <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold', letterSpacing: '1px' }}>
           {t(title)}
         </Typography>
-        <Box sx={{ mr: 1.5, '& .MuiToggleButton-root': { color: 'rgba(255,255,255,0.85)', borderColor: 'rgba(255,255,255,0.4)' }, '& .Mui-selected': { color: '#fff !important', backgroundColor: 'rgba(255,255,255,0.18) !important' } }}>
+        <Box sx={{ ml: 2, mr: 1.5, flexShrink: 0, '& .MuiToggleButton-root': { color: 'rgba(255,255,255,0.85)', borderColor: 'rgba(255,255,255,0.4)' }, '& .Mui-selected': { color: '#fff !important', backgroundColor: 'rgba(255,255,255,0.18) !important' } }}>
           <LanguageSwitcher />
         </Box>
         <NotificationBell />

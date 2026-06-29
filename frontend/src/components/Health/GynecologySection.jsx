@@ -40,6 +40,7 @@ const GynecologySection = ({
   const { t } = useTranslation();
   const [profileDraft, setProfileDraft] = useState({ menarcheDate: toDateInput(menarcheDate), atMenopause, menopauseDate: toDateInput(menopauseDate) });
   const [profileBusy, setProfileBusy] = useState(false);
+  const [profileError, setProfileError] = useState('');
   const [birthDraft, setBirthDraft] = useState(emptyBirth);
   const [editingBirthId, setEditingBirthId] = useState(null);
   const [birthBusy, setBirthBusy] = useState(false);
@@ -59,6 +60,15 @@ const GynecologySection = ({
   };
 
   const saveProfile = async () => {
+    // Validate up front so the user gets a clear, specific message instead of a
+    // native tooltip on hover or a generic "Validation failed" toast.
+    if (profileDraft.menarcheDate && profileDraft.menarcheDate > todayStr) {
+      return setProfileError(t('The first menstruation date is in the future. Please choose a past date.'));
+    }
+    if (profileDraft.atMenopause && profileDraft.menopauseDate && profileDraft.menopauseDate > todayStr) {
+      return setProfileError(t('The menopause start date is in the future. Please choose a past date.'));
+    }
+    setProfileError('');
     setProfileBusy(true);
     try {
       await onSaveProfile({
@@ -122,29 +132,36 @@ const GynecologySection = ({
         <Box sx={{ mt: 1, pl: { xs: 0, sm: 1 }, borderLeft: { sm: '3px solid #f8d7e3' } }}>
           {/* Menarche + menopause */}
           {editable ? (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
-              <TextField
-                size="small" type="date" label={t('First menstruation (menarche)')}
-                value={profileDraft.menarcheDate}
-                onChange={(e) => setProfileDraft({ ...profileDraft, menarcheDate: e.target.value })}
-                slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayStr } }}
-                sx={{ minWidth: 240 }}
-              />
-              <FormControlLabel
-                control={<Checkbox checked={profileDraft.atMenopause}
-                  onChange={(e) => setProfileDraft({ ...profileDraft, atMenopause: e.target.checked })} />}
-                label={t('At menopause')}
-              />
-              {profileDraft.atMenopause && (
+            <Box sx={{ mb: 2 }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2 }}>
                 <TextField
-                  size="small" type="date" label={t('Menopause start')}
-                  value={profileDraft.menopauseDate}
-                  onChange={(e) => setProfileDraft({ ...profileDraft, menopauseDate: e.target.value })}
+                  size="small" type="date" label={t('First menstruation (menarche)')}
+                  value={profileDraft.menarcheDate}
+                  onChange={(e) => { setProfileError(''); setProfileDraft({ ...profileDraft, menarcheDate: e.target.value }); }}
                   slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayStr } }}
                   sx={{ minWidth: 240 }}
                 />
+                <FormControlLabel
+                  control={<Checkbox checked={profileDraft.atMenopause}
+                    onChange={(e) => { setProfileError(''); setProfileDraft({ ...profileDraft, atMenopause: e.target.checked }); }} />}
+                  label={t('At menopause')}
+                />
+                {profileDraft.atMenopause && (
+                  <TextField
+                    size="small" type="date" label={t('Menopause start')}
+                    value={profileDraft.menopauseDate}
+                    onChange={(e) => { setProfileError(''); setProfileDraft({ ...profileDraft, menopauseDate: e.target.value }); }}
+                    slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayStr } }}
+                    sx={{ minWidth: 240 }}
+                  />
+                )}
+                <Button variant="outlined" size="small" disabled={profileBusy} onClick={saveProfile}>{t('Save')}</Button>
+              </Box>
+              {profileError && (
+                <Typography role="alert" sx={{ color: '#d32f2f', fontSize: '0.85rem', mt: 1 }}>
+                  {profileError}
+                </Typography>
               )}
-              <Button variant="outlined" size="small" disabled={profileBusy} onClick={saveProfile}>{t('Save')}</Button>
             </Box>
           ) : (
             <Box sx={{ mb: 2 }}>

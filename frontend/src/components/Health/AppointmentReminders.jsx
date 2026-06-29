@@ -24,16 +24,21 @@ const AppointmentReminders = ({
   const [draft, setDraft] = useState(emptyDraft);
   const [editingId, setEditingId] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  const reset = () => { setDraft(emptyDraft); setEditingId(null); };
+  const reset = () => { setDraft(emptyDraft); setEditingId(null); setError(''); };
 
   const submit = async (e) => {
     e.preventDefault();
     if (!draft.specialty.trim() || !draft.dateTime) return;
-    // Reminders are for upcoming visits — reject anything before today.
-    if (draft.dateTime < todayStr) return;
+    // Reminders are for upcoming visits — reject anything before today with a
+    // clear message rather than silently doing nothing.
+    if (draft.dateTime < todayStr) {
+      return setError(t('The appointment date is in the past. Please choose today or a future date.'));
+    }
+    setError('');
     setBusy(true);
     try {
       if (editingId) await onUpdate(editingId, draft);
@@ -91,7 +96,7 @@ const AppointmentReminders = ({
           <TextField size="small" label={t('Specialty / title')} required value={draft.specialty}
             onChange={(e) => setDraft({ ...draft, specialty: e.target.value })} sx={{ flex: '1 1 160px' }} />
           <TextField size="small" type="date" label={t('Date')} required value={draft.dateTime}
-            onChange={(e) => setDraft({ ...draft, dateTime: e.target.value })}
+            onChange={(e) => { setError(''); setDraft({ ...draft, dateTime: e.target.value }); }}
             slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: todayStr } }} sx={{ flex: '0 0 170px' }} />
           <TextField size="small" label={t('Location (optional)')} value={draft.location}
             onChange={(e) => setDraft({ ...draft, location: e.target.value })} sx={{ flex: '1 1 160px' }} />
@@ -101,6 +106,11 @@ const AppointmentReminders = ({
             {editingId ? t('Save') : t('Add')}
           </Button>
           {editingId && <IconButton onClick={reset} aria-label="Cancel edit"><CloseIcon /></IconButton>}
+          {error && (
+            <Typography role="alert" sx={{ width: '100%', color: '#d32f2f', fontSize: '0.85rem' }}>
+              {error}
+            </Typography>
+          )}
         </Box>
       )}
     </Box>

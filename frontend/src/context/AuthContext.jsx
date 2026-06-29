@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { useTranslation } from 'react-i18next';
-import { API_URL, fetchWithAuth, clearCsrfToken } from '../services/api';
+import { API_URL, fetchWithAuth, clearCsrfToken, setCsrfToken } from '../services/api';
 import { useToast } from '../hooks/useToast';
 
 const AuthContext = createContext(null);
@@ -22,6 +22,9 @@ export const AuthProvider = ({ children }) => {
     // Check session on mount
     fetchWithAuth('/api/auth/me')
       .then(data => {
+        // Rehydrate the in-memory CSRF token wiped by the page reload, so the
+        // first mutating request (e.g. generating a vault access code) succeeds.
+        if (data.csrfToken) setCsrfToken(data.csrfToken);
         setIsAuthenticated(true);
         setRole(data.role);
       })

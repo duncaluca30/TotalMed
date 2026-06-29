@@ -264,8 +264,13 @@ router.post('/reset-password', authLimiter, validate(resetPasswordSchema), async
 
 // GET /api/auth/me
 router.get('/me', authenticateToken, (req, res) => {
-    // If the middleware passes, we know the user is authenticated via cookie
-    res.json({ role: req.user.role });
+    // If the middleware passes, we know the user is authenticated via cookie.
+    // Re-issue the CSRF token here so a page reload (which wipes the in-memory
+    // token on the client) can rehydrate it without forcing a fresh login —
+    // otherwise the first mutating request after a reload fails CSRF.
+    const csrfToken = generateCsrfToken();
+    setCsrfCookie(res, csrfToken);
+    res.json({ role: req.user.role, csrfToken });
 });
 
 // POST /api/auth/logout

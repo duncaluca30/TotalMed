@@ -29,7 +29,10 @@ export const fetchWithAuth = async (endpoint, options = {}) => {
   const data = isJson ? await response.json() : null;
 
   if (!response.ok) {
-    const error = new Error(data?.error || response.statusText);
+    // Surface the specific field-level reason (e.g. "Date cannot be in the
+    // future") instead of the generic "Validation failed" wrapper.
+    const detail = Array.isArray(data?.details) && data.details[0]?.message;
+    const error = new Error(detail || data?.error || response.statusText);
     error.response = response;
     error.data = data;
     throw error;

@@ -68,11 +68,29 @@ const EmergencyCard = () => {
             <Typography sx={{ fontWeight: 700, color: '#c0392b' }}>{t('Allergies')}</Typography>
           </Box>
           {card.allergies?.length ? (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
-              {card.allergies.map((a, i) => (
-                <Chip key={i} label={`${a.substance}${a.reaction ? ` (${a.reaction})` : ''}`}
-                  sx={{ backgroundColor: `${SEVERITY_COLOR[a.severity] || '#636e72'}22`, color: SEVERITY_COLOR[a.severity] || '#636e72', fontWeight: 600 }} />
-              ))}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
+              {card.allergies.map((a, i) => {
+                const color = SEVERITY_COLOR[a.severity] || '#636e72';
+                return (
+                  <Box key={i} sx={{
+                    border: '1px solid #eee', borderLeft: `4px solid ${color}`,
+                    borderRadius: '8px', px: 1.5, py: 1,
+                  }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                      <Typography sx={{ fontWeight: 700 }}>{a.substance}</Typography>
+                      {a.severity && (
+                        <Chip size="small" label={t({ SEVERE: 'Severe', MODERATE: 'Moderate', MILD: 'Mild' }[a.severity])}
+                          sx={{ backgroundColor: `${color}22`, color, fontWeight: 600 }} />
+                      )}
+                    </Box>
+                    {a.reaction && (
+                      <Typography sx={{ fontSize: '0.88rem', color: '#636e72', mt: 0.25 }}>
+                        {t('Reaction:')} {a.reaction}
+                      </Typography>
+                    )}
+                  </Box>
+                );
+              })}
             </Box>
           ) : <Typography sx={{ color: '#b2bec3', fontStyle: 'italic' }}>{t('None recorded')}</Typography>}
         </Box>

@@ -17,13 +17,11 @@ function decryptAllergy(allergy) {
     return allergy;
 }
 
-/** Decrypt a list of allergies in place. */
 function decryptAllergies(allergies) {
     allergies.forEach(decryptAllergy);
     return allergies;
 }
 
-/** Fetch and decrypt all allergies for a patient. */
 async function getDecryptedAllergies(patientId) {
     const allergies = await prisma.allergy.findMany({
         where: { patientId },
@@ -32,7 +30,6 @@ async function getDecryptedAllergies(patientId) {
     return decryptAllergies(allergies);
 }
 
-/** Create an encrypted allergy, returning it decrypted. */
 async function createAllergy({ patientId, substance, reaction, severity }) {
     const created = await prisma.allergy.create({
         data: {
@@ -45,10 +42,6 @@ async function createAllergy({ patientId, substance, reaction, severity }) {
     return decryptAllergy(created);
 }
 
-/**
- * Update an allergy, scoped to its owning patient so no one can edit another
- * patient's data. Returns the decrypted record, or null if not found/owned.
- */
 async function updateAllergy({ id, patientId, substance, reaction, severity }) {
     const result = await prisma.allergy.updateMany({
         where: { id, patientId },
@@ -63,7 +56,6 @@ async function updateAllergy({ id, patientId, substance, reaction, severity }) {
     return decryptAllergy(updated);
 }
 
-/** Delete an allergy scoped to its owning patient. Returns true if deleted. */
 async function deleteAllergy({ id, patientId }) {
     const result = await prisma.allergy.deleteMany({ where: { id, patientId } });
     return result.count > 0;
@@ -83,13 +75,11 @@ function decryptMedication(med) {
     return med;
 }
 
-/** Decrypt a list of medications in place. */
 function decryptMedications(medications) {
     medications.forEach(decryptMedication);
     return medications;
 }
 
-/** Fetch and decrypt all current medications for a patient. */
 async function getDecryptedMedications(patientId) {
     const medications = await prisma.medication.findMany({
         where: { patientId },
@@ -98,15 +88,8 @@ async function getDecryptedMedications(patientId) {
     return decryptMedications(medications);
 }
 
-/**
- * Create an encrypted medication, returning it decrypted. Also runs a
- * non-blocking safety check against the patient's allergies and current
- * medications and attaches any `warnings` to the returned object.
- */
 async function createMedication({ patientId, name, dosage, frequency }) {
-    // Gather the patient's existing data BEFORE inserting, so the new drug isn't
-    // compared against itself. Sequential (not Promise.all) to stay friendly to
-    // single-connection drivers.
+
     const allergies = await getDecryptedAllergies(patientId);
     const medications = await getDecryptedMedications(patientId);
 
@@ -124,7 +107,6 @@ async function createMedication({ patientId, name, dosage, frequency }) {
     return result;
 }
 
-/** Update a medication scoped to its owning patient. Returns decrypted record or null. */
 async function updateMedication({ id, patientId, name, dosage, frequency }) {
     const result = await prisma.medication.updateMany({
         where: { id, patientId },
@@ -139,13 +121,11 @@ async function updateMedication({ id, patientId, name, dosage, frequency }) {
     return decryptMedication(updated);
 }
 
-/** Delete a medication scoped to its owning patient. Returns true if deleted. */
 async function deleteMedication({ id, patientId }) {
     const result = await prisma.medication.deleteMany({ where: { id, patientId } });
     return result.count > 0;
 }
 
-/** Toggle the daily reminder for a medication, scoped to its owner. */
 async function setMedicationReminder({ id, patientId, enabled }) {
     const result = await prisma.medication.updateMany({
         where: { id, patientId },
@@ -158,11 +138,6 @@ async function setMedicationReminder({ id, patientId, enabled }) {
 
 // ── Gynecological / obstetric profile ───────────────────────────────────────
 
-/**
- * Patch the patient-level gynecological fields (sex, menopause, menarche).
- * Only the keys present in `fields` are touched, so partial updates are safe.
- * Returns the updated subset.
- */
 async function updatePatientProfile(patientId, fields) {
     const data = {};
     if (fields.sex !== undefined) data.sex = fields.sex;
@@ -173,8 +148,7 @@ async function updatePatientProfile(patientId, fields) {
     if (fields.menopauseDate !== undefined) {
         data.menopauseDate = fields.menopauseDate ? new Date(fields.menopauseDate) : null;
     }
-    // Clearing the menopause flag should also clear its date so we never keep a
-    // stale "menopause started on …" once the patient unticks the box.
+
     if (fields.atMenopause === false) data.menopauseDate = null;
 
     return prisma.patient.update({
@@ -184,7 +158,6 @@ async function updatePatientProfile(patientId, fields) {
     });
 }
 
-/** Fetch all births for a patient (most recent first). */
 async function getBirths(patientId) {
     return prisma.birth.findMany({
         where: { patientId },
@@ -192,14 +165,12 @@ async function getBirths(patientId) {
     });
 }
 
-/** Create a birth entry. */
 async function createBirth({ patientId, modality, year }) {
     return prisma.birth.create({
         data: { patientId, modality, year: year ?? null }
     });
 }
 
-/** Update a birth scoped to its owning patient. Returns the record or null. */
 async function updateBirth({ id, patientId, modality, year }) {
     const result = await prisma.birth.updateMany({
         where: { id, patientId },
@@ -209,7 +180,6 @@ async function updateBirth({ id, patientId, modality, year }) {
     return prisma.birth.findUnique({ where: { id } });
 }
 
-/** Delete a birth scoped to its owning patient. Returns true if deleted. */
 async function deleteBirth({ id, patientId }) {
     const result = await prisma.birth.deleteMany({ where: { id, patientId } });
     return result.count > 0;
@@ -228,13 +198,11 @@ function decryptAppointment(appt) {
     return appt;
 }
 
-/** Decrypt a list of appointments in place. */
 function decryptAppointments(appointments) {
     appointments.forEach(decryptAppointment);
     return appointments;
 }
 
-/** Fetch and decrypt a patient's appointment reminders (soonest first). */
 async function getDecryptedAppointments(patientId) {
     const appointments = await prisma.appointment.findMany({
         where: { patientId },
@@ -243,7 +211,6 @@ async function getDecryptedAppointments(patientId) {
     return decryptAppointments(appointments);
 }
 
-/** Create an encrypted appointment reminder, returning it decrypted. */
 async function createAppointment({ patientId, doctorId, dateTime, specialty, location, reason }) {
     const created = await prisma.appointment.create({
         data: {
@@ -258,7 +225,6 @@ async function createAppointment({ patientId, doctorId, dateTime, specialty, loc
     return decryptAppointment(created);
 }
 
-/** Update an appointment scoped to its owning patient. Returns decrypted record or null. */
 async function updateAppointment({ id, patientId, dateTime, specialty, location, reason }) {
     const result = await prisma.appointment.updateMany({
         where: { id, patientId },
@@ -274,14 +240,12 @@ async function updateAppointment({ id, patientId, dateTime, specialty, location,
     return decryptAppointment(updated);
 }
 
-/** Delete an appointment scoped to its owning patient. Returns true if deleted. */
 async function deleteAppointment({ id, patientId }) {
     const result = await prisma.appointment.deleteMany({ where: { id, patientId } });
     return result.count > 0;
 }
 
 // ── Vaccinations ─────────────────────────────────────────────────────────────
-// Vaccine name + notes are encrypted; date/dose are structured typed columns.
 
 function decryptVaccination(v) {
     if (!v) return v;
@@ -292,7 +256,6 @@ function decryptVaccination(v) {
     return v;
 }
 
-/** Fetch and decrypt a patient's vaccinations (most recent first). */
 async function getVaccinations(patientId) {
     const rows = await prisma.vaccination.findMany({
         where: { patientId },
@@ -302,7 +265,6 @@ async function getVaccinations(patientId) {
     return rows;
 }
 
-/** Create an encrypted vaccination, returning it decrypted. */
 async function createVaccination({ patientId, vaccineName, date, doseNumber, nextDoseDate, notes }) {
     const created = await prisma.vaccination.create({
         data: {
@@ -317,17 +279,13 @@ async function createVaccination({ patientId, vaccineName, date, doseNumber, nex
     return decryptVaccination(created);
 }
 
-/** Delete a vaccination scoped to its owning patient. Returns true if deleted. */
 async function deleteVaccination({ id, patientId }) {
     const result = await prisma.vaccination.deleteMany({ where: { id, patientId } });
     return result.count > 0;
 }
 
 // ── Vital signs ──────────────────────────────────────────────────────────────
-// Numeric measurements — stored as plain typed columns (non-identifying and
-// needed for charting), so no encryption, unlike the free-text health fields.
 
-/** Fetch a patient's vital signs, oldest first (chart-friendly ordering). */
 function getVitalSigns(patientId) {
     return prisma.vitalSign.findMany({
         where: { patientId },
@@ -335,7 +293,6 @@ function getVitalSigns(patientId) {
     });
 }
 
-/** Create a vital-sign measurement. */
 function createVitalSign({ patientId, type, value, value2, unit, measuredAt }) {
     return prisma.vitalSign.create({
         data: {
@@ -349,7 +306,6 @@ function createVitalSign({ patientId, type, value, value2, unit, measuredAt }) {
     });
 }
 
-/** Delete a vital sign scoped to its owning patient. Returns true if deleted. */
 async function deleteVitalSign({ id, patientId }) {
     const result = await prisma.vitalSign.deleteMany({ where: { id, patientId } });
     return result.count > 0;

@@ -35,18 +35,15 @@ const DoctorDashboard = () => {
   const navigate = useNavigate();
   const { socket } = useAuth();
 
-  // Best-effort: close a vault session we're abandoning (e.g. opening a second
-  // patient's vault while one is still minimized) so the previous patient's
-  // "doctor is viewing" banner clears. Idempotent server-side.
   const lockPreviousSession = async (token) => {
     if (!token) return;
     try {
       await fetchWithAuth('/api/doctor/lock-vault', { method: 'POST', body: JSON.stringify({ vaultToken: token }) });
-    } catch { /* non-critical */ }
+    } catch { /* best-effort */ }
   };
 
   const requestAccess = async (code) => {
-    const previousToken = vaultToken; // a minimized session we'll replace, if any
+    const previousToken = vaultToken;
     const controller = new AbortController();
     abortRef.current = controller;
     setIsWaiting(true);
@@ -63,7 +60,7 @@ const DoctorDashboard = () => {
       setMinimized(false);
       showToast(t('Vault Unlocked'), "success");
     } catch (error) {
-      // Aborts are user-initiated (Cancel button) — no error toast needed.
+
       if (error.name !== 'AbortError') {
         showToast(error.message || t('Failed to connect.'), "error");
       }
@@ -78,9 +75,6 @@ const DoctorDashboard = () => {
     requestAccess(vaultCode);
   };
 
-  // When a doctor scans the patient's QR, it deep-links here as
-  // /doctor?vaultCode=NNNNNN. Pre-fill the code, fire the access request once,
-  // then strip the param so a refresh doesn't re-trigger it.
   const autoTriedRef = useRef(false);
   useEffect(() => {
     if (autoTriedRef.current) return;
@@ -92,7 +86,7 @@ const DoctorDashboard = () => {
       requestAccess(code);
       navigate('/doctor', { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, []);
 
   const handleCancelWait = () => {
@@ -108,8 +102,6 @@ const DoctorDashboard = () => {
     setMinimized(false);
   };
 
-  // The patient can revoke access mid-visit. The server pushes this event to the
-  // doctor who holds the session; close the open (or minimized) vault at once.
   useEffect(() => {
     if (!socket) return;
     const onRevoked = () => {
@@ -120,15 +112,13 @@ const DoctorDashboard = () => {
     };
     socket.on('vault-access-revoked', onRevoked);
     return () => socket.off('vault-access-revoked', onRevoked);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [socket, unlockedPatient, minimized]);
 
-  // Lock from the minimized card: notify the patient that viewing ended (same as
-  // "Lock Vault & Exit" inside the vault), then clear the session.
   const handleLockVault = async () => {
     try {
       await fetchWithAuth('/api/doctor/lock-vault', { method: 'POST', body: JSON.stringify({ vaultToken }) });
-    } catch { /* non-critical */ }
+    } catch { /* best-effort */ }
     resetVault();
   };
 
@@ -145,7 +135,7 @@ const DoctorDashboard = () => {
 
   const handleEmergencyAccess = async () => {
     setConfirmOpen(false);
-    const previousToken = vaultToken; // a minimized session we'll replace, if any
+    const previousToken = vaultToken;
     try {
       const data = await fetchWithAuth('/api/doctor/emergency-access', {
         method: 'POST',
@@ -309,9 +299,6 @@ const DoctorDashboard = () => {
         </>
       )}
 
-      {/* Hide the doctor's own 2FA/biometric settings while a patient vault is
-          actively open. When the vault is minimized the doctor is back on their
-          dashboard, so the security controls return alongside the resume card. */}
       {(!unlockedPatient || minimized) && <ConsultationHistory />}
 
       {(!unlockedPatient || minimized) && (

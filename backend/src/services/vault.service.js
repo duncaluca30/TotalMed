@@ -5,10 +5,6 @@ const { encrypt, decrypt } = require('../../utils/cipher');
 const { attachMetaToRecords } = require('./attachment.service');
 const { attachToRecords: attachAmendmentsToRecords } = require('./amendment.service');
 
-/**
- * Look up an access code by decrypting all active codes and matching.
- * Returns the matching AccessCode record or null.
- */
 async function lookupAccessCode(code) {
     const activeCodes = await prisma.accessCode.findMany({
         where: { expiresAt: { gt: new Date() } }
@@ -24,22 +20,10 @@ async function lookupAccessCode(code) {
     return null;
 }
 
-/**
- * Build the QR payload for an access code. Instead of the bare 6 digits — which
- * a phone camera just shows as plain text — we encode a deep link into the
- * doctor portal with the code pre-filled, so scanning actually starts the access
- * flow. `base` is the app origin; when missing we fall back to the bare code.
- */
 function buildAccessQrPayload(code, base) {
     return base ? `${base.replace(/\/$/, '')}/doctor?vaultCode=${code}` : code;
 }
 
-/**
- * Generate a new 6-digit access code for a patient.
- * If an unexpired code already exists, returns it instead.
- * `base` is the public app origin, used to build the scannable QR deep link.
- * Returns { code: string, expiresAt: Date, qrDataUrl: string }
- */
 async function generateAccessCode(patientId, base = null) {
     const existingCode = await prisma.accessCode.findUnique({
         where: { patientId }
@@ -55,7 +39,6 @@ async function generateAccessCode(patientId, base = null) {
         }
     }
 
-    // crypto.randomInt is cryptographically secure and unbiased over [100000, 999999]
     const rawCode = crypto.randomInt(100000, 1000000).toString();
     const encryptedCode = encrypt(rawCode);
 
@@ -74,10 +57,6 @@ async function generateAccessCode(patientId, base = null) {
     return { code: rawCode, expiresAt: newCode.expiresAt, qrDataUrl };
 }
 
-/**
- * Fetch and decrypt medical records for a patient, with pagination.
- * Returns { records: MedicalRecord[], total: number }
- */
 async function getDecryptedRecords(patientId, page = 1, limit = 10) {
     const skip = (page - 1) * limit;
 
@@ -114,9 +93,6 @@ async function getDecryptedRecords(patientId, page = 1, limit = 10) {
     return { records, total };
 }
 
-/**
- * Decrypt a batch of medical records in place (when records are already loaded).
- */
 function decryptRecords(records) {
     records.forEach(record => {
         if (record.diagnosis) record.diagnosis = decrypt(record.diagnosis);
@@ -135,9 +111,6 @@ function decryptRecords(records) {
     return records;
 }
 
-/**
- * Create an encrypted medical record.
- */
 async function createEncryptedRecord({ diagnosis, treatment, notes, icdCode, patientId, doctorId }) {
     return prisma.medicalRecord.create({
         data: {
@@ -151,21 +124,13 @@ async function createEncryptedRecord({ diagnosis, treatment, notes, icdCode, pat
     });
 }
 
-// Genesis value used as the previous-hash of the very first audit entry.
 const AUDIT_GENESIS = 'GENESIS';
 
-// Deterministic hash of an entry's stable fields, chained to the previous entry.
 function computeEntryHash({ id, userId, action, details, ipAddress, createdAt, prevHash }) {
     const payload = [id, userId, action, details ?? '', ipAddress ?? '', new Date(createdAt).toISOString(), prevHash].join('|');
     return crypto.createHash('sha256').update(payload).digest('hex');
 }
 
-/**
- * Create an audit log entry as the next link in a tamper-evident hash chain.
- * Each row stores the previous row's hash plus a hash of its own fields, so any
- * later edit or deletion breaks the chain (detected by the admin verify check).
- * Wrapped in a transaction so the "read latest → append" step is atomic.
- */
 async function createAuditLog({ userId, action, details, ipAddress }) {
     const detailsStr = typeof details === 'string' ? details : JSON.stringify(details);
     const ip = ipAddress ? ipAddress.split(',')[0].trim() : null;
@@ -186,10 +151,6 @@ async function createAuditLog({ userId, action, details, ipAddress }) {
     });
 }
 
-/**
- * Recompute the audit-log hash chain in order and report the first entry where
- * it breaks. Returns { ok: true } if intact, otherwise { ok: false, brokenAtId }.
- */
 async function verifyAuditChain() {
     const logs = await prisma.auditLog.findMany({ orderBy: { createdAt: 'asc' } });
     let prevHash = AUDIT_GENESIS;
@@ -203,11 +164,6 @@ async function verifyAuditChain() {
     return { ok: true, checked: logs.length };
 }
 
-/**
- * Build the patient-facing access log: every audited action whose details
- * reference this patient (vault views, records/allergies/medications added),
- * with the acting doctor resolved to a readable name.
- */
 async function getPatientAccessLog(patientId, limit = 100) {
     const logs = await prisma.auditLog.findMany({
         where: { details: { contains: patientId } },
@@ -222,8 +178,6 @@ async function getPatientAccessLog(patientId, limit = 100) {
     });
     const byUser = new Map(doctors.map(d => [d.userId, d]));
 
-    // Resolve the patient's own user id so their self-service actions read as
-    // "You" rather than "Unknown user".
     const patient = await prisma.patient.findUnique({
         where: { id: patientId },
         select: { userId: true }

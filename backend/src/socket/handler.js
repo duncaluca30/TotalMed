@@ -4,7 +4,7 @@ const prisma = require('../config/prisma');
 const { lookupAccessCode } = require('../services/vault.service');
 
 function setupSocketHandlers(io) {
-    // Middleware to authenticate socket connections via httpOnly cookie
+
     io.use((socket, next) => {
         const cookies = cookie.parse(socket.handshake.headers.cookie || '');
         const token = cookies.token;
@@ -22,9 +22,6 @@ function setupSocketHandlers(io) {
             console.log('🟢 User connected to switchboard:', socket.id);
         }
 
-        // Doctors join a room keyed by their own user id so the server can push
-        // targeted events to them (e.g. "the patient just revoked your access").
-        // Patients use the dedicated join-secure-room handler below instead.
         if (socket.user?.role === 'DOCTOR') {
             socket.join(socket.user.id.toString());
         }
@@ -34,7 +31,6 @@ function setupSocketHandlers(io) {
                 if (socket.user.role !== 'PATIENT') return;
                 const roomName = socket.user.id.toString();
 
-                // Kick any existing sockets already in this room (previous sessions/tabs)
                 const socketsInRoom = await io.in(roomName).fetchSockets();
                 for (const existingSocket of socketsInRoom) {
                     existingSocket.emit('session-replaced');
@@ -52,10 +48,7 @@ function setupSocketHandlers(io) {
         });
 
         socket.on('auth-response', async (data) => {
-            // SECURITY: an approval is only valid if it comes from the PATIENT who
-            // actually owns the access code. Without this check, any authenticated
-            // socket (including the requesting doctor) could forge an approval and
-            // bypass patient consent entirely.
+
             try {
                 if (!socket.user || socket.user.role !== 'PATIENT') return;
                 if (!data || typeof data.code !== 'string') return;
@@ -69,8 +62,6 @@ function setupSocketHandlers(io) {
                 });
                 if (!patient || patient.userId !== socket.user.id) return;
 
-                // Verified: this socket belongs to the patient who owns the code.
-                // Emit on the app-level EventEmitter so the doctor's pending HTTP request resolves.
                 io._expressApp.emit(`auth-resolved-${data.code}`, data);
             } catch (err) {
                 console.error('🚨 auth-response handling failed:', err);

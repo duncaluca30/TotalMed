@@ -7,10 +7,6 @@ import AddIcon from '@mui/icons-material/Add';
 
 const empty = { vaccineName: '', date: '', doseNumber: '', nextDoseDate: '', notes: '' };
 
-/**
- * Immunization history list + add form. Parent owns the data and supplies async
- * handlers. When `editable` is false (or no onDelete), controls are hidden.
- */
 const Vaccinations = ({ vaccinations = [], editable = true, onAdd, onDelete }) => {
   const { t } = useTranslation();
   const [draft, setDraft] = useState(empty);

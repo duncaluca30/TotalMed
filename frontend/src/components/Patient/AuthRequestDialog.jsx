@@ -3,9 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, TextField, Box, List, ListItem, ListItemText, Checkbox, Button, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import { filterRecords } from '../../utils/recordSearch';
 
-// How long the doctor's vault session stays open after approval. Must match the
-// allow-list the server validates in POST /access-vault. Labels are translation
-// keys, resolved with t() at render time.
 const DURATION_OPTIONS = [
   { value: 15, label: '15 minutes' },
   { value: 60, label: '1 hour' },

@@ -6,8 +6,6 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import AddIcon from '@mui/icons-material/Add';
 import { LineChart } from '@mui/x-charts/LineChart';
 
-// Metric definitions. `dual` metrics (blood pressure) carry two values. Text
-// fields are translation keys, resolved with t() at render time.
 const TYPES = {
   BLOOD_PRESSURE: { label: 'Blood pressure', unit: 'mmHg', dual: true, v1: 'Systolic', v2: 'Diastolic' },
   WEIGHT: { label: 'Weight', unit: 'kg' },
@@ -18,11 +16,6 @@ const TYPES = {
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
-/**
- * Vital-sign tracker with a per-metric trend chart. The parent owns the data and
- * supplies async `onAdd` / `onDelete` handlers (delete is optional — omitted for
- * the doctor view). When `editable` is false, only the chart + history show.
- */
 const VitalSigns = ({ vitals = [], editable = true, onAdd, onDelete }) => {
   const { t } = useTranslation();
   const [type, setType] = useState('BLOOD_PRESSURE');

@@ -20,7 +20,6 @@ const MedicalHistory = () => {
   const showToast = useToast();
   const [search, setSearch] = useState('');
 
-  // Replace the attachments array on one record inside patientData.
   const setRecordAttachments = (recordId, updater) => {
     setPatientData((prev) => ({
       ...prev,

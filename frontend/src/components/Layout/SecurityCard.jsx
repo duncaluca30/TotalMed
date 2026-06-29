@@ -149,7 +149,7 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
         method: 'POST',
         body: JSON.stringify({ currentPassword: pw.current, newPassword: pw.next }),
       });
-      // The server rotated our session token — refresh the in-memory CSRF token.
+
       if (data?.csrfToken) setCsrfToken(data.csrfToken);
       setPw({ current: '', next: '', confirm: '' });
       setPwOpen(false);
@@ -163,7 +163,6 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
 
   return (
     <div className="card card--security" style={{ marginTop: '20px' }}>
-      {/* ---- Two-Factor Authentication ---- */}
       <SectionHeader
         icon={<ShieldOutlinedIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />}
         title={t('Two-factor authentication')}
@@ -193,7 +192,6 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
 
       <hr className="section-divider" />
 
-      {/* ---- Biometric Login ---- */}
       <SectionHeader
         icon={<FingerprintIcon sx={{ fontSize: 22, color: '#7c3aed' }} />}
         title={t('Biometric login')}
@@ -227,7 +225,6 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
 
       <hr className="section-divider" />
 
-      {/* ---- Change password ---- */}
       <SectionHeader
         icon={<KeyOutlinedIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />}
         title={t('Password')}
@@ -260,7 +257,6 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
 
       <hr className="section-divider" />
 
-      {/* ---- Backup codes ---- */}
       <SectionHeader
         icon={<RestartAltIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />}
         title={t('Backup codes')}
@@ -272,7 +268,6 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
 
       <hr className="section-divider" />
 
-      {/* ---- Active sessions ---- */}
       <SectionHeader
         icon={<DevicesOutlinedIcon sx={{ fontSize: 20, color: '#5b4fe6' }} />}
         title={t('Active sessions')}
@@ -282,7 +277,6 @@ const SecurityCard = ({ isTwoFactorEnabled, passkeys = [], onTwoFactorEnabled, o
         {signingOut ? t('Signing out…') : t('Sign out of all other devices')}
       </Button>
 
-      {/* Backup codes shown once after generation */}
       <Dialog open={!!backupCodes} onClose={() => setBackupCodes(null)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>{t('Your backup codes')}</DialogTitle>
         <DialogContent>

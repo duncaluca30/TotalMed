@@ -19,14 +19,6 @@ const SEVERITY = {
 const emptyAllergy = { substance: '', reaction: '', severity: 'MODERATE' };
 const emptyMedication = { name: '', dosage: '', frequency: '' };
 
-/**
- * Reusable, self-contained editor for a patient's allergies and current
- * medications. The parent owns the data arrays and supplies async handlers that
- * perform the API call + state update; this component manages the add/edit form
- * UI and clears itself when a handler resolves.
- *
- * When `editable` is false the lists render read-only (no forms or controls).
- */
 const HealthLists = ({
   allergies = [],
   medications = [],

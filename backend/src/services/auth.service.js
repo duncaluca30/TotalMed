@@ -11,21 +11,12 @@ const { encrypt, decrypt } = require('../../utils/cipher');
 const { sendOTPEmail, sendSecurityAlertEmail, sendPasswordResetEmail, sendVerificationEmail } = require('../../utils/mailer');
 const notifications = require('./notification.service');
 
-// Tokens are emailed in the clear (in the link) but stored only as a SHA-256 hash.
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
-// otplib v13 verifies TOTP codes with ZERO tolerance by default, so a correct
-// code typed near the end of its 30s window — or any small clock drift between
-// the user's phone and our server — is rejected. Allow ±1 time step (±30s), the
-// window RFC 6238 §5.2 recommends, so legitimate codes don't bounce.
 const TOTP_TOLERANCE_SECONDS = 30;
-// Back-compat alias used by the reset flow.
+
 const hashResetToken = hashToken;
 
-/**
- * Register a new patient user.
- * Returns the created user object.
- */
 async function registerUser({ email, password, firstName, lastName, dateOfBirth, phone, cnp }, baseUrl) {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -37,9 +28,8 @@ async function registerUser({ email, password, firstName, lastName, dateOfBirth,
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // New accounts start unverified and must confirm their email before logging in.
     const rawToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60000); // 24h
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60000);
 
     const user = await prisma.user.create({
         data: {
@@ -69,9 +59,6 @@ async function registerUser({ email, password, firstName, lastName, dateOfBirth,
     return user;
 }
 
-/**
- * Confirm an email using the token from the verification link.
- */
 async function verifyEmail(token) {
     if (!token) {
         const error = new Error("Invalid or expired verification link.");
@@ -98,10 +85,6 @@ async function verifyEmail(token) {
     });
 }
 
-/**
- * Re-send a verification email. Silent when the email is unknown or already
- * verified, to avoid leaking which addresses are registered.
- */
 async function resendVerification(email, baseUrl) {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || user.isEmailVerified) return;
@@ -120,11 +103,6 @@ async function resendVerification(email, baseUrl) {
     }
 }
 
-/**
- * Authenticate a user by email/password.
- * Handles IP-based security alerts and device tracking.
- * Returns { user, availableMethods } on success.
- */
 async function authenticateUser(email, password, req) {
     const user = await prisma.user.findUnique({
         where: { email },
@@ -154,7 +132,6 @@ async function authenticateUser(email, password, req) {
     const currentIp = rawIp.split(',')[0].trim();
     const currentDevice = req.headers['user-agent'];
 
-    // Send security alert if login is from a new IP
     if (user.lastLoginIp && user.lastLoginIp !== currentIp) {
         let locationString = "Unknown Location";
 
@@ -197,11 +174,6 @@ async function authenticateUser(email, password, req) {
     return { user, availableMethods };
 }
 
-/**
- * Generate a fresh set of 10 single-use backup codes. The plaintext is returned
- * once (to show the user); only SHA-256 hashes are stored. Replaces any existing
- * codes.
- */
 async function generateBackupCodes(userId) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -210,9 +182,6 @@ async function generateBackupCodes(userId) {
         throw error;
     }
 
-    // 10 codes, each 10 hex chars. Displayed grouped as XXXXX-XXXXX for
-    // readability, but hashed/compared in canonical no-dash form so the dash is
-    // optional on input.
     const raws = Array.from({ length: 10 }, () => crypto.randomBytes(5).toString('hex'));
 
     await prisma.user.update({
@@ -223,10 +192,6 @@ async function generateBackupCodes(userId) {
     return raws.map((raw) => `${raw.slice(0, 5)}-${raw.slice(5)}`);
 }
 
-/**
- * Invalidate every existing session for a user by advancing sessionValidAfter.
- * The caller re-issues a token for the current device so it stays logged in.
- */
 async function logoutAll(userId) {
     await prisma.user.update({
         where: { id: userId },
@@ -234,9 +199,6 @@ async function logoutAll(userId) {
     });
 }
 
-/**
- * Generate and send an email OTP to a user.
- */
 async function sendEmailOTP(userId) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -257,10 +219,6 @@ async function sendEmailOTP(userId) {
     await sendOTPEmail(user.email, otpCode);
 }
 
-/**
- * Validate a 2FA token (APP or EMAIL method).
- * Returns the user on success.
- */
 async function validate2FA(userId, token, method) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -285,8 +243,6 @@ async function validate2FA(userId, token, method) {
             throw error;
         }
 
-        // otplib v13's verify() is async and resolves to an object ({ valid, ... }),
-        // not a boolean — must await and read `.valid`.
         const result = await verify({ token, secret: decryptedSecret, epochTolerance: TOTP_TOLERANCE_SECONDS });
         isValid = result.valid;
     } else if (method === 'EMAIL') {
@@ -302,14 +258,14 @@ async function validate2FA(userId, token, method) {
         }
         isValid = await bcrypt.compare(token, user.emailOtpCode);
     } else if (method === 'BACKUP') {
-        // Canonicalise to lowercase no-dash, so the dash and case are optional.
+
         const canonical = (token || '').toString().trim().toLowerCase().replace(/[\s-]/g, '');
         const stored = user.twoFactorBackupCodes || [];
         const candidateHash = hashToken(canonical);
         const matchHash = stored.includes(candidateHash) ? candidateHash : null;
         if (matchHash) {
             isValid = true;
-            // Consume the used code so it can never be replayed.
+
             await prisma.user.update({
                 where: { id: user.id },
                 data: { twoFactorBackupCodes: stored.filter((h) => h !== matchHash) }
@@ -323,7 +279,6 @@ async function validate2FA(userId, token, method) {
         throw error;
     }
 
-    // Clear OTP fields
     await prisma.user.update({
         where: { id: user.id },
         data: { emailOtpCode: null, emailOtpExpiresAt: null }
@@ -332,9 +287,6 @@ async function validate2FA(userId, token, method) {
     return user;
 }
 
-/**
- * Generate a TOTP 2FA setup (QR code + secret).
- */
 async function generate2FASetup(userId) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -350,8 +302,6 @@ async function generate2FASetup(userId) {
 
     const secret = generateSecret();
 
-    // Store the secret encrypted from the start — it should never sit in plaintext,
-    // not even during the setup window before verification.
     await prisma.user.update({
         where: { id: userId },
         data: { twoFactorSecret: encrypt(secret) }
@@ -367,9 +317,6 @@ async function generate2FASetup(userId) {
     return { qrCodeUrl, secret };
 }
 
-/**
- * Verify a TOTP code to finalize 2FA setup.
- */
 async function verify2FASetup(userId, token) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
 
@@ -379,7 +326,6 @@ async function verify2FASetup(userId, token) {
         throw error;
     }
 
-    // The secret is stored encrypted (since generate2FASetup) — decrypt to verify.
     const decryptedSecret = decrypt(user.twoFactorSecret);
     if (!decryptedSecret) {
         const error = new Error("Security error: Could not read 2FA key.");
@@ -401,9 +347,6 @@ async function verify2FASetup(userId, token) {
     });
 }
 
-/**
- * Generate WebAuthn registration options for a user.
- */
 async function generateWebAuthnRegistration(userId, origin) {
     const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -436,9 +379,6 @@ async function generateWebAuthnRegistration(userId, origin) {
     return options;
 }
 
-/**
- * Verify a WebAuthn registration response and store the passkey.
- */
 async function verifyWebAuthnRegistration(userId, body, origin) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     const expectedChallenge = user.webAuthnChallenge;
@@ -486,9 +426,6 @@ async function verifyWebAuthnRegistration(userId, body, origin) {
     });
 }
 
-/**
- * Generate WebAuthn authentication options for login.
- */
 async function generateWebAuthnAuthentication(userId, origin) {
     const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -514,10 +451,6 @@ async function generateWebAuthnAuthentication(userId, origin) {
     return options;
 }
 
-/**
- * Verify a WebAuthn authentication response for login.
- * Returns the user on success.
- */
 async function verifyWebAuthnAuthentication(userId, response, origin) {
     const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -554,7 +487,6 @@ async function verifyWebAuthnAuthentication(userId, response, origin) {
         throw error;
     }
 
-    // Update counter to prevent replay attacks
     await prisma.passkey.update({
         where: { id: passkey.id },
         data: { counter: verification.authenticationInfo.newCounter }
@@ -567,17 +499,12 @@ async function verifyWebAuthnAuthentication(userId, response, origin) {
     return user;
 }
 
-/**
- * Begin a password reset. Always resolves without revealing whether the email
- * exists (to avoid account enumeration). If it does, a one-time token is stored
- * (hashed) and a reset link is emailed.
- */
 async function requestPasswordReset(email, baseUrl) {
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return; // Silent — don't disclose that the email is unregistered.
+    if (!user) return;
 
     const rawToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 30 * 60000); // 30 minutes
+    const expiresAt = new Date(Date.now() + 30 * 60000);
 
     await prisma.user.update({
         where: { id: user.id },
@@ -588,10 +515,6 @@ async function requestPasswordReset(email, baseUrl) {
     await sendPasswordResetEmail(user.email, resetUrl);
 }
 
-/**
- * Complete a password reset using the emailed token. Throws on an invalid or
- * expired token. Clears the token so it can't be reused.
- */
 async function resetPassword(token, newPassword) {
     if (!token) {
         const error = new Error("Invalid or expired reset link.");
@@ -621,17 +544,12 @@ async function resetPassword(token, newPassword) {
             password: hashedPassword,
             passwordResetToken: null,
             passwordResetExpiresAt: null,
-            // Log out every existing session — a reset usually means the old
-            // password (and any active session) may be compromised.
+
             sessionValidAfter: new Date()
         }
     });
 }
 
-/**
- * Change the password of a logged-in user after re-confirming the current one.
- * Invalidates other active sessions.
- */
 async function changePassword(userId, currentPassword, newPassword) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -656,16 +574,10 @@ async function changePassword(userId, currentPassword, newPassword) {
     });
 }
 
-/**
- * Sign a JWT for a user.
- */
 function signUserToken(user) {
     return jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
 }
 
-/**
- * Set the auth cookie on a response.
- */
 function setAuthCookie(res, token) {
     res.cookie('token', token, {
         httpOnly: true,

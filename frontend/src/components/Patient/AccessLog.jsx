@@ -4,7 +4,6 @@ import { Box, Typography, Chip, Skeleton } from '@mui/material';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 
-// Friendly label (translation key) + colour for each audited action.
 const ACTIONS = {
   VAULT_ACCESSED: { label: 'Viewed records', color: '#5b4fe6', bg: 'rgba(91, 79, 230, 0.12)' },
   RECORD_ADDED: { label: 'Added record', color: '#0f6e56', bg: 'rgba(0, 184, 148, 0.14)' },

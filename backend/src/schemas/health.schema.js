@@ -19,16 +19,12 @@ const birthFields = {
   year: z.coerce.number().int().min(1900, 'Year too early').max(currentYear, 'Year cannot be in the future').optional().nullable()
 };
 
-// A date-only (or ISO) string that must not be in the future. Used for
-// menarche / menopause, which can only have happened in the past.
 const notFutureDate = z
   .string()
   .min(1)
   .refine((v) => new Date(v) <= new Date(new Date().toDateString() + ' 23:59:59'),
     'Date cannot be in the future');
 
-// All fields optional — this is a partial patch of the patient's gynecological
-// profile. menarcheDate / menopauseDate accept an ISO date string (or null to clear).
 const patientProfileFields = {
   sex: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
   atMenopause: z.boolean().optional(),
@@ -71,7 +67,6 @@ const vitalFields = {
   measuredAt: z.string().min(1, 'Measurement date is required')
 };
 
-// Doctor-side requests carry the active vault session + the target patient.
 const vaultFields = {
   patientId: z.string().uuid('Invalid patient ID format'),
   vaultToken: z.string().min(1, 'Vault session token is required')

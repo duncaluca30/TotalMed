@@ -77,7 +77,6 @@ const PatientDashboard = () => {
 
   return (
     <Box>
-      {/* Profile */}
       <div className="card card--profile">
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Box sx={{ width: 48, height: 48, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '1.05rem' }}>
@@ -109,7 +108,6 @@ const PatientDashboard = () => {
         })}
       />
 
-      {/* Share medical file */}
       <div className="card card--access-code" style={{ marginTop: '20px' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
           <VpnKeyOutlinedIcon sx={{ fontSize: 20, color: '#7c3aed' }} />

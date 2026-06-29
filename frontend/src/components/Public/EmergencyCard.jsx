@@ -8,11 +8,10 @@ import { API_URL } from '../../services/api';
 
 const SEVERITY_COLOR = { SEVERE: '#c0392b', MODERATE: '#b7791f', MILD: '#0f6e56' };
 
-// PUBLIC page (no login) reached by scanning a patient's Emergency Medical ID QR.
 const EmergencyCard = () => {
   const { t } = useTranslation();
   const { token } = useParams();
-  const [card, setCard] = useState(undefined); // undefined = loading, null = not found
+  const [card, setCard] = useState(undefined);
 
   useEffect(() => {
     fetch(`${API_URL}/api/public/emergency/${encodeURIComponent(token)}`)

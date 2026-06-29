@@ -4,8 +4,6 @@ import { Box, Typography, Button } from '@mui/material';
 import LockClockIcon from '@mui/icons-material/LockClock';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 
-// Read the `exp` claim out of the vault JWT (without verifying — we only use it
-// to display a countdown; the server still enforces expiry on every request).
 function tokenExpMs(token) {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
@@ -24,9 +22,6 @@ function formatRemaining(secs) {
   return `${s}s`;
 }
 
-// Compact placeholder shown when a doctor minimizes an open vault: the session
-// stays alive so they can resume without a new access code, until the patient's
-// chosen duration runs out (or they lock it).
 const MinimizedVault = ({ patient, vaultToken, onResume, onLock }) => {
   const { t } = useTranslation();
   const expMs = tokenExpMs(vaultToken);
@@ -41,7 +36,6 @@ const MinimizedVault = ({ patient, vaultToken, onResume, onLock }) => {
   const secs = expMs ? Math.max(0, Math.round((expMs - now) / 1000)) : null;
   const expired = secs === 0;
 
-  // Once the grant lapses the token is useless — clean up automatically.
   useEffect(() => {
     if (expired) onLock();
   }, [expired, onLock]);

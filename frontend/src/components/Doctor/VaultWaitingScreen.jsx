@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Box, Typography, Button, CircularProgress } from '@mui/material';
 
-// Mirrors the server-side approval timeout in doctor.routes.js (30s).
 const TIMEOUT_SECONDS = 30;
 
 const VaultWaitingScreen = ({ onCancel }) => {

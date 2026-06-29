@@ -11,9 +11,6 @@ function prettySize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// Renders the attachment chips for a single record plus an optional upload
-// control. The parent owns the actual network calls so this stays reusable
-// across the patient view and the doctor vault.
 const RecordAttachments = ({ attachments = [], onUpload, onDownload, onDelete }) => {
   const { t } = useTranslation();
   const inputRef = useRef(null);
@@ -21,7 +18,7 @@ const RecordAttachments = ({ attachments = [], onUpload, onDownload, onDelete })
 
   const handlePick = async (e) => {
     const file = e.target.files?.[0];
-    e.target.value = ''; // allow re-picking the same file
+    e.target.value = '';
     if (!file || !onUpload) return;
     setBusy(true);
     try { await onUpload(file); } finally { setBusy(false); }

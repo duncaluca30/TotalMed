@@ -12,15 +12,14 @@ const VerifyEmail = () => {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') || '';
-  // Derive the initial state from the token so the effect never has to call
-  // setState synchronously (which would trigger cascading renders).
-  const [status, setStatus] = useState(token ? 'loading' : 'error'); // 'loading' | 'success' | 'error'
+
+  const [status, setStatus] = useState(token ? 'loading' : 'error');
   const [message, setMessage] = useState(token ? '' : i18n.t('This confirmation link is invalid or incomplete.'));
   const ran = useRef(false);
 
   useEffect(() => {
     if (!token) return;
-    // Guard against double-invocation in React StrictMode.
+
     if (ran.current) return;
     ran.current = true;
 

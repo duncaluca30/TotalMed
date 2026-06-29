@@ -12,18 +12,16 @@ export const AuthProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   
-  // Shared socket state
   const [authRequest, setAuthRequest] = useState(null);
 
   const showToast = useToast();
   const { t } = useTranslation();
 
   useEffect(() => {
-    // Check session on mount
+
     fetchWithAuth('/api/auth/me')
       .then(data => {
-        // Rehydrate the in-memory CSRF token wiped by the page reload, so the
-        // first mutating request (e.g. generating a vault access code) succeeds.
+
         if (data.csrfToken) setCsrfToken(data.csrfToken);
         setIsAuthenticated(true);
         setRole(data.role);
@@ -61,7 +59,6 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!isAuthenticated || (role !== 'PATIENT' && role !== 'DOCTOR')) return;
 
-    // socket.io uses withCredentials to automatically send the httpOnly cookie
     const newSocket = io(API_URL, { withCredentials: true });
     setSocket(newSocket);
 
@@ -75,8 +72,6 @@ export const AuthProvider = ({ children }) => {
         showToast(t('You were logged in on another device. This session has ended.'), 'warning');
       });
     }
-    // Doctors are auto-joined to their own room server-side on connection, so
-    // targeted events (e.g. vault-access-revoked) reach them with no extra emit.
 
     return () => {
       newSocket.disconnect();

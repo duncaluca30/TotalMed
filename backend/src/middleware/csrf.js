@@ -1,20 +1,5 @@
 const crypto = require('crypto');
 
-/**
- * CSRF Protection via Double-Submit Cookie pattern.
- * 
- * How it works:
- * 1. On login, a random CSRF token is set as a readable (non-httpOnly) cookie.
- * 2. The frontend reads this cookie and sends it back as an X-CSRF-Token header.
- * 3. This middleware compares the header value to the cookie value.
- * 
- * Why it works:
- * - An attacker on another origin cannot read our cookies (same-origin policy).
- * - So they cannot set the X-CSRF-Token header to match.
- * - The httpOnly auth cookie is sent automatically, but without the matching header,
- *   the request is rejected.
- */
-
 const CSRF_COOKIE_NAME = 'csrf-token';
 
 function generateCsrfToken() {
@@ -23,14 +8,13 @@ function generateCsrfToken() {
 
 function setCsrfCookie(res, token) {
     res.cookie(CSRF_COOKIE_NAME, token, {
-        httpOnly: false,       // JS must be able to read this
+        httpOnly: false,
         secure: process.env.NODE_ENV === 'production',
         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-        maxAge: 24 * 60 * 60 * 1000  // match JWT expiry
+        maxAge: 24 * 60 * 60 * 1000
     });
 }
 
-// Routes that don't require CSRF (pre-authentication or public)
 const EXEMPT_ROUTES = [
     '/api/auth/login',
     '/api/auth/register',
@@ -47,12 +31,11 @@ const EXEMPT_ROUTES = [
 ];
 
 function csrfProtection(req, res, next) {
-    // Only check mutating methods
+
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
         return next();
     }
 
-    // Skip exempt routes
     if (EXEMPT_ROUTES.includes(req.path)) {
         return next();
     }
@@ -65,7 +48,6 @@ function csrfProtection(req, res, next) {
         return res.status(403).json({ error: "CSRF validation failed: missing token." });
     }
 
-    // Constant-time comparison to prevent timing attacks
     if (cookieToken.length !== headerToken.length ||
         !crypto.timingSafeEqual(Buffer.from(cookieToken), Buffer.from(headerToken))) {
         console.warn(`⚠️ CSRF REJECTED (mismatch) — ${req.method} ${req.path}`);

@@ -1,6 +1,3 @@
-// Builds the fully-wired Express app + HTTP server + Socket.IO server, but does
-// NOT start listening or schedule background jobs. server.js (production) and the
-// integration tests both use this so they exercise identical wiring.
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
@@ -36,7 +33,6 @@ function createServer() {
         pingTimeout: 60000
     });
 
-    // Store app reference on io so the socket handler can emit auth-resolved events
     io._expressApp = app;
     setupSocketHandlers(io);
 
@@ -55,13 +51,11 @@ function createServer() {
     app.use(cookieParser());
     app.use(helmet());
 
-    // Inject io into every request so route handlers can emit socket events
     app.use((req, res, next) => {
         req.io = io;
         next();
     });
 
-    // CSRF protection (double-submit cookie pattern)
     app.use(csrfProtection);
 
     app.get('/api/status', async (req, res) => {
@@ -80,12 +74,10 @@ function createServer() {
     app.use('/api/admin', adminRoutes);
     app.use('/api/notifications', notificationRoutes);
 
-    // --- SERVE FRONTEND IN PRODUCTION ---
     if (process.env.NODE_ENV === 'production') {
         const frontendDistPath = path.join(__dirname, '../../frontend/dist');
         app.use(express.static(frontendDistPath));
 
-        // Catch-all route to serve index.html for React Router
         app.use((req, res, next) => {
             if (req.method === 'GET' && !req.path.startsWith('/api')) {
                 res.sendFile(path.join(frontendDistPath, 'index.html'));

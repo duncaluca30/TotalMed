@@ -20,11 +20,6 @@ const { isVaultTokenRevoked, setActiveVaultDoctor, clearActiveVaultDoctor } = re
 const { sendEmergencyAccessEmail } = require('../../utils/mailer');
 const { decrypt } = require('../../utils/cipher');
 
-/**
- * Validate an active vault session for the requesting doctor against a target
- * patient. Returns { ok: true } on success, or { ok: false, status, error }
- * describing why access is denied. Mirrors the checks in POST /records.
- */
 function verifyVaultSession(vaultToken, doctorId, patientId) {
     let session;
     try {
@@ -41,7 +36,6 @@ function verifyVaultSession(vaultToken, doctorId, patientId) {
     return { ok: true, session };
 }
 
-// GET /api/doctor/dashboard
 router.get('/dashboard', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') {
@@ -74,7 +68,6 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/doctor/access-vault
 router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAccessSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -113,14 +106,9 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
             responded = true;
             clearTimeout(timeout);
 
-            // This callback runs OUTSIDE the route's try/catch (it fires later, on an
-            // event). Any throw here would be an unhandled rejection and crash the whole
-            // server, so it must guard itself.
             try {
                 if (authData.approved) {
-                    // Consume the access code — it can never be reused. deleteMany is
-                    // idempotent: if the code was already consumed (e.g. a duplicate
-                    // request), it returns count 0 instead of throwing P2025.
+
                     const consumed = await prisma.accessCode.deleteMany({ where: { id: validCode.id } });
                     if (consumed.count === 0) {
                         return res.status(409).json({ error: "This access request was already used. Please ask the patient for a new code." });
@@ -140,13 +128,11 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                     }
                 });
 
-                // Filter to only the records the patient explicitly approved sharing
                 const sharedRecordIds = Array.isArray(authData.sharedRecordIds) ? authData.sharedRecordIds : [];
                 const approvedRecords = patientData.medicalRecords.filter(record =>
                     sharedRecordIds.includes(record.id)
                 );
 
-                // Paginate and decrypt the approved records
                 const totalRecords = approvedRecords.length;
                 const paginatedRecords = approvedRecords.slice(skip, skip + limit);
                 decryptRecords(paginatedRecords);
@@ -154,9 +140,6 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                 await amendments.attachToRecords(paginatedRecords);
                 patientData.medicalRecords = paginatedRecords;
 
-                // Allergies and current medications are safety-critical, so they
-                // are always shared with the treating doctor — regardless of which
-                // historical records the patient chose to disclose.
                 patientData.allergies = await health.getDecryptedAllergies(validCode.patientId);
                 patientData.medications = await health.getDecryptedMedications(validCode.patientId);
                 patientData.births = await health.getBirths(validCode.patientId);
@@ -172,28 +155,19 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                     ipAddress: rawIp
                 });
 
-                // The patient chooses how long the session lasts in the consent
-                // dialog. Validate against an allow-list so a tampered socket
-                // payload can't request an arbitrarily long token; default 15m.
                 const ALLOWED_DURATIONS = [15, 60, 480, 1440];
                 const durationMinutes = ALLOWED_DURATIONS.includes(authData.durationMinutes)
                     ? authData.durationMinutes
                     : 15;
 
-                // Issue a vault session token so the doctor can add records even
-                // though the access code is now consumed.
                 const vaultToken = jwt.sign(
                     { patientId: validCode.patientId, doctorId: doctor.id },
                     process.env.JWT_SECRET,
                     { expiresIn: `${durationMinutes}m` }
                 );
 
-                // Remember which doctor holds this patient's active session, so a
-                // later revoke can push a real-time close event to that doctor.
                 setActiveVaultDoctor(validCode.patientId, doctor.userId);
 
-                // Let the patient know their doctor is now actively viewing the records
-                // they just shared, and for how long.
                 req.io.to(patientUser.userId).emit('vault-viewing-started', {
                     doctorName: `Dr. ${doctor.lastName}`,
                     durationMinutes
@@ -226,14 +200,12 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
     }
 });
 
-// POST /api/doctor/records
 router.post('/records', authenticateToken, validate(recordSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
 
         const { patientId, vaultToken, diagnosis, treatment, notes, icdCode } = req.body;
 
-        // Validate the vault session token (issued during access-vault)
         let vaultSession;
         try {
             vaultSession = jwt.verify(vaultToken, process.env.JWT_SECRET);
@@ -241,13 +213,11 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
             return res.status(403).json({ error: "Vault session expired. Please re-enter a new access code." });
         }
 
-        // Ensure the token matches the claimed patient and the requesting doctor
         const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
         if (vaultSession.patientId !== patientId || vaultSession.doctorId !== doctor.id) {
             return res.status(403).json({ error: "Vault session mismatch. Access denied." });
         }
 
-        // Reject if the patient revoked this session after the token was issued.
         if (isVaultTokenRevoked(vaultSession.patientId, vaultSession.iat)) {
             return res.status(403).json({ error: "Access was revoked by the patient." });
         }
@@ -276,7 +246,7 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
                 if (process.env.NODE_ENV !== 'production') {
                     console.log(`🚨 PINGING PATIENT ROOM: ${patientForSocket.userId}`);
                 }
-                // Emit the decrypted record — newRecord contains ciphertext from the DB
+
                 const decryptedRecord = {
                     ...newRecord,
                     diagnosis,
@@ -287,7 +257,6 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
                 };
                 io.to(patientForSocket.userId).emit('vault-updated', { newRecord: decryptedRecord });
 
-                // Durable in-app notification + real-time push.
                 const note = await notifications.create(
                     patientForSocket.userId,
                     'RECORD_ADDED',
@@ -310,8 +279,6 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
 
 // ── Attachments (doctor, during an active vault session) ─────────────────────
 
-// POST /api/doctor/attachments — upload a file against a record of the patient
-// whose vault is currently open (multipart: file + recordId + patientId + vaultToken).
 router.post('/attachments', authenticateToken, singleFile('file'), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -344,9 +311,6 @@ router.post('/attachments', authenticateToken, singleFile('file'), async (req, r
     }
 });
 
-// GET /api/doctor/attachments/:id/download?vaultToken=... — stream a file from
-// the open vault. The owning patient is resolved from the attachment and the
-// vault session is verified against them.
 router.get('/attachments/:id/download', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -372,7 +336,6 @@ router.get('/attachments/:id/download', authenticateToken, async (req, res) => {
 
 // ── Record amendments (doctor, during an active vault session) ───────────────
 
-// POST /api/doctor/records/:id/amendments — append a dated correction to a record.
 router.post('/records/:id/amendments', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -401,7 +364,6 @@ router.post('/records/:id/amendments', authenticateToken, async (req, res) => {
 
 // ── Allergies (doctor, during an active vault session) ───────────────────────
 
-// POST /api/doctor/allergies
 router.post('/allergies', authenticateToken, validate(doctorAllergySchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -423,7 +385,6 @@ router.post('/allergies', authenticateToken, validate(doctorAllergySchema), asyn
     }
 });
 
-// PUT /api/doctor/allergies/:id
 router.put('/allergies/:id', authenticateToken, validate(doctorAllergySchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -442,7 +403,6 @@ router.put('/allergies/:id', authenticateToken, validate(doctorAllergySchema), a
     }
 });
 
-// DELETE /api/doctor/allergies/:id
 router.delete('/allergies/:id', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -463,7 +423,6 @@ router.delete('/allergies/:id', authenticateToken, async (req, res) => {
 
 // ── Medications (doctor, during an active vault session) ──────────────────────
 
-// POST /api/doctor/medications
 router.post('/medications', authenticateToken, validate(doctorMedicationSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -485,7 +444,6 @@ router.post('/medications', authenticateToken, validate(doctorMedicationSchema),
     }
 });
 
-// PUT /api/doctor/medications/:id
 router.put('/medications/:id', authenticateToken, validate(doctorMedicationSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -504,7 +462,6 @@ router.put('/medications/:id', authenticateToken, validate(doctorMedicationSchem
     }
 });
 
-// DELETE /api/doctor/medications/:id
 router.delete('/medications/:id', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -525,7 +482,6 @@ router.delete('/medications/:id', authenticateToken, async (req, res) => {
 
 // ── Gynecological profile (doctor, during an active vault session) ───────────
 
-// PUT /api/doctor/patient-profile
 router.put('/patient-profile', authenticateToken, validate(doctorPatientProfileSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -543,7 +499,6 @@ router.put('/patient-profile', authenticateToken, validate(doctorPatientProfileS
     }
 });
 
-// POST /api/doctor/births
 router.post('/births', authenticateToken, validate(doctorBirthSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -561,7 +516,6 @@ router.post('/births', authenticateToken, validate(doctorBirthSchema), async (re
     }
 });
 
-// PUT /api/doctor/births/:id
 router.put('/births/:id', authenticateToken, validate(doctorBirthSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -580,7 +534,6 @@ router.put('/births/:id', authenticateToken, validate(doctorBirthSchema), async 
     }
 });
 
-// DELETE /api/doctor/births/:id
 router.delete('/births/:id', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -601,7 +554,6 @@ router.delete('/births/:id', authenticateToken, async (req, res) => {
 
 // ── Vital signs (doctor, during an active vault session) ─────────────────────
 
-// POST /api/doctor/vitals
 router.post('/vitals', authenticateToken, validate(doctorVitalSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -621,7 +573,6 @@ router.post('/vitals', authenticateToken, validate(doctorVitalSchema), async (re
 
 // ── Vaccinations (doctor, during an active vault session) ────────────────────
 
-// POST /api/doctor/vaccinations
 router.post('/vaccinations', authenticateToken, validate(doctorVaccinationSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -641,7 +592,6 @@ router.post('/vaccinations', authenticateToken, validate(doctorVaccinationSchema
 
 // ── Appointment reminders (doctor, during an active vault session) ───────────
 
-// POST /api/doctor/appointments
 router.post('/appointments', authenticateToken, validate(doctorAppointmentSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -659,7 +609,6 @@ router.post('/appointments', authenticateToken, validate(doctorAppointmentSchema
     }
 });
 
-// PUT /api/doctor/appointments/:id
 router.put('/appointments/:id', authenticateToken, validate(doctorAppointmentSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -678,7 +627,6 @@ router.put('/appointments/:id', authenticateToken, validate(doctorAppointmentSch
     }
 });
 
-// DELETE /api/doctor/appointments/:id
 router.delete('/appointments/:id', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -697,9 +645,6 @@ router.delete('/appointments/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /api/doctor/consultations?page=&limit= — records this doctor authored,
-// most recent first. The doctor wrote these, so showing the decrypted diagnosis
-// back to them raises no consent concern.
 router.get('/consultations', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -736,9 +681,6 @@ router.get('/consultations', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /api/doctor/patient-search?cnp=...
-// Returns only the patient's name and ID so the doctor can confirm they have
-// the right person before triggering emergency access.
 router.get('/patient-search', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -762,9 +704,6 @@ router.get('/patient-search', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/doctor/emergency-access
-// Break-the-glass: bypasses patient consent. Requires a mandatory reason.
-// Audit log is written BEFORE data is returned; patient is notified by email.
 router.post('/emergency-access', authenticateToken, vaultLimiter, validate(emergencyAccessSchema), async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -781,7 +720,6 @@ router.post('/emergency-access', authenticateToken, vaultLimiter, validate(emerg
         });
         if (!patientWithUser) return res.status(404).json({ error: "Patient not found." });
 
-        // Audit-first: log the access before returning any data
         const emergencyLog = await prisma.emergencyAccess.create({
             data: { doctorId: doctor.id, patientId, reason }
         });
@@ -792,7 +730,6 @@ router.post('/emergency-access', authenticateToken, vaultLimiter, validate(emerg
             ipAddress: rawIp
         });
 
-        // Fetch all records — no consent filter applies in an emergency
         const { records } = await getDecryptedRecords(patientId, 1, 1000);
         const allergies = await health.getDecryptedAllergies(patientId);
         const medications = await health.getDecryptedMedications(patientId);
@@ -800,17 +737,19 @@ router.post('/emergency-access', authenticateToken, vaultLimiter, validate(emerg
         const vitalSigns = await health.getVitalSigns(patientId);
         const vaccinations = await health.getVaccinations(patientId);
 
-        // Issue a standard vault token so the doctor can add records if needed
         const vaultToken = jwt.sign(
             { patientId, doctorId: doctor.id },
             process.env.JWT_SECRET,
             { expiresIn: '15m' }
         );
 
-        // Track the active session so a patient revoke can close this doctor's page.
         setActiveVaultDoctor(patientId, doctor.userId);
 
-        // Notify patient asynchronously — do not block the emergency response
+        req.io.to(patientWithUser.userId).emit('vault-viewing-started', {
+            doctorName: `Dr. ${doctor.lastName}`,
+            durationMinutes: 15
+        });
+
         const timestamp = new Date().toLocaleString('ro-RO', { timeZone: 'Europe/Bucharest' });
         sendEmergencyAccessEmail(
             patientWithUser.user.email,
@@ -823,7 +762,6 @@ router.post('/emergency-access', authenticateToken, vaultLimiter, validate(emerg
             data: { notifiedAt: new Date() }
         })).catch(() => {});
 
-        // Durable in-app notification (in addition to the email).
         const note = await notifications.create(
             patientWithUser.userId,
             'EMERGENCY_ACCESS',
@@ -842,9 +780,6 @@ router.post('/emergency-access', authenticateToken, vaultLimiter, validate(emerg
     }
 });
 
-// POST /api/doctor/lock-vault
-// Best-effort notification that the doctor has stopped viewing — clears the
-// "doctor is viewing" banner on the patient's screen. Never errors hard.
 router.post('/lock-vault', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
@@ -854,7 +789,7 @@ router.post('/lock-vault', authenticateToken, async (req, res) => {
         try {
             session = jwt.verify(vaultToken, process.env.JWT_SECRET);
         } catch (err) {
-            // Token already expired — nothing left to notify about.
+
             return res.json({ ok: true });
         }
 

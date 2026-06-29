@@ -10,11 +10,6 @@ import EventOutlinedIcon from '@mui/icons-material/EventOutlined';
 const emptyDraft = { specialty: '', dateTime: '', location: '', reason: '' };
 const toDateInput = (iso) => (iso ? new Date(iso).toISOString().slice(0, 10) : '');
 
-/**
- * Reusable list + editor for a patient's appointment reminders (e.g. "Cardiology
- * · 12 Jun 2027 · Clinica Sfânta Maria"). The parent owns the data and supplies
- * async handlers that perform the API call + state update.
- */
 const AppointmentReminders = ({
   appointments = [],
   editable = true,
@@ -33,8 +28,7 @@ const AppointmentReminders = ({
   const submit = async (e) => {
     e.preventDefault();
     if (!draft.specialty.trim() || !draft.dateTime) return;
-    // Reminders are for upcoming visits — reject anything before today with a
-    // clear message rather than silently doing nothing.
+
     if (draft.dateTime < todayStr) {
       return setError(t('The appointment date is in the past. Please choose today or a future date.'));
     }

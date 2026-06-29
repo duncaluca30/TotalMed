@@ -42,7 +42,7 @@ const LoginForm = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        // 403 from an unverified account — offer to resend the confirmation link.
+
         setNeedsVerification(response.status === 403 && /verify/i.test(data.error || ''));
         return showToast(data.error, 'error');
       }

@@ -2,12 +2,6 @@ const prisma = require('../config/prisma');
 const { getDecryptedRecords } = require('./vault.service');
 const health = require('./health.service');
 
-/**
- * Assemble a patient's full medical history as a minimal FHIR R4-style Bundle
- * (the GDPR right to data portability). All sensitive fields are decrypted. This
- * is intentionally a lightweight mapping — enough to be recognisably FHIR and
- * machine-readable, not a certified implementation.
- */
 async function buildFhirBundle(patientId) {
     const patient = await prisma.patient.findUnique({
         where: { id: patientId },

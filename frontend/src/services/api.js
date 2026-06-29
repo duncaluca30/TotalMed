@@ -1,7 +1,5 @@
 export const API_URL = import.meta.env.PROD ? '' : 'http://localhost:5000';
 
-// In-memory CSRF token — set from login/register/2FA response body.
-// This avoids relying on document.cookie which fails in cross-origin setups.
 let _csrfToken = null;
 
 export function setCsrfToken(token) {
@@ -29,8 +27,7 @@ export const fetchWithAuth = async (endpoint, options = {}) => {
   const data = isJson ? await response.json() : null;
 
   if (!response.ok) {
-    // Surface the specific field-level reason (e.g. "Date cannot be in the
-    // future") instead of the generic "Validation failed" wrapper.
+
     const detail = Array.isArray(data?.details) && data.details[0]?.message;
     const error = new Error(detail || data?.error || response.statusText);
     error.response = response;
@@ -41,9 +38,6 @@ export const fetchWithAuth = async (endpoint, options = {}) => {
   return data;
 };
 
-// Upload a file via multipart/form-data. We must NOT set Content-Type ourselves —
-// the browser adds it with the correct multipart boundary. CSRF + auth cookie
-// still apply.
 export const uploadFile = async (endpoint, formData, options = {}) => {
   const response = await fetch(`${API_URL}${endpoint}`, {
     method: 'POST',
@@ -64,8 +58,6 @@ export const uploadFile = async (endpoint, formData, options = {}) => {
   return data;
 };
 
-// Download a file (GET, CSRF-exempt) and trigger a browser save dialog. Falls
-// back to the Content-Disposition filename when none is supplied.
 export const downloadFile = async (endpoint, fallbackName = 'download') => {
   const response = await fetch(`${API_URL}${endpoint}`, { credentials: 'include' });
   if (!response.ok) {

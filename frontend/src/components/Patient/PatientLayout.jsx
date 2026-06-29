@@ -15,7 +15,7 @@ const PatientLayout = () => {
   const [pagination, setPagination] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [viewingDoctor, setViewingDoctor] = useState(null);
-  const [viewingUntil, setViewingUntil] = useState(null); // epoch ms when the grant expires
+  const [viewingUntil, setViewingUntil] = useState(null);
   const [now, setNow] = useState(Date.now());
 
   const { logout, authRequest, setAuthRequest, socket } = useAuth();
@@ -61,7 +61,7 @@ const PatientLayout = () => {
         medicalRecords: [data.newRecord, ...prev.medicalRecords],
         accessCode: null
       } : prev);
-      setViewingDoctor(null); // adding a record ends the viewing session
+      setViewingDoctor(null);
       setViewingUntil(null);
       navigate('/patient/history');
     };
@@ -69,9 +69,7 @@ const PatientLayout = () => {
       setViewingDoctor(data?.doctorName || t('Your doctor'));
       const minutes = data?.durationMinutes || 15;
       setViewingUntil(Date.now() + minutes * 60 * 1000);
-      // The access code was consumed on the server the moment access was granted.
-      // Clear it locally so we don't keep showing a dead code, and so the
-      // "Generate Access Code" button reappears for the next share.
+
       setPatientData(prev => prev ? { ...prev, accessCode: null } : prev);
     };
     const handleViewingEnded = () => { setViewingDoctor(null); setViewingUntil(null); };
@@ -86,8 +84,6 @@ const PatientLayout = () => {
     };
   }, [socket, navigate, t]);
 
-  // Tick once a second while a doctor is viewing, so the countdown updates and
-  // the banner clears itself the moment the grant expires.
   useEffect(() => {
     if (!viewingUntil) return;
     const id = setInterval(() => {

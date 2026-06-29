@@ -5,8 +5,6 @@ import HistoryIcon from '@mui/icons-material/History';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 
-// Read-only list of records the logged-in doctor has authored, so they have a
-// trail of whom they've treated even after a vault is locked.
 const ConsultationHistory = () => {
   const { t } = useTranslation();
   const showToast = useToast();
@@ -21,7 +19,7 @@ const ConsultationHistory = () => {
     } catch (e) { showToast(e.message || t('Failed to load consultations.'), 'error'); }
   };
 
-  useEffect(() => { load(1); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => { load(1); }, []);
 
   return (
     <div className="card" style={{ marginTop: '20px' }}>

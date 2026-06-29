@@ -19,12 +19,11 @@ const NotificationBell = () => {
       const list = data.notifications || [];
       setItems(list);
       setUnread(list.filter((n) => !n.read).length);
-    } catch { /* silent — the bell is non-critical */ }
+    } catch { /* ignore */ }
   };
 
   useEffect(() => { load(); }, []);
 
-  // Patients have a live socket; prepend pushed notifications in real time.
   useEffect(() => {
     if (!socket) return;
     const onNote = (note) => {

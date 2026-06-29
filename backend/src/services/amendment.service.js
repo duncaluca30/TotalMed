@@ -1,7 +1,6 @@
 const prisma = require('../config/prisma');
 const { encrypt, decrypt } = require('../../utils/cipher');
 
-// Public, decrypted view of an amendment row.
 function toView(am) {
     return {
         id: am.id,
@@ -12,7 +11,6 @@ function toView(am) {
     };
 }
 
-/** Create an encrypted amendment on a record. Returns the decrypted view. */
 async function createAmendment({ recordId, doctorId, text }) {
     const created = await prisma.amendment.create({
         data: { recordId, doctorId, text: encrypt(text) },
@@ -21,10 +19,6 @@ async function createAmendment({ recordId, doctorId, text }) {
     return toView(created);
 }
 
-/**
- * Attach decrypted amendments to each record under a `.amendments` key, in one
- * query. Mirrors attachment.service.attachMetaToRecords.
- */
 async function attachToRecords(records) {
     if (!records || records.length === 0) return records;
     const ids = records.map(r => r.id);
@@ -43,7 +37,6 @@ async function attachToRecords(records) {
     return records;
 }
 
-/** Confirm a record belongs to a patient (used before accepting an amendment). */
 async function recordBelongsToPatient(recordId, patientId) {
     const rec = await prisma.medicalRecord.findUnique({
         where: { id: recordId },

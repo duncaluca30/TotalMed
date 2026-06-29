@@ -16,9 +16,7 @@ const authenticateToken = async (req, res, next) => {
     }
 
     try {
-        // The token is cryptographically valid, but also confirm the account still
-        // exists (handles deleted accounts) and the token wasn't issued before the
-        // account's last session reset (handles password reset/change → logout).
+
         const user = await prisma.user.findUnique({
             where: { id: payload.id },
             select: { id: true, sessionValidAfter: true }
@@ -28,9 +26,6 @@ const authenticateToken = async (req, res, next) => {
             return res.status(401).json({ error: "Account no longer exists." });
         }
 
-        // jwt `iat` is in whole seconds (floored), so compare the cutoff at the
-        // same second granularity — otherwise a token re-issued in the same second
-        // as the cutoff (e.g. right after change-password) would be wrongly rejected.
         if (user.sessionValidAfter && payload.iat < Math.floor(user.sessionValidAfter.getTime() / 1000)) {
             return res.status(403).json({ error: "Session expired. Please log in again." });
         }

@@ -39,8 +39,6 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
   });
   const showToast = useToast();
 
-  // Doctor-side allergy/medication mutations carry the active vault session so
-  // the server can verify the doctor still has access to this patient.
   const vaultBody = (payload) => JSON.stringify({ ...payload, patientId: patient.id, vaultToken });
 
   const addAllergy = async (payload) => {
@@ -259,15 +257,14 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
   };
 
   const handleLockAndExit = async () => {
-    // Best-effort: tell the server we're done so the patient's "doctor is viewing"
-    // banner clears. Never block the UI on it.
+
     try {
       await fetchWithAuth('/api/doctor/lock-vault', {
         method: 'POST',
         body: JSON.stringify({ vaultToken }),
       });
     } catch (err) {
-      /* non-critical */
+      /* best-effort: closing the session shouldn't block exit */
     }
     onClose();
   };
@@ -290,7 +287,6 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
 
   return (
     <div className="card card--vault" style={{ marginTop: '30px', padding: 0, overflow: 'hidden' }}>
-      {/* Header strip */}
       <Box sx={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         flexWrap: 'wrap', gap: 2,
@@ -329,7 +325,6 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
       </Box>
 
       <Box sx={{ p: 3 }}>
-        {/* Allergies & current medications — always shared for patient safety */}
         <Box sx={{
           backgroundColor: 'rgba(231, 76, 60, 0.05)', border: '1px solid rgba(231, 76, 60, 0.2)',
           borderRadius: '10px', p: 2.5, mb: 3,
@@ -447,7 +442,6 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
 
         <hr className="section-divider" />
 
-        {/* Add record */}
         <Box component="form" onSubmit={handleAddRecord} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Typography variant="h6" sx={{ color: 'var(--dark-text)', mb: 0 }}>{t('Add New Record')}</Typography>
           <Box sx={{

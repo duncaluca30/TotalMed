@@ -29,15 +29,12 @@ const {
     setAuthCookie
 } = require('../services/auth.service');
 
-// Base URL of wherever the user opened the app — used to build email links that
-// point back to a real page.
 function appBaseUrl(req) {
     return req.headers.origin
         || process.env.FRONTEND_URL
         || `${req.protocol}://${req.get('host')}`;
 }
 
-// Helper: complete login by setting cookies and responding
 function completeLogin(res, user, message, statusCode = 200) {
     const token = signUserToken(user);
     const csrfToken = generateCsrfToken();
@@ -46,11 +43,10 @@ function completeLogin(res, user, message, statusCode = 200) {
     res.status(statusCode).json({ message, role: user.role, csrfToken });
 }
 
-// POST /api/auth/register
 router.post('/register', validate(registerSchema), async (req, res) => {
     try {
         await registerUser(req.body, appBaseUrl(req));
-        // No auto-login: the account must confirm its email first.
+
         res.status(201).json({ message: "Account created. Check your email for a confirmation link to activate it." });
     } catch (error) {
         console.error(error);
@@ -58,7 +54,6 @@ router.post('/register', validate(registerSchema), async (req, res) => {
     }
 });
 
-// POST /api/auth/verify-email
 router.post('/verify-email', authLimiter, async (req, res) => {
     try {
         await verifyEmail(req.body.token);
@@ -69,24 +64,20 @@ router.post('/verify-email', authLimiter, async (req, res) => {
     }
 });
 
-// POST /api/auth/resend-verification
 router.post('/resend-verification', authLimiter, validate(forgotPasswordSchema), async (req, res) => {
     try {
         await resendVerification(req.body.email, appBaseUrl(req));
     } catch (error) {
         console.error("🚨 RESEND VERIFICATION ERROR:", error);
     }
-    // Always generic — never reveal whether the email exists / is already verified.
+
     res.json({ message: "If that email needs confirming, a new link has been sent." });
 });
 
-// POST /api/auth/change-password (authenticated)
 router.post('/change-password', authenticateToken, validate(changePasswordSchema), async (req, res) => {
     try {
         await changePassword(req.user.id, req.body.currentPassword, req.body.newPassword);
-        // changePassword bumps sessionValidAfter, which would invalidate THIS session
-        // too — re-issue a fresh token so the current device stays logged in while
-        // any other sessions are logged out.
+
         const freshUser = { id: req.user.id, role: req.user.role };
         completeLogin(res, freshUser, "Password changed. Other devices have been signed out.");
     } catch (error) {
@@ -95,7 +86,6 @@ router.post('/change-password', authenticateToken, validate(changePasswordSchema
     }
 });
 
-// POST /api/auth/login
 router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -112,7 +102,6 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
     }
 });
 
-// POST /api/auth/2fa/send-email
 router.post('/2fa/send-email', authLimiter, async (req, res) => {
     try {
         await sendEmailOTP(req.body.userId);
@@ -123,7 +112,6 @@ router.post('/2fa/send-email', authLimiter, async (req, res) => {
     }
 });
 
-// POST /api/auth/2fa/generate
 router.post('/2fa/generate', authenticateToken, async (req, res) => {
     try {
         const data = await generate2FASetup(req.user.id);
@@ -134,7 +122,6 @@ router.post('/2fa/generate', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/auth/2fa/verify-setup
 router.post('/2fa/verify-setup', authenticateToken, async (req, res) => {
     try {
         await verify2FASetup(req.user.id, req.body.token);
@@ -145,7 +132,6 @@ router.post('/2fa/verify-setup', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/auth/2fa/backup-codes (authenticated) — (re)generate recovery codes
 router.post('/2fa/backup-codes', authenticateToken, async (req, res) => {
     try {
         const codes = await generateBackupCodes(req.user.id);
@@ -156,11 +142,10 @@ router.post('/2fa/backup-codes', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/auth/logout-all (authenticated) — sign out every other device, keep this one
 router.post('/logout-all', authenticateToken, async (req, res) => {
     try {
         await logoutAll(req.user.id);
-        // Re-issue a token for the current device so it survives the sessionValidAfter bump.
+
         completeLogin(res, { id: req.user.id, role: req.user.role }, "Signed out of all other devices.");
     } catch (error) {
         console.error("🚨 LOGOUT-ALL ERROR:", error);
@@ -168,7 +153,6 @@ router.post('/logout-all', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/auth/2fa/validate
 router.post('/2fa/validate', twoFactorLimiter, async (req, res) => {
     try {
         const { userId, token, method } = req.body;
@@ -180,11 +164,9 @@ router.post('/2fa/validate', twoFactorLimiter, async (req, res) => {
     }
 });
 
-// GET /api/auth/webauthn/generate-registration
 router.get('/webauthn/generate-registration', authenticateToken, async (req, res) => {
     try {
-        // GET requests don't carry an Origin header; fall back to the actual host.
-        // req.protocol respects the X-Forwarded-Proto header because trust proxy is set.
+
         const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
         const options = await generateWebAuthnRegistration(req.user.id, origin);
         res.json(options);
@@ -194,7 +176,6 @@ router.get('/webauthn/generate-registration', authenticateToken, async (req, res
     }
 });
 
-// POST /api/auth/webauthn/verify-registration
 router.post('/webauthn/verify-registration', authenticateToken, async (req, res) => {
     try {
         const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
@@ -206,7 +187,6 @@ router.post('/webauthn/verify-registration', authenticateToken, async (req, res)
     }
 });
 
-// POST /api/auth/webauthn/generate-authentication
 router.post('/webauthn/generate-authentication', async (req, res) => {
     try {
         const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
@@ -218,7 +198,6 @@ router.post('/webauthn/generate-authentication', async (req, res) => {
     }
 });
 
-// POST /api/auth/webauthn/verify-authentication
 router.post('/webauthn/verify-authentication', async (req, res) => {
     try {
         const { userId, response } = req.body;
@@ -231,27 +210,22 @@ router.post('/webauthn/verify-authentication', async (req, res) => {
     }
 });
 
-// POST /api/auth/forgot-password
 router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), async (req, res) => {
     try {
-        // Build the reset link from wherever the user actually opened the app
-        // (the request Origin) — that origin already serves the SPA, so the link
-        // always points to a page that exists. FRONTEND_URL is only a fallback for
-        // when there's no Origin header (e.g. a non-browser client).
+
         const baseUrl = req.headers.origin
             || process.env.FRONTEND_URL
             || `${req.protocol}://${req.get('host')}`;
         await requestPasswordReset(req.body.email, baseUrl);
-        // Always succeed — never reveal whether the email is registered.
+
         res.json({ message: "If an account exists for that email, a reset link has been sent." });
     } catch (error) {
         console.error("🚨 FORGOT PASSWORD ERROR:", error);
-        // Still respond generically so failures don't leak account existence.
+
         res.json({ message: "If an account exists for that email, a reset link has been sent." });
     }
 });
 
-// POST /api/auth/reset-password
 router.post('/reset-password', authLimiter, validate(resetPasswordSchema), async (req, res) => {
     try {
         await resetPassword(req.body.token, req.body.password);
@@ -262,18 +236,13 @@ router.post('/reset-password', authLimiter, validate(resetPasswordSchema), async
     }
 });
 
-// GET /api/auth/me
 router.get('/me', authenticateToken, (req, res) => {
-    // If the middleware passes, we know the user is authenticated via cookie.
-    // Re-issue the CSRF token here so a page reload (which wipes the in-memory
-    // token on the client) can rehydrate it without forcing a fresh login —
-    // otherwise the first mutating request after a reload fails CSRF.
+
     const csrfToken = generateCsrfToken();
     setCsrfCookie(res, csrfToken);
     res.json({ role: req.user.role, csrfToken });
 });
 
-// POST /api/auth/logout
 router.post('/logout', (req, res) => {
     res.clearCookie('token', {
         httpOnly: true,

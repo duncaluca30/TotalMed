@@ -5,7 +5,6 @@ const prisma = require('../config/prisma');
 const authenticateToken = require('../middleware/authenticate');
 const { verifyAuditChain } = require('../services/vault.service');
 
-// Every route here requires ADMIN clearance.
 function requireAdmin(req, res, next) {
     if (req.user.role !== 'ADMIN') {
         return res.status(403).json({ error: "Access Denied: Administrator clearance required." });
@@ -13,7 +12,6 @@ function requireAdmin(req, res, next) {
     next();
 }
 
-// GET /api/admin/stats — high-level counts for the dashboard.
 router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const [users, patients, doctors, records, emergencies, attachments] = await Promise.all([
@@ -31,8 +29,6 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
     }
 });
 
-// GET /api/admin/audit-logs?page=&limit= — the full audit trail, acting user's
-// email resolved for readability.
 router.get('/audit-logs', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -69,7 +65,6 @@ router.get('/audit-logs', authenticateToken, requireAdmin, async (req, res) => {
     }
 });
 
-// GET /api/admin/audit-logs/verify — recompute the tamper-evident hash chain.
 router.get('/audit-logs/verify', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const result = await verifyAuditChain();
@@ -80,8 +75,6 @@ router.get('/audit-logs/verify', authenticateToken, requireAdmin, async (req, re
     }
 });
 
-// GET /api/admin/emergency-access — every break-the-glass access, with the
-// doctor and patient resolved to names.
 router.get('/emergency-access', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const rows = await prisma.emergencyAccess.findMany({

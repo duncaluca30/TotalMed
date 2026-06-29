@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { ToggleButtonGroup, ToggleButton } from '@mui/material';
 
-// Compact RO / EN toggle. Persists the choice so it survives reloads.
 export default function LanguageSwitcher({ size = 'small', sx }) {
   const { i18n } = useTranslation();
   const current = (i18n.language || 'ro').startsWith('en') ? 'en' : 'ro';

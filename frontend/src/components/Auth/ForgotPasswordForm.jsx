@@ -24,7 +24,7 @@ const ForgotPasswordForm = () => {
         body: JSON.stringify({ email }),
       });
       const data = await response.json();
-      // The endpoint always succeeds (it never reveals whether the email exists).
+
       if (response.ok) {
         setSent(true);
       } else {

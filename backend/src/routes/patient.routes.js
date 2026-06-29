@@ -16,9 +16,6 @@ const qrcode = require('qrcode');
 const { singleFile } = require('../middleware/upload');
 const { decrypt } = require('../../utils/cipher');
 
-// Resolve the authenticated patient's profile id (or null). Used by the
-// self-service allergy/medication endpoints so a patient can only ever touch
-// their own data.
 async function getPatientId(userId) {
     const patient = await prisma.patient.findUnique({
         where: { userId },
@@ -27,8 +24,6 @@ async function getPatientId(userId) {
     return patient ? patient.id : null;
 }
 
-// Enrich an emergency profile with the public card URL + a QR of it, built from
-// wherever the patient opened the app (so the link points at a real page).
 async function withEmergencyLink(req, profile) {
     if (!profile || !profile.emergencyEnabled || !profile.emergencyId) return profile;
     const base = req.headers.origin || process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
@@ -37,7 +32,6 @@ async function withEmergencyLink(req, profile) {
     return { ...profile, emergencyUrl, qrDataUrl };
 }
 
-// GET /api/patient/dashboard
 router.get('/dashboard', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied" });
@@ -60,12 +54,9 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 
         if (!patientData) return res.status(404).json({ error: "Profile not found" });
 
-        // Fetch decrypted, paginated records via service
         const { records, total } = await getDecryptedRecords(patientData.id, page, limit);
         patientData.medicalRecords = records;
 
-        // Allergies and current medications are small, patient-level lists —
-        // always returned in full (decrypted), not paginated.
         patientData.allergies = await health.getDecryptedAllergies(patientData.id);
         patientData.medications = await health.getDecryptedMedications(patientData.id);
         patientData.births = await health.getBirths(patientData.id);
@@ -93,7 +84,6 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/patient/generate-code
 router.post('/generate-code', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -110,10 +100,6 @@ router.post('/generate-code', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/patient/revoke-access
-// Immediately invalidates any active vault session for this patient, so a doctor
-// who was mid-visit can no longer add records. Already-loaded records on the
-// doctor's screen cannot be recalled (they were transmitted on grant).
 router.post('/revoke-access', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -126,9 +112,6 @@ router.post('/revoke-access', authenticateToken, async (req, res) => {
 
         revokeVaultAccess(patient.id);
 
-        // Push a real-time close event to the doctor who currently holds the
-        // session, so their open vault page exits immediately instead of only
-        // failing on the next write.
         const doctorUserId = getActiveVaultDoctor(patient.id);
         if (doctorUserId) {
             req.io.to(doctorUserId.toString()).emit('vault-access-revoked');
@@ -142,7 +125,6 @@ router.post('/revoke-access', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /api/patient/access-log — who accessed this patient's data, and when
 router.get('/access-log', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -159,7 +141,6 @@ router.get('/access-log', authenticateToken, async (req, res) => {
 
 // ── Allergies (patient self-service) ─────────────────────────────────────────
 
-// POST /api/patient/allergies
 router.post('/allergies', authenticateToken, validate(allergySchema), async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -179,7 +160,6 @@ router.post('/allergies', authenticateToken, validate(allergySchema), async (req
     }
 });
 
-// PUT /api/patient/allergies/:id
 router.put('/allergies/:id', authenticateToken, validate(allergySchema), async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -196,7 +176,6 @@ router.put('/allergies/:id', authenticateToken, validate(allergySchema), async (
     }
 });
 
-// DELETE /api/patient/allergies/:id
 router.delete('/allergies/:id', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -214,7 +193,6 @@ router.delete('/allergies/:id', authenticateToken, async (req, res) => {
 
 // ── Medications (patient self-service) ────────────────────────────────────────
 
-// POST /api/patient/medications
 router.post('/medications', authenticateToken, validate(medicationSchema), async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -234,7 +212,6 @@ router.post('/medications', authenticateToken, validate(medicationSchema), async
     }
 });
 
-// PUT /api/patient/medications/:id
 router.put('/medications/:id', authenticateToken, validate(medicationSchema), async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -251,7 +228,6 @@ router.put('/medications/:id', authenticateToken, validate(medicationSchema), as
     }
 });
 
-// DELETE /api/patient/medications/:id
 router.delete('/medications/:id', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -267,7 +243,6 @@ router.delete('/medications/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/patient/medications/:id/reminder — toggle the daily reminder
 router.post('/medications/:id/reminder', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -285,7 +260,6 @@ router.post('/medications/:id/reminder', authenticateToken, async (req, res) => 
 
 // ── Gynecological profile (patient self-service) ─────────────────────────────
 
-// PUT /api/patient/profile — patch sex / menopause / menarche
 router.put('/profile', authenticateToken, validate(patientProfileSchema), async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -301,7 +275,6 @@ router.put('/profile', authenticateToken, validate(patientProfileSchema), async 
     }
 });
 
-// POST /api/patient/births
 router.post('/births', authenticateToken, validate(birthSchema), async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -317,7 +290,6 @@ router.post('/births', authenticateToken, validate(birthSchema), async (req, res
     }
 });
 
-// PUT /api/patient/births/:id
 router.put('/births/:id', authenticateToken, validate(birthSchema), async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -334,7 +306,6 @@ router.put('/births/:id', authenticateToken, validate(birthSchema), async (req, 
     }
 });
 
-// DELETE /api/patient/births/:id
 router.delete('/births/:id', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -352,7 +323,6 @@ router.delete('/births/:id', authenticateToken, async (req, res) => {
 
 // ── Appointment reminders (patient self-service) ─────────────────────────────
 
-// POST /api/patient/appointments
 router.post('/appointments', authenticateToken, validate(appointmentSchema), async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -368,7 +338,6 @@ router.post('/appointments', authenticateToken, validate(appointmentSchema), asy
     }
 });
 
-// PUT /api/patient/appointments/:id
 router.put('/appointments/:id', authenticateToken, validate(appointmentSchema), async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -385,7 +354,6 @@ router.put('/appointments/:id', authenticateToken, validate(appointmentSchema), 
     }
 });
 
-// DELETE /api/patient/appointments/:id
 router.delete('/appointments/:id', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -403,7 +371,6 @@ router.delete('/appointments/:id', authenticateToken, async (req, res) => {
 
 // ── Vital signs (patient self-service) ───────────────────────────────────────
 
-// POST /api/patient/vitals
 router.post('/vitals', authenticateToken, validate(vitalSchema), async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -419,7 +386,6 @@ router.post('/vitals', authenticateToken, validate(vitalSchema), async (req, res
     }
 });
 
-// DELETE /api/patient/vitals/:id
 router.delete('/vitals/:id', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -437,7 +403,6 @@ router.delete('/vitals/:id', authenticateToken, async (req, res) => {
 
 // ── Vaccinations (patient self-service) ──────────────────────────────────────
 
-// POST /api/patient/vaccinations
 router.post('/vaccinations', authenticateToken, validate(vaccinationSchema), async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -453,7 +418,6 @@ router.post('/vaccinations', authenticateToken, validate(vaccinationSchema), asy
     }
 });
 
-// DELETE /api/patient/vaccinations/:id
 router.delete('/vaccinations/:id', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -471,7 +435,6 @@ router.delete('/vaccinations/:id', authenticateToken, async (req, res) => {
 
 // ── Emergency Medical ID (patient self-service) ──────────────────────────────
 
-// GET /api/patient/emergency-profile — the owner's view (decrypted + token)
 router.get('/emergency-profile', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -486,7 +449,6 @@ router.get('/emergency-profile', authenticateToken, async (req, res) => {
     }
 });
 
-// PUT /api/patient/emergency-profile — update fields / enable / regenerate token
 router.put('/emergency-profile', authenticateToken, validate(emergencyProfileSchema), async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -503,7 +465,6 @@ router.put('/emergency-profile', authenticateToken, validate(emergencyProfileSch
 
 // ── Data portability (GDPR) ──────────────────────────────────────────────────
 
-// GET /api/patient/export — download the full history as a FHIR-style JSON Bundle.
 router.get('/export', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -524,8 +485,6 @@ router.get('/export', authenticateToken, async (req, res) => {
 
 // ── Attachments (patient self-service) ───────────────────────────────────────
 
-// POST /api/patient/attachments — upload a file against one of the patient's
-// own records (multipart/form-data: file + recordId).
 router.post('/attachments', authenticateToken, singleFile('file'), async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -557,7 +516,6 @@ router.post('/attachments', authenticateToken, singleFile('file'), async (req, r
     }
 });
 
-// GET /api/patient/attachments/:id/download — stream the decrypted file.
 router.get('/attachments/:id/download', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -576,7 +534,6 @@ router.get('/attachments/:id/download', authenticateToken, async (req, res) => {
     }
 });
 
-// DELETE /api/patient/attachments/:id
 router.delete('/attachments/:id', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -594,7 +551,6 @@ router.delete('/attachments/:id', authenticateToken, async (req, res) => {
 
 // ── Account deletion (right to be forgotten) ─────────────────────────────────
 
-// DELETE /api/patient/account — permanently erase the patient and all their data
 router.delete('/account', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'PATIENT') return res.status(403).json({ error: "Access Denied." });
@@ -603,10 +559,6 @@ router.delete('/account', authenticateToken, async (req, res) => {
         if (!patient) return res.status(404).json({ error: "Patient profile not found." });
         const patientId = patient.id;
 
-        // Delete child rows first (no cascade configured), then the patient, then
-        // the user's own auth artifacts and the user record itself — all atomically.
-        // Attachments reference medical records (FK), so they must be cleared
-        // before the records they hang off.
         const recordIds = (await prisma.medicalRecord.findMany({
             where: { patientId }, select: { id: true }
         })).map(r => r.id);
@@ -629,7 +581,6 @@ router.delete('/account', authenticateToken, async (req, res) => {
             prisma.user.delete({ where: { id: userId } })
         ]);
 
-        // Clear the now-orphaned session cookies.
         res.clearCookie('token', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' });
         res.clearCookie('csrf-token', { httpOnly: false, secure: process.env.NODE_ENV === 'production', sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' });
         res.json({ message: "Your account and all associated data have been permanently deleted." });

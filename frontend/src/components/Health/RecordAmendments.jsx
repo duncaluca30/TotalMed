@@ -3,8 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { Box, Typography, TextField, Button } from '@mui/material';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 
-// Shows the append-only amendments under a record, plus an optional add form
-// (rendered only when `onAdd` is supplied — i.e. for a doctor in a vault session).
 const RecordAmendments = ({ amendments = [], onAdd }) => {
   const { t } = useTranslation();
   const [text, setText] = useState('');

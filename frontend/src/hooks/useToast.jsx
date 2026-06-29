@@ -31,9 +31,6 @@ export const ToastProvider = ({ children }) => {
           severity={toast.severity || 'info'} 
           sx={{ width: '100%', fontSize: '1.1rem', fontWeight: 'bold' }}
         >
-          {/* Translate at render time so messages coming straight from the
-              backend (English) are localised too. Already-translated strings
-              pass through unchanged (no matching key → returns the input). */}
           {toast.message ? t(toast.message) : ''}
         </Alert>
       </Snackbar>

@@ -3,7 +3,6 @@ const prisma = require('../config/prisma');
 const { encrypt, decrypt } = require('../../utils/cipher');
 const { getDecryptedAllergies, getDecryptedMedications } = require('./health.service');
 
-// The patient-facing Emergency Medical ID profile (decrypted, for the owner).
 async function getProfile(patientId) {
     const p = await prisma.patient.findUnique({
         where: { id: patientId },
@@ -25,8 +24,6 @@ async function getProfile(patientId) {
     };
 }
 
-// Update the editable fields. Enabling for the first time mints a token; the
-// patient can also force a fresh token (revoking the old URL) via regenerate.
 async function updateProfile(patientId, { bloodType, emergencyContactName, emergencyContactPhone, enabled, regenerate }) {
     const current = await prisma.patient.findUnique({ where: { id: patientId }, select: { emergencyId: true } });
 
@@ -37,7 +34,6 @@ async function updateProfile(patientId, { bloodType, emergencyContactName, emerg
     };
     if (enabled !== undefined) data.emergencyEnabled = !!enabled;
 
-    // Mint a token when enabling and none exists, or when explicitly regenerating.
     if (regenerate || (enabled && !current?.emergencyId)) {
         data.emergencyId = crypto.randomBytes(24).toString('base64url');
     }
@@ -46,8 +42,6 @@ async function updateProfile(patientId, { bloodType, emergencyContactName, emerg
     return getProfile(patientId);
 }
 
-// The PUBLIC card served to a first responder via the token. No auth. Returns
-// only the minimal safety set, and only if the patient has it enabled.
 async function getPublicCard(token) {
     if (!token) return null;
     const p = await prisma.patient.findUnique({

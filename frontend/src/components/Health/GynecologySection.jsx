@@ -21,12 +21,6 @@ const MODALITY = {
 const emptyBirth = { modality: 'NATURAL', year: '' };
 const toDateInput = (iso) => (iso ? new Date(iso).toISOString().slice(0, 10) : '');
 
-/**
- * Reusable editor for a patient's sex and (when female) gynecological / obstetric
- * history: menarche date, menopause status, and the list of births. The parent
- * owns the data and supplies async handlers that perform the API call + state
- * update; this component manages form UI and resets itself on success.
- */
 const GynecologySection = ({
   sex = null,
   menarcheDate = null,
@@ -45,9 +39,6 @@ const GynecologySection = ({
   const [editingBirthId, setEditingBirthId] = useState(null);
   const [birthBusy, setBirthBusy] = useState(false);
 
-  // Re-sync the editable draft when the parent's saved values change (e.g. after
-  // a save, or a real-time refresh) — the recommended render-time pattern rather
-  // than a setState-in-effect, which avoids cascading renders.
   const [syncedFrom, setSyncedFrom] = useState({ menarcheDate, atMenopause, menopauseDate });
   if (syncedFrom.menarcheDate !== menarcheDate || syncedFrom.atMenopause !== atMenopause || syncedFrom.menopauseDate !== menopauseDate) {
     setSyncedFrom({ menarcheDate, atMenopause, menopauseDate });
@@ -60,14 +51,10 @@ const GynecologySection = ({
   };
 
   const saveProfile = async () => {
-    // Only touch the date fields the user actually changed. This avoids
-    // re-sending (and re-validating) a pre-existing value the user isn't
-    // editing — e.g. an old future-dated menarche shouldn't block saving a
-    // perfectly valid menopause date.
+
     const menarcheChanged = profileDraft.menarcheDate !== toDateInput(menarcheDate);
     const menopauseChanged = profileDraft.menopauseDate !== toDateInput(menopauseDate);
 
-    // Validate (with a clear, specific message) only the changed fields.
     if (menarcheChanged && profileDraft.menarcheDate && profileDraft.menarcheDate > todayStr) {
       return setProfileError(t('The first menstruation date is in the future. Please choose a past date.'));
     }
@@ -79,8 +66,7 @@ const GynecologySection = ({
     try {
       const payload = { atMenopause: profileDraft.atMenopause };
       if (menarcheChanged) payload.menarcheDate = profileDraft.menarcheDate || null;
-      // menopauseDate is only meaningful while at menopause; the server clears it
-      // automatically when atMenopause is false.
+
       if (profileDraft.atMenopause && menopauseChanged) payload.menopauseDate = profileDraft.menopauseDate || null;
       await onSaveProfile(payload);
     } finally { setProfileBusy(false); }
@@ -181,7 +167,6 @@ const GynecologySection = ({
             </Box>
           )}
 
-          {/* Births */}
           <Typography sx={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--dark-text)', mb: 1 }}>
             {t('Births')} <Typography component="span" sx={{ color: 'var(--light-text)', fontWeight: 400 }}>({births.length})</Typography>
           </Typography>

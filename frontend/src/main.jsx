@@ -8,8 +8,6 @@ import './index.css'
 import './i18n'
 import App from './App.jsx'
 
-// Brand theme so MUI components (Tabs, DatePicker, color="primary" buttons, etc.)
-// match the indigo-violet palette used across the app.
 const gradient = 'linear-gradient(135deg, #4f46e5, #7c3aed)'
 
 const theme = createTheme({
@@ -24,8 +22,7 @@ const theme = createTheme({
     MuiButton: {
       styleOverrides: {
         root: { textTransform: 'none', fontWeight: 600 },
-        // Primary contained buttons get the brand gradient (matches the rest of the app).
-        // backgroundImage layers cleanly over any background-color set via sx.
+
         containedPrimary: {
           backgroundImage: gradient,
           boxShadow: '0 6px 16px rgba(79, 70, 229, 0.28)',
@@ -40,8 +37,6 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <ThemeProvider theme={theme}>
-        {/* Provides the date adapter context required by every MUI X DatePicker
-            (without it they throw MUI X error #149). */}
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <App />
         </LocalizationProvider>

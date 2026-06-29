@@ -4,9 +4,6 @@ const router = express.Router();
 const authenticateToken = require('../middleware/authenticate');
 const notifications = require('../services/notification.service');
 
-// All routes here are for the authenticated user themselves — any role.
-
-// GET /api/notifications — recent notifications
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const list = await notifications.list(req.user.id);
@@ -17,7 +14,6 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /api/notifications/unread-count
 router.get('/unread-count', authenticateToken, async (req, res) => {
     try {
         const count = await notifications.unreadCount(req.user.id);
@@ -28,7 +24,6 @@ router.get('/unread-count', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/notifications/:id/read
 router.post('/:id/read', authenticateToken, async (req, res) => {
     try {
         const ok = await notifications.markRead(req.params.id, req.user.id);
@@ -40,7 +35,6 @@ router.post('/:id/read', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/notifications/read-all
 router.post('/read-all', authenticateToken, async (req, res) => {
     try {
         await notifications.markAllRead(req.user.id);

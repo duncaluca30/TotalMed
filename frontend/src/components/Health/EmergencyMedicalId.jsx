@@ -7,8 +7,6 @@ import { useToast } from '../../hooks/useToast';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown'];
 
-// Lets a patient opt into a minimal, public Emergency Medical ID and get a QR /
-// link a first responder can open without logging in.
 const EmergencyMedicalId = () => {
   const { t } = useTranslation();
   const showToast = useToast();

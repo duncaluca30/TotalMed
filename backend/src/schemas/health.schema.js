@@ -19,16 +19,29 @@ const birthFields = {
   year: z.coerce.number().int().min(1900, 'Year too early').max(currentYear, 'Year cannot be in the future').optional().nullable()
 };
 
+// A date-only (or ISO) string that must not be in the future. Used for
+// menarche / menopause, which can only have happened in the past.
+const notFutureDate = z
+  .string()
+  .min(1)
+  .refine((v) => new Date(v) <= new Date(new Date().toDateString() + ' 23:59:59'),
+    'Date cannot be in the future');
+
 // All fields optional — this is a partial patch of the patient's gynecological
-// profile. menarcheDate accepts an ISO date string (or null to clear).
+// profile. menarcheDate / menopauseDate accept an ISO date string (or null to clear).
 const patientProfileFields = {
   sex: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
   atMenopause: z.boolean().optional(),
-  menarcheDate: z.string().min(1).optional().nullable()
+  menarcheDate: notFutureDate.optional().nullable(),
+  menopauseDate: notFutureDate.optional().nullable()
 };
 
 const appointmentFields = {
-  dateTime: z.string().min(1, 'Date is required'),
+  dateTime: z
+    .string()
+    .min(1, 'Date is required')
+    .refine((v) => new Date(v) >= new Date(new Date().toDateString()),
+      'Appointment date cannot be in the past'),
   specialty: z.string().min(1, 'Specialty / title is required').max(200, 'Too long (max 200 chars)'),
   location: z.string().max(200, 'Location too long (max 200 chars)').optional().nullable(),
   reason: z.string().max(500, 'Note too long (max 500 chars)').optional().nullable()

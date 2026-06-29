@@ -31,13 +31,14 @@ const GynecologySection = ({
   sex = null,
   menarcheDate = null,
   atMenopause = false,
+  menopauseDate = null,
   births = [],
   editable = true,
   onSaveProfile,
   onAddBirth, onUpdateBirth, onDeleteBirth,
 }) => {
   const { t } = useTranslation();
-  const [profileDraft, setProfileDraft] = useState({ menarcheDate: toDateInput(menarcheDate), atMenopause });
+  const [profileDraft, setProfileDraft] = useState({ menarcheDate: toDateInput(menarcheDate), atMenopause, menopauseDate: toDateInput(menopauseDate) });
   const [profileBusy, setProfileBusy] = useState(false);
   const [birthDraft, setBirthDraft] = useState(emptyBirth);
   const [editingBirthId, setEditingBirthId] = useState(null);
@@ -46,10 +47,10 @@ const GynecologySection = ({
   // Re-sync the editable draft when the parent's saved values change (e.g. after
   // a save, or a real-time refresh) — the recommended render-time pattern rather
   // than a setState-in-effect, which avoids cascading renders.
-  const [syncedFrom, setSyncedFrom] = useState({ menarcheDate, atMenopause });
-  if (syncedFrom.menarcheDate !== menarcheDate || syncedFrom.atMenopause !== atMenopause) {
-    setSyncedFrom({ menarcheDate, atMenopause });
-    setProfileDraft({ menarcheDate: toDateInput(menarcheDate), atMenopause });
+  const [syncedFrom, setSyncedFrom] = useState({ menarcheDate, atMenopause, menopauseDate });
+  if (syncedFrom.menarcheDate !== menarcheDate || syncedFrom.atMenopause !== atMenopause || syncedFrom.menopauseDate !== menopauseDate) {
+    setSyncedFrom({ menarcheDate, atMenopause, menopauseDate });
+    setProfileDraft({ menarcheDate: toDateInput(menarcheDate), atMenopause, menopauseDate: toDateInput(menopauseDate) });
   }
 
   const changeSex = async (value) => {
@@ -63,6 +64,8 @@ const GynecologySection = ({
       await onSaveProfile({
         menarcheDate: profileDraft.menarcheDate || null,
         atMenopause: profileDraft.atMenopause,
+        // Only meaningful while at menopause; cleared server-side otherwise.
+        menopauseDate: profileDraft.atMenopause ? (profileDraft.menopauseDate || null) : null,
       });
     } finally { setProfileBusy(false); }
   };
@@ -132,6 +135,15 @@ const GynecologySection = ({
                   onChange={(e) => setProfileDraft({ ...profileDraft, atMenopause: e.target.checked })} />}
                 label={t('At menopause')}
               />
+              {profileDraft.atMenopause && (
+                <TextField
+                  size="small" type="date" label={t('Menopause start')}
+                  value={profileDraft.menopauseDate}
+                  onChange={(e) => setProfileDraft({ ...profileDraft, menopauseDate: e.target.value })}
+                  slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayStr } }}
+                  sx={{ minWidth: 240 }}
+                />
+              )}
               <Button variant="outlined" size="small" disabled={profileBusy} onClick={saveProfile}>{t('Save')}</Button>
             </Box>
           ) : (
@@ -141,6 +153,7 @@ const GynecologySection = ({
               </Typography>
               <Typography sx={{ fontSize: '0.9rem' }}>
                 <strong>{t('Menopause:')}</strong> {atMenopause ? t('Yes') : t('No')}
+                {atMenopause && menopauseDate ? ` (${new Date(menopauseDate).toLocaleDateString()})` : ''}
               </Typography>
             </Box>
           )}

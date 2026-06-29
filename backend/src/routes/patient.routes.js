@@ -280,8 +280,8 @@ router.put('/profile', authenticateToken, validate(patientProfileSchema), async 
         const patientId = await getPatientId(req.user.id);
         if (!patientId) return res.status(404).json({ error: "Patient profile not found." });
 
-        const { sex, atMenopause, menarcheDate } = req.body;
-        const updated = await health.updatePatientProfile(patientId, { sex, atMenopause, menarcheDate });
+        const { sex, atMenopause, menarcheDate, menopauseDate } = req.body;
+        const updated = await health.updatePatientProfile(patientId, { sex, atMenopause, menarcheDate, menopauseDate });
         res.json(updated);
     } catch (error) {
         console.error(error);

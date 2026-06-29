@@ -6,6 +6,7 @@ import { startAuthentication } from '@simplewebauthn/browser';
 import { API_URL, setCsrfToken } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../hooks/useToast';
+import useDragScroll from '../../hooks/useDragScroll';
 import LanguageSwitcher from '../Layout/LanguageSwitcher';
 
 const LoginForm = () => {
@@ -22,6 +23,7 @@ const LoginForm = () => {
   const { login } = useAuth();
   const showToast = useToast();
   const navigate = useNavigate();
+  const tabsRef = useDragScroll('.MuiTabs-scroller', [requires2FA, available2FAMethods.length]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -177,12 +179,15 @@ const LoginForm = () => {
           <Box component="form" onSubmit={handle2FAValidation} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {available2FAMethods.length > 1 && (
               <Tabs
+                ref={tabsRef}
                 value={selected2FAMethod}
                 onChange={(e, newValue) => {
                   setSelected2FAMethod(newValue);
                   if (newValue === 'EMAIL' && !emailCodeSent) handleSendEmailCode();
                 }}
-                centered
+                variant="scrollable"
+                scrollButtons={false}
+                allowScrollButtonsMobile
                 sx={{ mb: 2 }}
               >
                 {available2FAMethods.includes('APP') && <Tab label={t('App')} value="APP" />}

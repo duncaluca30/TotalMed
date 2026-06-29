@@ -527,11 +527,11 @@ router.put('/patient-profile', authenticateToken, validate(doctorPatientProfileS
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
         const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
 
-        const { patientId, vaultToken, sex, atMenopause, menarcheDate } = req.body;
+        const { patientId, vaultToken, sex, atMenopause, menarcheDate, menopauseDate } = req.body;
         const check = verifyVaultSession(vaultToken, doctor.id, patientId);
         if (!check.ok) return res.status(check.status).json({ error: check.error });
 
-        const updated = await health.updatePatientProfile(patientId, { sex, atMenopause, menarcheDate });
+        const updated = await health.updatePatientProfile(patientId, { sex, atMenopause, menarcheDate, menopauseDate });
         res.json(updated);
     } catch (error) {
         console.error(error);

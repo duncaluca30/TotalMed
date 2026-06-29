@@ -25,11 +25,15 @@ const AppointmentReminders = ({
   const [editingId, setEditingId] = useState(null);
   const [busy, setBusy] = useState(false);
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   const reset = () => { setDraft(emptyDraft); setEditingId(null); };
 
   const submit = async (e) => {
     e.preventDefault();
     if (!draft.specialty.trim() || !draft.dateTime) return;
+    // Reminders are for upcoming visits — reject anything before today.
+    if (draft.dateTime < todayStr) return;
     setBusy(true);
     try {
       if (editingId) await onUpdate(editingId, draft);
@@ -88,7 +92,7 @@ const AppointmentReminders = ({
             onChange={(e) => setDraft({ ...draft, specialty: e.target.value })} sx={{ flex: '1 1 160px' }} />
           <TextField size="small" type="date" label={t('Date')} required value={draft.dateTime}
             onChange={(e) => setDraft({ ...draft, dateTime: e.target.value })}
-            slotProps={{ inputLabel: { shrink: true } }} sx={{ flex: '0 0 170px' }} />
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: todayStr } }} sx={{ flex: '0 0 170px' }} />
           <TextField size="small" label={t('Location (optional)')} value={draft.location}
             onChange={(e) => setDraft({ ...draft, location: e.target.value })} sx={{ flex: '1 1 160px' }} />
           <TextField size="small" label={t('Note (optional)')} value={draft.reason}

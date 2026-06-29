@@ -170,11 +170,17 @@ async function updatePatientProfile(patientId, fields) {
     if (fields.menarcheDate !== undefined) {
         data.menarcheDate = fields.menarcheDate ? new Date(fields.menarcheDate) : null;
     }
+    if (fields.menopauseDate !== undefined) {
+        data.menopauseDate = fields.menopauseDate ? new Date(fields.menopauseDate) : null;
+    }
+    // Clearing the menopause flag should also clear its date so we never keep a
+    // stale "menopause started on …" once the patient unticks the box.
+    if (fields.atMenopause === false) data.menopauseDate = null;
 
     return prisma.patient.update({
         where: { id: patientId },
         data,
-        select: { id: true, sex: true, atMenopause: true, menarcheDate: true }
+        select: { id: true, sex: true, atMenopause: true, menarcheDate: true, menopauseDate: true }
     });
 }
 

@@ -90,6 +90,7 @@ model Patient {
   // Individual births are tracked in the Birth model below.
   menarcheDate DateTime?
   atMenopause  Boolean  @default(false)
+  menopauseDate DateTime?
 
   // Emergency Medical ID — an opt-in, minimal "in case of emergency" profile a
   // first responder can read without logging in, via an unguessable token URL.

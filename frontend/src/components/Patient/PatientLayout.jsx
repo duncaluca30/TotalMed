@@ -5,6 +5,7 @@ import { Box, Tabs, Tab, Skeleton, Typography, Button } from '@mui/material';
 import { fetchWithAuth } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../hooks/useToast';
+import useDragScroll from '../../hooks/useDragScroll';
 import AppHeader from '../Layout/AppHeader';
 import AuthRequestDialog from './AuthRequestDialog';
 
@@ -21,6 +22,7 @@ const PatientLayout = () => {
   const showToast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+  const tabsRef = useDragScroll('.MuiTabs-scroller', [patientData]);
 
   useEffect(() => {
     fetchWithAuth('/api/patient/dashboard')
@@ -120,7 +122,7 @@ const PatientLayout = () => {
         <AppHeader title="TotalMed Patient Portal" />
         <Box sx={{ width: '100%', mt: 3 }}>
           <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-            <Tabs value={currentTab} textColor="primary" indicatorColor="primary">
+            <Tabs value={currentTab} textColor="primary" indicatorColor="primary" variant="scrollable" scrollButtons={false} allowScrollButtonsMobile>
               {tabLabels.map((label) => <Tab key={label} label={label} sx={{ fontWeight: 'bold' }} />)}
             </Tabs>
           </Box>
@@ -186,8 +188,8 @@ const PatientLayout = () => {
       )}
 
       <Box sx={{ width: '100%' }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-          <Tabs value={currentTab} onChange={handleTabChange} textColor="primary" indicatorColor="primary">
+        <Box ref={tabsRef} sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Tabs value={currentTab} onChange={handleTabChange} textColor="primary" indicatorColor="primary" variant="scrollable" scrollButtons={false} allowScrollButtonsMobile>
             {tabLabels.map((label) => <Tab key={label} label={label} sx={{ fontWeight: 'bold' }} />)}
           </Tabs>
         </Box>

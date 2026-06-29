@@ -61,7 +61,7 @@ const HealthProfile = () => {
   const saveProfile = async (fields) => {
     try {
       const updated = await fetchWithAuth('/api/patient/profile', { method: 'PUT', body: JSON.stringify(fields) });
-      setPatientData({ ...patientData, sex: updated.sex, atMenopause: updated.atMenopause, menarcheDate: updated.menarcheDate });
+      setPatientData({ ...patientData, sex: updated.sex, atMenopause: updated.atMenopause, menarcheDate: updated.menarcheDate, menopauseDate: updated.menopauseDate });
       showToast(t('Profile updated.'), 'success');
     } catch (e) { showToast(e.message || t('Failed to update profile.'), 'error'); throw e; }
   };
@@ -154,6 +154,7 @@ const HealthProfile = () => {
           sex={patientData.sex}
           menarcheDate={patientData.menarcheDate}
           atMenopause={patientData.atMenopause}
+          menopauseDate={patientData.menopauseDate}
           births={births}
           onSaveProfile={saveProfile}
           onAddBirth={addBirth}

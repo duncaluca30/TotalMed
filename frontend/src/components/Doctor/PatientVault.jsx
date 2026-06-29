@@ -35,6 +35,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
     sex: patient.sex || null,
     menarcheDate: patient.menarcheDate || null,
     atMenopause: patient.atMenopause || false,
+    menopauseDate: patient.menopauseDate || null,
   });
   const showToast = useToast();
 
@@ -89,7 +90,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
   const saveProfile = async (fields) => {
     try {
       const updated = await fetchWithAuth('/api/doctor/patient-profile', { method: 'PUT', body: vaultBody(fields) });
-      setProfile({ sex: updated.sex, menarcheDate: updated.menarcheDate, atMenopause: updated.atMenopause });
+      setProfile({ sex: updated.sex, menarcheDate: updated.menarcheDate, atMenopause: updated.atMenopause, menopauseDate: updated.menopauseDate });
       showToast(t('Profile updated.'), 'success');
     } catch (e) { showToast(e.message || t('Failed to update profile.'), 'error'); throw e; }
   };
@@ -352,6 +353,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
               sex={profile.sex}
               menarcheDate={profile.menarcheDate}
               atMenopause={profile.atMenopause}
+              menopauseDate={profile.menopauseDate}
               births={births}
               onSaveProfile={saveProfile}
               onAddBirth={addBirth}

@@ -60,23 +60,29 @@ const GynecologySection = ({
   };
 
   const saveProfile = async () => {
-    // Validate up front so the user gets a clear, specific message instead of a
-    // native tooltip on hover or a generic "Validation failed" toast.
-    if (profileDraft.menarcheDate && profileDraft.menarcheDate > todayStr) {
+    // Only touch the date fields the user actually changed. This avoids
+    // re-sending (and re-validating) a pre-existing value the user isn't
+    // editing — e.g. an old future-dated menarche shouldn't block saving a
+    // perfectly valid menopause date.
+    const menarcheChanged = profileDraft.menarcheDate !== toDateInput(menarcheDate);
+    const menopauseChanged = profileDraft.menopauseDate !== toDateInput(menopauseDate);
+
+    // Validate (with a clear, specific message) only the changed fields.
+    if (menarcheChanged && profileDraft.menarcheDate && profileDraft.menarcheDate > todayStr) {
       return setProfileError(t('The first menstruation date is in the future. Please choose a past date.'));
     }
-    if (profileDraft.atMenopause && profileDraft.menopauseDate && profileDraft.menopauseDate > todayStr) {
+    if (profileDraft.atMenopause && menopauseChanged && profileDraft.menopauseDate && profileDraft.menopauseDate > todayStr) {
       return setProfileError(t('The menopause start date is in the future. Please choose a past date.'));
     }
     setProfileError('');
     setProfileBusy(true);
     try {
-      await onSaveProfile({
-        menarcheDate: profileDraft.menarcheDate || null,
-        atMenopause: profileDraft.atMenopause,
-        // Only meaningful while at menopause; cleared server-side otherwise.
-        menopauseDate: profileDraft.atMenopause ? (profileDraft.menopauseDate || null) : null,
-      });
+      const payload = { atMenopause: profileDraft.atMenopause };
+      if (menarcheChanged) payload.menarcheDate = profileDraft.menarcheDate || null;
+      // menopauseDate is only meaningful while at menopause; the server clears it
+      // automatically when atMenopause is false.
+      if (profileDraft.atMenopause && menopauseChanged) payload.menopauseDate = profileDraft.menopauseDate || null;
+      await onSaveProfile(payload);
     } finally { setProfileBusy(false); }
   };
 

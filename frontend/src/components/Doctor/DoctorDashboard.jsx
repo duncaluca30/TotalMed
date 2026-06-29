@@ -7,6 +7,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
 import { fetchWithAuth } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
+import { useAuth } from '../../context/AuthContext';
 import PatientVault from './PatientVault';
 import MinimizedVault from './MinimizedVault';
 import VaultWaitingScreen from './VaultWaitingScreen';
@@ -32,6 +33,7 @@ const DoctorDashboard = () => {
   const showToast = useToast();
   const location = useLocation();
   const navigate = useNavigate();
+  const { socket } = useAuth();
 
   // Best-effort: close a vault session we're abandoning (e.g. opening a second
   // patient's vault while one is still minimized) so the previous patient's
@@ -105,6 +107,21 @@ const DoctorDashboard = () => {
     setVaultCode('');
     setMinimized(false);
   };
+
+  // The patient can revoke access mid-visit. The server pushes this event to the
+  // doctor who holds the session; close the open (or minimized) vault at once.
+  useEffect(() => {
+    if (!socket) return;
+    const onRevoked = () => {
+      if (unlockedPatient || minimized) {
+        showToast(t('The patient revoked access. The vault has been closed.'), 'warning');
+        resetVault();
+      }
+    };
+    socket.on('vault-access-revoked', onRevoked);
+    return () => socket.off('vault-access-revoked', onRevoked);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, unlockedPatient, minimized]);
 
   // Lock from the minimized card: notify the patient that viewing ended (same as
   // "Lock Vault & Exit" inside the vault), then clear the session.

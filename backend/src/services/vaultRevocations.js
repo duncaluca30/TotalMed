@@ -11,8 +11,25 @@
  */
 const revocations = new Map(); // patientId -> epoch ms of revocation
 
+// patientId -> the user id (socket room) of the doctor currently holding an
+// active vault session. Lets us push a real-time "access revoked" event to that
+// specific doctor so their open vault page closes itself immediately.
+const activeDoctorByPatient = new Map();
+
 function revokeVaultAccess(patientId) {
     revocations.set(patientId, Date.now());
+}
+
+function setActiveVaultDoctor(patientId, doctorUserId) {
+    activeDoctorByPatient.set(patientId, doctorUserId);
+}
+
+function getActiveVaultDoctor(patientId) {
+    return activeDoctorByPatient.get(patientId) || null;
+}
+
+function clearActiveVaultDoctor(patientId) {
+    activeDoctorByPatient.delete(patientId);
 }
 
 /**
@@ -26,4 +43,4 @@ function isVaultTokenRevoked(patientId, tokenIssuedAtSeconds) {
     return tokenIssuedAtSeconds * 1000 < revokedAt;
 }
 
-module.exports = { revokeVaultAccess, isVaultTokenRevoked };
+module.exports = { revokeVaultAccess, isVaultTokenRevoked, setActiveVaultDoctor, getActiveVaultDoctor, clearActiveVaultDoctor };

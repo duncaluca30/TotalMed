@@ -12,6 +12,7 @@
   "Access expires in {{time}}.": "Accesul expiră în {{time}}.",
   "Revoke Access": "Retrage accesul",
   "Access revoked. The doctor can no longer add records.": "Acces retras. Medicul nu mai poate adăuga documente.",
+  "The patient revoked access. The vault has been closed.": "Pacientul a retras accesul. Seiful a fost închis.",
   "Failed to revoke access.": "Retragerea accesului a eșuat.",
   "Appointment added.": "Programare adăugată.",
   "Failed to add appointment.": "Adăugarea programării a eșuat.",

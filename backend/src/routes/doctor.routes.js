@@ -16,7 +16,7 @@ const attachments = require('../services/attachment.service');
 const amendments = require('../services/amendment.service');
 const notifications = require('../services/notification.service');
 const { singleFile } = require('../middleware/upload');
-const { isVaultTokenRevoked } = require('../services/vaultRevocations');
+const { isVaultTokenRevoked, setActiveVaultDoctor, clearActiveVaultDoctor } = require('../services/vaultRevocations');
 const { sendEmergencyAccessEmail } = require('../../utils/mailer');
 const { decrypt } = require('../../utils/cipher');
 
@@ -187,6 +187,10 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                     process.env.JWT_SECRET,
                     { expiresIn: `${durationMinutes}m` }
                 );
+
+                // Remember which doctor holds this patient's active session, so a
+                // later revoke can push a real-time close event to that doctor.
+                setActiveVaultDoctor(validCode.patientId, doctor.userId);
 
                 // Let the patient know their doctor is now actively viewing the records
                 // they just shared, and for how long.
@@ -803,6 +807,9 @@ router.post('/emergency-access', authenticateToken, vaultLimiter, validate(emerg
             { expiresIn: '15m' }
         );
 
+        // Track the active session so a patient revoke can close this doctor's page.
+        setActiveVaultDoctor(patientId, doctor.userId);
+
         // Notify patient asynchronously — do not block the emergency response
         const timestamp = new Date().toLocaleString('ro-RO', { timeZone: 'Europe/Bucharest' });
         sendEmergencyAccessEmail(
@@ -850,6 +857,8 @@ router.post('/lock-vault', authenticateToken, async (req, res) => {
             // Token already expired — nothing left to notify about.
             return res.json({ ok: true });
         }
+
+        clearActiveVaultDoctor(session.patientId);
 
         const patient = await prisma.patient.findUnique({
             where: { id: session.patientId },

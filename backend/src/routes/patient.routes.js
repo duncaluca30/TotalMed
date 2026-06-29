@@ -5,7 +5,7 @@ const prisma = require('../config/prisma');
 const authenticateToken = require('../middleware/authenticate');
 const validate = require('../middleware/validate');
 const { getDecryptedRecords, generateAccessCode, getPatientAccessLog, buildAccessQrPayload } = require('../services/vault.service');
-const { revokeVaultAccess } = require('../services/vaultRevocations');
+const { revokeVaultAccess, getActiveVaultDoctor, clearActiveVaultDoctor } = require('../services/vaultRevocations');
 const { allergySchema, medicationSchema, birthSchema, patientProfileSchema, appointmentSchema, vitalSchema, vaccinationSchema, emergencyProfileSchema } = require('../schemas/health.schema');
 const health = require('../services/health.service');
 const emergency = require('../services/emergency.service');
@@ -125,6 +125,16 @@ router.post('/revoke-access', authenticateToken, async (req, res) => {
         if (!patient) return res.status(404).json({ error: "Patient profile not found." });
 
         revokeVaultAccess(patient.id);
+
+        // Push a real-time close event to the doctor who currently holds the
+        // session, so their open vault page exits immediately instead of only
+        // failing on the next write.
+        const doctorUserId = getActiveVaultDoctor(patient.id);
+        if (doctorUserId) {
+            req.io.to(doctorUserId.toString()).emit('vault-access-revoked');
+            clearActiveVaultDoctor(patient.id);
+        }
+
         res.json({ message: "Access revoked." });
     } catch (error) {
         console.error(error);

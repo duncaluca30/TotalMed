@@ -22,6 +22,13 @@ function setupSocketHandlers(io) {
             console.log('🟢 User connected to switchboard:', socket.id);
         }
 
+        // Doctors join a room keyed by their own user id so the server can push
+        // targeted events to them (e.g. "the patient just revoked your access").
+        // Patients use the dedicated join-secure-room handler below instead.
+        if (socket.user?.role === 'DOCTOR') {
+            socket.join(socket.user.id.toString());
+        }
+
         socket.on('join-secure-room', async () => {
             try {
                 if (socket.user.role !== 'PATIENT') return;

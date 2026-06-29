@@ -59,24 +59,28 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    if (isAuthenticated && role === 'PATIENT') {
-      // socket.io uses withCredentials to automatically send the httpOnly cookie
-      const newSocket = io(API_URL, { withCredentials: true });
-      setSocket(newSocket);
+    if (!isAuthenticated || (role !== 'PATIENT' && role !== 'DOCTOR')) return;
 
+    // socket.io uses withCredentials to automatically send the httpOnly cookie
+    const newSocket = io(API_URL, { withCredentials: true });
+    setSocket(newSocket);
+
+    if (role === 'PATIENT') {
       newSocket.emit('join-secure-room');
-      
+
       newSocket.on('auth-request', (data) => setAuthRequest(data));
-      
+
       newSocket.on('session-replaced', () => {
         logout();
         showToast(t('You were logged in on another device. This session has ended.'), 'warning');
       });
-
-      return () => {
-        newSocket.disconnect();
-      };
     }
+    // Doctors are auto-joined to their own room server-side on connection, so
+    // targeted events (e.g. vault-access-revoked) reach them with no extra emit.
+
+    return () => {
+      newSocket.disconnect();
+    };
   }, [isAuthenticated, role]);
 
   return (

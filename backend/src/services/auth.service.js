@@ -13,6 +13,12 @@ const notifications = require('./notification.service');
 
 // Tokens are emailed in the clear (in the link) but stored only as a SHA-256 hash.
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+// otplib v13 verifies TOTP codes with ZERO tolerance by default, so a correct
+// code typed near the end of its 30s window — or any small clock drift between
+// the user's phone and our server — is rejected. Allow ±1 time step (±30s), the
+// window RFC 6238 §5.2 recommends, so legitimate codes don't bounce.
+const TOTP_TOLERANCE_SECONDS = 30;
 // Back-compat alias used by the reset flow.
 const hashResetToken = hashToken;
 
@@ -281,7 +287,7 @@ async function validate2FA(userId, token, method) {
 
         // otplib v13's verify() is async and resolves to an object ({ valid, ... }),
         // not a boolean — must await and read `.valid`.
-        const result = await verify({ token, secret: decryptedSecret });
+        const result = await verify({ token, secret: decryptedSecret, epochTolerance: TOTP_TOLERANCE_SECONDS });
         isValid = result.valid;
     } else if (method === 'EMAIL') {
         if (!user.emailOtpCode || !user.emailOtpExpiresAt) {
@@ -381,7 +387,7 @@ async function verify2FASetup(userId, token) {
         throw error;
     }
 
-    const isValid = (await verify({ token, secret: decryptedSecret })).valid;
+    const isValid = (await verify({ token, secret: decryptedSecret, epochTolerance: TOTP_TOLERANCE_SECONDS })).valid;
 
     if (!isValid) {
         const error = new Error("Invalid authenticator code. Please try again.");

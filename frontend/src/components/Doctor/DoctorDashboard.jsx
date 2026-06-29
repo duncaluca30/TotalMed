@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useOutletContext, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Box, Typography, Button, TextField, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
@@ -30,21 +30,35 @@ const DoctorDashboard = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const showToast = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const handleUnlockVault = async (e) => {
-    e.preventDefault();
+  // Best-effort: close a vault session we're abandoning (e.g. opening a second
+  // patient's vault while one is still minimized) so the previous patient's
+  // "doctor is viewing" banner clears. Idempotent server-side.
+  const lockPreviousSession = async (token) => {
+    if (!token) return;
+    try {
+      await fetchWithAuth('/api/doctor/lock-vault', { method: 'POST', body: JSON.stringify({ vaultToken: token }) });
+    } catch { /* non-critical */ }
+  };
+
+  const requestAccess = async (code) => {
+    const previousToken = vaultToken; // a minimized session we'll replace, if any
     const controller = new AbortController();
     abortRef.current = controller;
     setIsWaiting(true);
     try {
       const data = await fetchWithAuth('/api/doctor/access-vault', {
         method: 'POST',
-        body: JSON.stringify({ code: vaultCode }),
+        body: JSON.stringify({ code }),
         signal: controller.signal,
       });
+      await lockPreviousSession(previousToken);
       setUnlockedPatient(data.patient);
       setVaultToken(data.vaultToken);
       setPagination(data.pagination);
+      setMinimized(false);
       showToast(t('Vault Unlocked'), "success");
     } catch (error) {
       // Aborts are user-initiated (Cancel button) — no error toast needed.
@@ -56,6 +70,28 @@ const DoctorDashboard = () => {
       abortRef.current = null;
     }
   };
+
+  const handleUnlockVault = (e) => {
+    e.preventDefault();
+    requestAccess(vaultCode);
+  };
+
+  // When a doctor scans the patient's QR, it deep-links here as
+  // /doctor?vaultCode=NNNNNN. Pre-fill the code, fire the access request once,
+  // then strip the param so a refresh doesn't re-trigger it.
+  const autoTriedRef = useRef(false);
+  useEffect(() => {
+    if (autoTriedRef.current) return;
+    const params = new URLSearchParams(location.search);
+    const code = params.get('vaultCode');
+    if (code && /^\d{6}$/.test(code) && !unlockedPatient && !isWaiting) {
+      autoTriedRef.current = true;
+      setVaultCode(code);
+      requestAccess(code);
+      navigate('/doctor', { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCancelWait = () => {
     if (abortRef.current) abortRef.current.abort();
@@ -92,14 +128,17 @@ const DoctorDashboard = () => {
 
   const handleEmergencyAccess = async () => {
     setConfirmOpen(false);
+    const previousToken = vaultToken; // a minimized session we'll replace, if any
     try {
       const data = await fetchWithAuth('/api/doctor/emergency-access', {
         method: 'POST',
         body: JSON.stringify({ patientId: foundPatient.id, reason: emergencyReason }),
       });
+      await lockPreviousSession(previousToken);
       setUnlockedPatient(data.patient);
       setVaultToken(data.vaultToken);
       setPagination(null);
+      setMinimized(false);
       setCnpSearch('');
       setFoundPatient(null);
       setEmergencyReason('');
@@ -129,7 +168,30 @@ const DoctorDashboard = () => {
 
       {isWaiting ? (
         <VaultWaitingScreen onCancel={handleCancelWait} />
-      ) : !unlockedPatient ? (
+      ) : unlockedPatient && !minimized ? (
+        <PatientVault
+          doctorData={doctorData}
+          patient={unlockedPatient}
+          vaultToken={vaultToken}
+          pagination={pagination}
+          onClose={resetVault}
+          onMinimize={() => setMinimized(true)}
+        />
+      ) : (
+        <>
+          {minimized && (
+            <MinimizedVault
+              patient={unlockedPatient}
+              vaultToken={vaultToken}
+              onResume={() => setMinimized(false)}
+              onLock={handleLockVault}
+            />
+          )}
+          {minimized && (
+            <Typography sx={{ textAlign: 'center', mt: 4, mb: -1, fontWeight: 600, color: 'var(--light-text)' }}>
+              {t('Or open another patient\'s file')}
+            </Typography>
+          )}
         <div className="card card--centered" style={{ marginTop: '30px' }}>
           <Box sx={{
             width: 64, height: 64, borderRadius: '50%', mx: 'auto', mb: 2,
@@ -227,22 +289,7 @@ const DoctorDashboard = () => {
             </DialogActions>
           </Dialog>
         </div>
-      ) : minimized ? (
-        <MinimizedVault
-          patient={unlockedPatient}
-          vaultToken={vaultToken}
-          onResume={() => setMinimized(false)}
-          onLock={handleLockVault}
-        />
-      ) : (
-        <PatientVault
-          doctorData={doctorData}
-          patient={unlockedPatient}
-          vaultToken={vaultToken}
-          pagination={pagination}
-          onClose={resetVault}
-          onMinimize={() => setMinimized(true)}
-        />
+        </>
       )}
 
       {/* Hide the doctor's own 2FA/biometric settings while a patient vault is

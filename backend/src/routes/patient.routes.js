@@ -4,7 +4,7 @@ const router = express.Router();
 const prisma = require('../config/prisma');
 const authenticateToken = require('../middleware/authenticate');
 const validate = require('../middleware/validate');
-const { getDecryptedRecords, generateAccessCode, getPatientAccessLog } = require('../services/vault.service');
+const { getDecryptedRecords, generateAccessCode, getPatientAccessLog, buildAccessQrPayload } = require('../services/vault.service');
 const { revokeVaultAccess } = require('../services/vaultRevocations');
 const { allergySchema, medicationSchema, birthSchema, patientProfileSchema, appointmentSchema, vitalSchema, vaccinationSchema, emergencyProfileSchema } = require('../schemas/health.schema');
 const health = require('../services/health.service');
@@ -75,7 +75,8 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 
         if (patientData.accessCode) {
             patientData.accessCode.code = decrypt(patientData.accessCode.code);
-            patientData.accessCode.qrDataUrl = await qrcode.toDataURL(patientData.accessCode.code);
+            const base = req.headers.origin || process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+            patientData.accessCode.qrDataUrl = await qrcode.toDataURL(buildAccessQrPayload(patientData.accessCode.code, base));
         }
 
         res.json({
@@ -100,7 +101,8 @@ router.post('/generate-code', authenticateToken, async (req, res) => {
         const patient = await prisma.patient.findUnique({ where: { userId: req.user.id } });
         if (!patient) return res.status(404).json({ error: "Patient profile not found." });
 
-        const result = await generateAccessCode(patient.id);
+        const base = req.headers.origin || process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+        const result = await generateAccessCode(patient.id, base);
         res.json(result);
     } catch (error) {
         console.error(error);

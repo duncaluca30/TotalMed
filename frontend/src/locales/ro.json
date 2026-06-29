@@ -256,6 +256,7 @@
   "Emergency access granted. Patient has been notified.": "Acces de urgență acordat. Pacientul a fost notificat.",
   "Emergency access failed.": "Accesul de urgență a eșuat.",
   "Unlock Patient File": "Deblochează dosarul pacientului",
+  "Or open another patient's file": "Sau deschide dosarul altui pacient",
   "Enter the 6-digit access code provided by the patient. They'll be asked to approve and select which records to share.": "Introdu codul de acces de 6 cifre primit de la pacient. Acestuia i se va cere să aprobe și să aleagă ce documente partajează.",
   "6-Digit Vault Code": "Cod de acces (6 cifre)",
   "Request Access": "Solicită acces",

@@ -309,7 +309,7 @@ const PatientVault = ({ doctorData, patient, vaultToken, pagination, onClose, on
             </Typography>
           </Box>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button
             variant="outlined"
             startIcon={<PictureAsPdfIcon />}

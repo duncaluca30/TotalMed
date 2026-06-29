@@ -25,11 +25,22 @@ async function lookupAccessCode(code) {
 }
 
 /**
+ * Build the QR payload for an access code. Instead of the bare 6 digits — which
+ * a phone camera just shows as plain text — we encode a deep link into the
+ * doctor portal with the code pre-filled, so scanning actually starts the access
+ * flow. `base` is the app origin; when missing we fall back to the bare code.
+ */
+function buildAccessQrPayload(code, base) {
+    return base ? `${base.replace(/\/$/, '')}/doctor?vaultCode=${code}` : code;
+}
+
+/**
  * Generate a new 6-digit access code for a patient.
  * If an unexpired code already exists, returns it instead.
- * Returns { code: string, expiresAt: Date }
+ * `base` is the public app origin, used to build the scannable QR deep link.
+ * Returns { code: string, expiresAt: Date, qrDataUrl: string }
  */
-async function generateAccessCode(patientId) {
+async function generateAccessCode(patientId, base = null) {
     const existingCode = await prisma.accessCode.findUnique({
         where: { patientId }
     });
@@ -37,7 +48,7 @@ async function generateAccessCode(patientId) {
     if (existingCode) {
         if (new Date() < existingCode.expiresAt) {
             const decryptedCode = decrypt(existingCode.code);
-            const qrDataUrl = await qrcode.toDataURL(decryptedCode);
+            const qrDataUrl = await qrcode.toDataURL(buildAccessQrPayload(decryptedCode, base));
             return { code: decryptedCode, expiresAt: existingCode.expiresAt, qrDataUrl };
         } else {
             await prisma.accessCode.delete({ where: { id: existingCode.id } });
@@ -59,7 +70,7 @@ async function generateAccessCode(patientId) {
         }
     });
 
-    const qrDataUrl = await qrcode.toDataURL(rawCode);
+    const qrDataUrl = await qrcode.toDataURL(buildAccessQrPayload(rawCode, base));
     return { code: rawCode, expiresAt: newCode.expiresAt, qrDataUrl };
 }
 
@@ -238,6 +249,7 @@ async function getPatientAccessLog(patientId, limit = 100) {
 module.exports = {
     lookupAccessCode,
     generateAccessCode,
+    buildAccessQrPayload,
     getDecryptedRecords,
     decryptRecords,
     createEncryptedRecord,

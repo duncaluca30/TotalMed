@@ -19,11 +19,8 @@ const birthFields = {
   year: z.coerce.number().int().min(1900, 'Year too early').max(currentYear, 'Year cannot be in the future').optional().nullable()
 };
 
-const notFutureDate = z
-  .string()
-  .min(1)
-  .refine((v) => new Date(v) <= new Date(new Date().toDateString() + ' 23:59:59'),
-    'Date cannot be in the future');
+const notInFuture = (v) => new Date(v) <= new Date(new Date().toDateString() + ' 23:59:59');
+const notFutureDate = z.string().min(1).refine(notInFuture, 'Date cannot be in the future');
 
 const patientProfileFields = {
   sex: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
@@ -45,7 +42,7 @@ const appointmentFields = {
 
 const vaccinationFields = {
   vaccineName: z.string().min(1, 'Vaccine name is required').max(200, 'Name too long (max 200 chars)'),
-  date: z.string().min(1, 'Date is required'),
+  date: z.string().min(1, 'Date is required').refine(notInFuture, 'Date cannot be in the future'),
   doseNumber: z.coerce.number().int().min(1).max(50).optional().nullable(),
   nextDoseDate: z.string().optional().nullable(),
   notes: z.string().max(500, 'Note too long (max 500 chars)').optional().nullable()
@@ -64,7 +61,7 @@ const vitalFields = {
   value: z.coerce.number().finite('Value must be a number'),
   value2: z.coerce.number().finite().optional().nullable(),
   unit: z.string().min(1, 'Unit is required').max(20, 'Unit too long'),
-  measuredAt: z.string().min(1, 'Measurement date is required')
+  measuredAt: z.string().min(1, 'Measurement date is required').refine(notInFuture, 'Date cannot be in the future')
 };
 
 const vaultFields = {

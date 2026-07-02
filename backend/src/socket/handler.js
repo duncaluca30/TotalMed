@@ -10,7 +10,7 @@ function setupSocketHandlers(io) {
         const token = cookies.token;
         if (!token) return next(new Error('Authentication error'));
         
-        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] }, (err, decoded) => {
             if (err) return next(new Error('Authentication error'));
             socket.user = decoded;
             next();

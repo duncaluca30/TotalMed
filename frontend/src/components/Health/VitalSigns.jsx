@@ -21,6 +21,7 @@ const VitalSigns = ({ vitals = [], editable = true, onAdd, onDelete }) => {
   const [type, setType] = useState('BLOOD_PRESSURE');
   const [draft, setDraft] = useState({ value: '', value2: '', measuredAt: todayStr() });
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   const cfg = TYPES[type];
   const series = useMemo(
@@ -33,6 +34,10 @@ const VitalSigns = ({ vitals = [], editable = true, onAdd, onDelete }) => {
   const submit = async (e) => {
     e.preventDefault();
     if (draft.value === '' || (cfg.dual && draft.value2 === '')) return;
+    if (draft.measuredAt > todayStr()) {
+      return setError(t('The measurement date is in the future. Please choose today or a past date.'));
+    }
+    setError('');
     setBusy(true);
     try {
       await onAdd({
@@ -98,8 +103,8 @@ const VitalSigns = ({ vitals = [], editable = true, onAdd, onDelete }) => {
       {editable && (
         <Box component="form" onSubmit={submit} sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 1.5, mt: 2 }}>
           <TextField size="small" type="date" label={t('Date')} value={draft.measuredAt}
-            onChange={(e) => setDraft({ ...draft, measuredAt: e.target.value })}
-            slotProps={{ inputLabel: { shrink: true } }} sx={{ flex: '0 0 150px' }} />
+            onChange={(e) => { setError(''); setDraft({ ...draft, measuredAt: e.target.value }); }}
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayStr() } }} sx={{ flex: '0 0 150px' }} />
           <TextField size="small" type="number" label={cfg.dual ? `${t(cfg.v1)} (${cfg.unit})` : t('Value ({{unit}})', { unit: cfg.unit })}
             value={draft.value} onChange={(e) => setDraft({ ...draft, value: e.target.value })}
             required sx={{ flex: '1 1 120px' }} />
@@ -111,6 +116,11 @@ const VitalSigns = ({ vitals = [], editable = true, onAdd, onDelete }) => {
           <Button type="submit" variant="contained" disabled={busy} startIcon={<AddIcon />} sx={{ flexShrink: 0 }}>
             {busy ? t('Adding…') : t('Add')}
           </Button>
+          {error && (
+            <Typography role="alert" sx={{ width: '100%', color: '#d32f2f', fontSize: '0.85rem' }}>
+              {error}
+            </Typography>
+          )}
         </Box>
       )}
     </Box>

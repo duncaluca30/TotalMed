@@ -6,15 +6,22 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import AddIcon from '@mui/icons-material/Add';
 
 const empty = { vaccineName: '', date: '', doseNumber: '', nextDoseDate: '', notes: '' };
+const todayStr = () => new Date().toISOString().slice(0, 10);
 
 const Vaccinations = ({ vaccinations = [], editable = true, onAdd, onDelete }) => {
   const { t } = useTranslation();
   const [draft, setDraft] = useState(empty);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   const submit = async (e) => {
     e.preventDefault();
     if (!draft.vaccineName.trim() || !draft.date) return;
+    // The administration date can't be in the future; the next-due date can.
+    if (draft.date > todayStr()) {
+      return setError(t('The vaccination date is in the future. Please choose today or a past date.'));
+    }
+    setError('');
     setBusy(true);
     try {
       await onAdd({
@@ -69,8 +76,8 @@ const Vaccinations = ({ vaccinations = [], editable = true, onAdd, onDelete }) =
           <TextField size="small" label={t('Vaccine')} required value={draft.vaccineName}
             onChange={(e) => setDraft({ ...draft, vaccineName: e.target.value })} sx={{ flex: '1 1 160px' }} />
           <TextField size="small" type="date" label={t('Date')} required value={draft.date}
-            onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-            slotProps={{ inputLabel: { shrink: true } }} sx={{ flex: '0 0 150px' }} />
+            onChange={(e) => { setError(''); setDraft({ ...draft, date: e.target.value }); }}
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayStr() } }} sx={{ flex: '0 0 150px' }} />
           <TextField size="small" type="number" label={t('Dose #')} value={draft.doseNumber}
             onChange={(e) => setDraft({ ...draft, doseNumber: e.target.value })} sx={{ flex: '0 0 90px' }} />
           <TextField size="small" type="date" label={t('Next due')} value={draft.nextDoseDate}
@@ -81,6 +88,11 @@ const Vaccinations = ({ vaccinations = [], editable = true, onAdd, onDelete }) =
           <Button type="submit" variant="contained" disabled={busy} startIcon={<AddIcon />} sx={{ flexShrink: 0 }}>
             {busy ? t('Adding…') : t('Add')}
           </Button>
+          {error && (
+            <Typography role="alert" sx={{ width: '100%', color: '#d32f2f', fontSize: '0.85rem' }}>
+              {error}
+            </Typography>
+          )}
         </Box>
       )}
     </Box>

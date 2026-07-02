@@ -10,7 +10,7 @@ const authenticateToken = async (req, res, next) => {
 
     let payload;
     try {
-        payload = jwt.verify(token, process.env.JWT_SECRET);
+        payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     } catch (err) {
         return res.status(403).json({ error: "Access Denied: Invalid Token" });
     }

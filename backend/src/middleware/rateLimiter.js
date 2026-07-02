@@ -24,4 +24,15 @@ const twoFactorLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-module.exports = { authLimiter, vaultLimiter, twoFactorLimiter };
+// Caps how fast a doctor can look patients up by CNP. Generous enough for
+// legitimate use during a consultation, but low enough to make enumerating the
+// (structured) CNP space to harvest patient names impractical.
+const searchLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    message: { error: "Too many searches. Please try again in a few minutes." },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+module.exports = { authLimiter, vaultLimiter, twoFactorLimiter, searchLimiter };

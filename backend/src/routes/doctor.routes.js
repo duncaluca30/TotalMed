@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 
 const prisma = require('../config/prisma');
 const authenticateToken = require('../middleware/authenticate');
-const { vaultLimiter } = require('../middleware/rateLimiter');
+const { vaultLimiter, searchLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 const { recordSchema, patientSearchSchema, emergencyAccessSchema } = require('../schemas/doctor.schema');
 const { vaultAccessSchema } = require('../schemas/vault.schema');
@@ -23,7 +23,7 @@ const { decrypt } = require('../../utils/cipher');
 function verifyVaultSession(vaultToken, doctorId, patientId) {
     let session;
     try {
-        session = jwt.verify(vaultToken, process.env.JWT_SECRET);
+        session = jwt.verify(vaultToken, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     } catch (err) {
         return { ok: false, status: 403, error: "Vault session expired. Please re-enter a new access code." };
     }
@@ -96,13 +96,23 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
         const app = req.app;
 
         const timeout = setTimeout(() => {
-            if (!responded) {
-                app.removeAllListeners(eventName);
-                res.status(408).json({ error: "Patient did not respond to the approval request." });
-            }
+            if (responded) return;
+            responded = true;
+            app.removeListener(eventName, onResolved);
+            res.status(408).json({ error: "Patient did not respond to the approval request." });
         }, 30000);
 
-        app.once(eventName, async (authData) => {
+        // If the doctor's client disconnects before the patient answers, drop the
+        // pending listener so it can't linger on the shared app emitter.
+        res.on('close', () => {
+            if (responded) return;
+            responded = true;
+            clearTimeout(timeout);
+            app.removeListener(eventName, onResolved);
+        });
+
+        const onResolved = async (authData) => {
+            if (responded) return;
             responded = true;
             clearTimeout(timeout);
 
@@ -192,7 +202,9 @@ router.post('/access-vault', authenticateToken, vaultLimiter, validate(vaultAcce
                     res.status(500).json({ error: "Failed to finalize vault access." });
                 }
             }
-        });
+        };
+
+        app.once(eventName, onResolved);
 
     } catch (error) {
         console.error(error);
@@ -208,7 +220,7 @@ router.post('/records', authenticateToken, validate(recordSchema), async (req, r
 
         let vaultSession;
         try {
-            vaultSession = jwt.verify(vaultToken, process.env.JWT_SECRET);
+            vaultSession = jwt.verify(vaultToken, process.env.JWT_SECRET, { algorithms: ['HS256'] });
         } catch (err) {
             return res.status(403).json({ error: "Vault session expired. Please re-enter a new access code." });
         }
@@ -681,7 +693,7 @@ router.get('/consultations', authenticateToken, async (req, res) => {
     }
 });
 
-router.get('/patient-search', authenticateToken, async (req, res) => {
+router.get('/patient-search', authenticateToken, searchLimiter, async (req, res) => {
     try {
         if (req.user.role !== 'DOCTOR') return res.status(403).json({ error: "Access Denied." });
 
@@ -787,7 +799,7 @@ router.post('/lock-vault', authenticateToken, async (req, res) => {
         const { vaultToken } = req.body;
         let session;
         try {
-            session = jwt.verify(vaultToken, process.env.JWT_SECRET);
+            session = jwt.verify(vaultToken, process.env.JWT_SECRET, { algorithms: ['HS256'] });
         } catch (err) {
 
             return res.json({ ok: true });
